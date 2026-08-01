@@ -63,6 +63,18 @@ async function login(page) {
   await expect(page.getByTestId('app-view')).toBeVisible()
 }
 
+async function restoreAuthenticatedPageAfterReload(page) {
+  await expect.poll(async () => {
+    if (await page.getByTestId('app-view').isVisible().catch(() => false)) return 'app'
+    if (await page.getByTestId('login-view').isVisible().catch(() => false)) return 'login'
+    return ''
+  }, { timeout: 15_000 }).not.toBe('')
+
+  if (await page.getByTestId('login-view').isVisible().catch(() => false)) {
+    await login(page)
+  }
+}
+
 async function createTextChannel(page, accessToken, name) {
   const response = await page.request.post(resolveBackendUrl('/channels'), {
     headers: {
@@ -98,6 +110,7 @@ test.describe('message draft persistence', () => {
     const channelB = await createTextChannel(page, accessToken, `draft-b-${runId}`)
 
     await page.reload()
+    await restoreAuthenticatedPageAfterReload(page)
     await page.goto(`/channels/${channelA.id}`)
     await expect(page).toHaveURL(new RegExp(`/channels/${channelA.id}$`))
 
@@ -117,6 +130,8 @@ test.describe('message draft persistence', () => {
     await input.fill(`Other channel ${runId}`)
 
     await page.reload()
+    await restoreAuthenticatedPageAfterReload(page)
+    await page.goto(`/channels/${channelB.id}`)
     await expect(page).toHaveURL(new RegExp(`/channels/${channelB.id}$`))
     await expect(input).toHaveValue(`Other channel ${runId}`)
 

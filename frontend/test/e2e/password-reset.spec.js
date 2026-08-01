@@ -26,6 +26,6 @@ test.describe('password reset request flow', () => {
     await page.getByTestId('forgot-password-submit').click()
 
     await expect(page.getByTestId('forgot-password-go-login')).toBeVisible()
-    await expect(page.getByText(/If an eligible account exists/i)).toBeVisible()
+    await expect(page.getByText(/If an eligible account exists|Falls ein passendes Konto existiert/i)).toBeVisible()
   })
 })

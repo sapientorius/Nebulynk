@@ -138,7 +138,10 @@
         <n-alert type="error" :show-icon="true">{{ $t('platformUpdates.disableWarning') }}</n-alert>
         <n-form class="disable-form">
           <n-form-item :label="$t('platformUpdates.confirmationLabel')">
-            <n-input v-model:value="disableForm.confirmation" data-testid="platform-update-disable-confirmation" />
+            <n-input
+              v-model:value="disableForm.confirmation"
+              :input-props="{ 'data-testid': 'platform-update-disable-confirmation' }"
+            />
           </n-form-item>
           <n-form-item :label="$t('platformUpdates.reauthMethod')">
             <n-radio-group v-model:value="disableForm.method">
@@ -147,7 +150,12 @@
             </n-radio-group>
           </n-form-item>
           <n-form-item v-if="disableForm.method === 'password'" :label="$t('platformUpdates.password')">
-            <n-input v-model:value="disableForm.password" type="password" show-password-on="click" data-testid="platform-update-disable-password" />
+            <n-input
+              v-model:value="disableForm.password"
+              type="password"
+              show-password-on="click"
+              :input-props="{ 'data-testid': 'platform-update-disable-password' }"
+            />
           </n-form-item>
         </n-form>
         <template #footer>

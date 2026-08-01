@@ -60,11 +60,11 @@ jobs:
         uses: gitleaks/gitleaks-action@v2
 
       - name: Filesystem vulnerability and config scan
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: fs
           scan-ref: .
-          scanners: vuln,config
+          scanners: vuln,misconfig
           severity: HIGH,CRITICAL
           ignore-unfixed: true
           exit-code: '1'
@@ -93,9 +93,40 @@ jobs:
       POSTGRES_PASSWORD: postgres
       POSTGRES_ADMIN_DB: postgres
       E2E_POSTGRES_DB: nebulynk_e2e
+      E2E_USE_PREVIEW_FRONTEND: 'true'
+      STORAGE_S3_ENDPOINT: http://127.0.0.1:3900
+      STORAGE_S3_PUBLIC_ENDPOINT: http://127.0.0.1:3900
+      STORAGE_S3_ACCESS_KEY: nebulynk
+      STORAGE_S3_SECRET_KEY: nebulynk_dev_password
+      STORAGE_S3_BUCKET: nebulynk-files
+      STORAGE_S3_REGION: us-east-1
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Start S3-compatible storage
+        run: |
+          docker run --detach \
+            --name nebulynk-garage \
+            --hostname garage \
+            --publish 3900:3900 \
+            --env GARAGE_RPC_SECRET=0000000000000000000000000000000000000000000000000000000000000000 \
+            --env GARAGE_DEFAULT_ACCESS_KEY=nebulynk \
+            --env GARAGE_DEFAULT_SECRET_KEY=nebulynk_dev_password \
+            --env GARAGE_DEFAULT_BUCKET=nebulynk-files \
+            --volume "$GITHUB_WORKSPACE/garage.toml:/etc/garage.toml:ro" \
+            dxflrs/garage:v2.3.0 \
+            /garage server --single-node --default-bucket
+
+          for attempt in {1..30}; do
+            if curl --silent --output /dev/null http://127.0.0.1:3900/; then
+              exit 0
+            fi
+            sleep 1
+          done
+
+          docker logs nebulynk-garage
+          exit 1
 
       - name: Setup Node.js
         uses: actions/setup-node@v4

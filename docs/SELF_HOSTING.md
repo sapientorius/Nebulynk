@@ -285,6 +285,11 @@ Coolify creates persistent volumes for the Compose volumes. Back up
 `nebulynk_garage_data` together. Redis can be rebuilt from its data store if
 needed.
 
+Before Garage starts, the one-shot `garage-volume-init` service assigns only
+the two Garage volumes to the unprivileged Garage UID (`65532`). Wait for it to
+complete successfully in the Coolify logs; do not remove the service or change
+the volume ownership to root during maintenance.
+
 ## Acceptance checks, troubleshooting, and updates
 
 After the first deployment and after infrastructure changes, check that:

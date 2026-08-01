@@ -16,8 +16,7 @@ export const frontendUrl = useExternalServers
   ? (normalizeBaseUrl(process.env.E2E_FRONTEND_URL) || defaultFrontendUrl)
   : defaultFrontendUrl
 
-export const shouldUsePreviewFrontend = process.env.E2E_USE_PREVIEW_FRONTEND === 'true'
-  || process.argv.some((arg) => /browser-security\.spec\.js$/i.test(String(arg || '')))
+export const shouldUsePreviewFrontend = process.env.E2E_USE_PREVIEW_FRONTEND !== 'false'
 
 export function resolveBackendUrl(path = '/') {
   const normalizedPath = String(path || '/').replace(/^\/+/, '')

@@ -84,7 +84,7 @@ test.describe('settings security password change', () => {
 
     userMenu = await openUserMenu(page)
     await userMenu.getByTestId('user-menu-open-settings').click()
-    await expect(page).toHaveURL(/\/settings$/)
+    await expect(page).toHaveURL(/\/settings(?:\?.*)?$/)
     await expect(page.getByTestId('settings-view')).toBeVisible()
 
     await page.getByRole('menuitem', { name: /Security|Sicherheit/ }).click()

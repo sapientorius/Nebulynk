@@ -10,6 +10,7 @@
         :key="option.key"
         class="reminder-option"
         type="button"
+        :data-testid="`message-reminder-option-${option.key}`"
         :disabled="loading"
         @click="$emit('quick-select', option.ms)"
       >

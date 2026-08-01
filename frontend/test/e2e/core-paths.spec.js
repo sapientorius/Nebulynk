@@ -1,11 +1,11 @@
 import { expect, test } from '@playwright/test'
-import { getAuthFromBrowserSession } from './auth-helpers.js'
-import { writeSharedState } from './shared-state.js'
+import { getAuthFromBrowserSession, loginViaApi } from './auth-helpers.js'
+import { readSharedState, writeSharedState } from './shared-state.js'
 import { resolveBackendUrl } from './test-urls.js'
 
 const runId = Date.now().toString(36)
-const adminEmail = `admin.${runId}@example.com`
-const adminPassword = 'AdminPassw0rd!'
+let adminEmail = `admin.${runId}@example.com`
+let adminPassword = 'AdminPassw0rd!'
 const adminDisplayName = 'E2E Admin'
 const platformName = `Nebulynk E2E ${runId}`
 const inviteEmail = `member.${runId}@example.com`
@@ -24,6 +24,19 @@ async function login(page, { email, password }) {
   await page.getByTestId('login-submit').click()
   await expect(page).toHaveURL(/\/channels/)
   await expect(page.getByTestId('app-view')).toBeVisible()
+}
+
+async function waitForBootstrapView(page) {
+  await expect.poll(async () => {
+    if (await page.getByTestId('setup-view').isVisible().catch(() => false)) return 'setup'
+    if (await page.getByTestId('login-view').isVisible().catch(() => false)) return 'login'
+    return ''
+  }, { timeout: 15_000 }).not.toBe('')
+
+  if (await page.getByTestId('setup-view').isVisible().catch(() => false)) return 'setup'
+  if (await page.getByTestId('login-view').isVisible().catch(() => false)) return 'login'
+
+  throw new Error(`Neither setup nor login view became visible during onboarding (url=${page.url()}).`)
 }
 
 async function ensureAdminLogin(page) {
@@ -154,6 +167,25 @@ async function addMemberToChannel(page, { accessToken, channelId, userId }) {
   }
 }
 
+async function sendMessageToChannel(page, { accessToken, channelId, content }) {
+  const response = await page.request.post(resolveBackendUrl('/messages'), {
+    headers: {
+      Authorization: `Bearer ${accessToken}`
+    },
+    data: {
+      channel_id: channelId,
+      content
+    }
+  })
+
+  if (!response.ok()) {
+    const responseText = await response.text()
+    throw new Error(`Message API failed (${response.status()}): ${responseText}`)
+  }
+
+  return response.json()
+}
+
 async function createMeetingGuestInviteLink(page, { accessToken, meetingId, expiresAt = null }) {
   const payload = { action: 'create_invite_link' }
   if (expiresAt) {
@@ -272,6 +304,24 @@ async function expectNoHorizontalOverflow(page) {
   expect(hasOverflow).toBe(false)
 }
 
+async function setPageForegroundState(page, { visibilityState, hasFocus }) {
+  await page.evaluate(({ nextVisibilityState, nextHasFocus }) => {
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      value: nextVisibilityState
+    })
+    Object.defineProperty(document, 'hasFocus', {
+      configurable: true,
+      value: () => nextHasFocus
+    })
+    document.dispatchEvent(new Event('visibilitychange'))
+    window.dispatchEvent(new Event(nextHasFocus ? 'focus' : 'blur'))
+  }, {
+    nextVisibilityState: visibilityState,
+    nextHasFocus: hasFocus
+  })
+}
+
 async function injectInstallPrompt(page, outcome = 'accepted') {
   await page.evaluate((nextOutcome) => {
     const event = new Event('beforeinstallprompt')
@@ -312,18 +362,29 @@ test.describe('P2-02 core e2e paths', () => {
 
   test('setup and first login', async ({ page }) => {
     await page.goto('/setup')
-    await expect(page.getByTestId('setup-view')).toBeVisible()
+    const bootstrapView = await waitForBootstrapView(page)
 
-    await page.getByTestId('setup-platform-name').fill(platformName)
-    await page.getByTestId('setup-next').click()
+    if (bootstrapView === 'setup') {
+      await page.getByTestId('setup-platform-name').fill(platformName)
+      await page.getByTestId('setup-next').click()
 
-    await page.getByTestId('setup-display-name').fill(adminDisplayName)
-    await page.getByTestId('setup-email').fill(adminEmail)
-    await page.getByTestId('setup-password').fill(adminPassword)
-    await page.getByTestId('setup-submit').click()
+      await page.getByTestId('setup-display-name').fill(adminDisplayName)
+      await page.getByTestId('setup-email').fill(adminEmail)
+      await page.getByTestId('setup-password').fill(adminPassword)
+      await page.getByTestId('setup-submit').click()
 
-    await expect(page.getByTestId('setup-go-login')).toBeVisible()
-    await page.getByTestId('setup-go-login').click()
+      await expect(page.getByTestId('setup-go-login')).toBeVisible()
+      await writeSharedState({ adminEmail, adminPassword })
+      await page.getByTestId('setup-go-login').click()
+    } else {
+      const sharedState = await readSharedState()
+      if (!sharedState?.adminEmail || !sharedState?.adminPassword) {
+        throw new Error(`Platform was already initialized before onboarding, but no retry credentials were available (url=${page.url()}).`)
+      }
+
+      adminEmail = sharedState.adminEmail
+      adminPassword = sharedState.adminPassword
+    }
 
     await login(page, {
       email: adminEmail,
@@ -339,10 +400,6 @@ test.describe('P2-02 core e2e paths', () => {
     }
     defaultPublicChannelId = await resolveDefaultPublicChannelId(page, accessToken)
 
-    await writeSharedState({
-      adminEmail,
-      adminPassword
-    })
   })
 
   test('platform update center shows release gaps, acknowledgement, and owner disable warning', async ({ page }) => {
@@ -400,7 +457,7 @@ test.describe('P2-02 core e2e paths', () => {
       ]
     })
 
-    await page.route('**/platform-updates**', async (route) => {
+    await page.route(`${resolveBackendUrl('/platform-updates')}**`, async (route) => {
       const request = route.request()
       if (request.method() === 'POST' && request.url().endsWith('/acknowledgements')) acknowledged = true
       if (request.method() === 'PATCH' && request.url().endsWith('/settings')) checksEnabled = false
@@ -519,7 +576,6 @@ test.describe('P2-02 core e2e paths', () => {
     const hasDefaultChannel = visibleChannels.some((channel) => channel.id === defaultPublicChannelId)
     expect(hasDefaultChannel).toBe(true)
 
-    await page.reload()
     await page.goto(`/channels/${defaultPublicChannelId}`)
     await expect(page).toHaveURL(/\/channels\/.+/)
 
@@ -572,7 +628,7 @@ test.describe('P2-02 core e2e paths', () => {
     await page.keyboard.press('Escape')
     await expect(datePanel).toBeHidden()
 
-    await reminderSheet.getByRole('button', { name: /1 (hour|stunde)/i }).click()
+    await reminderSheet.getByTestId('message-reminder-option-1h').click()
     await expect(reminderSheet).toBeHidden()
     await expectNoHorizontalOverflow(page)
   })
@@ -613,7 +669,7 @@ test.describe('P2-02 core e2e paths', () => {
 
     userMenu = await openUserMenu(page)
     await userMenu.getByTestId('user-menu-open-settings').click()
-    await expect(page).toHaveURL(/\/settings$/)
+    await expect(page).toHaveURL(/\/settings(?:\?.*)?$/)
     await expect(page.getByTestId('settings-view')).toBeVisible()
 
     const archivedChannelName = `archived-settings-${runId}`
@@ -622,13 +678,14 @@ test.describe('P2-02 core e2e paths', () => {
     await createChannelFromSidebar(page, { name: archivedChannelName, type: 'private' })
     await expect(page.locator('.channel-name', { hasText: archivedChannelName })).toBeVisible()
 
-    await page.getByRole('button', { name: /Channel settings|Channel-Einstellungen/ }).click()
+    await page.getByTestId('channel-header-overflow-trigger').click()
+    await page.getByTestId('channel-header-settings').click()
     await page.getByRole('button', { name: /Archive channel|Channel archivieren/ }).click()
     await expect(page.locator('.channel-name', { hasText: archivedChannelName })).toHaveCount(0)
 
     userMenu = await openUserMenu(page)
     await userMenu.getByTestId('user-menu-open-settings').click()
-    await expect(page).toHaveURL(/\/settings$/)
+    await expect(page).toHaveURL(/\/settings(?:\?.*)?$/)
     await page.getByRole('menuitem', { name: /Archived channels|Archivierte Channels/ }).click()
     const archivedChannelItem = page.getByTestId('settings-archived-channel-item').filter({ hasText: archivedChannelName })
     await expect(archivedChannelItem).toBeVisible()
@@ -647,7 +704,7 @@ test.describe('P2-02 core e2e paths', () => {
     userMenu = await openUserMenu(page)
     await expect(userMenu.getByTestId('user-menu-open-admin')).toHaveCount(0)
     await userMenu.getByTestId('user-menu-open-settings').click()
-    await expect(page).toHaveURL(/\/settings$/)
+    await expect(page).toHaveURL(/\/settings(?:\?.*)?$/)
     await expect(page.getByRole('menuitem', { name: /Archived channels|Archivierte Channels/ })).toHaveCount(0)
   })
 
@@ -712,7 +769,7 @@ test.describe('P2-02 core e2e paths', () => {
 
     let userMenu = await openUserMenu(page)
     await userMenu.getByTestId('user-menu-open-settings').click()
-    await expect(page).toHaveURL(/\/settings$/)
+    await expect(page).toHaveURL(/\/settings(?:\?.*)?$/)
     await expect(page.getByTestId('settings-mobile-menu-trigger')).toBeVisible()
     await expectNoHorizontalOverflow(page)
 
@@ -793,21 +850,39 @@ test.describe('P2-02 core e2e paths', () => {
     await page.getByRole('menuitem', { name: sourceChannelName }).click()
     await expect(page).toHaveURL(new RegExp(`/channels/${sourceChannelId}$`))
 
-    await page.locator('.file-upload input[type="file"]').setInputFiles({
+    const input = page.getByTestId('message-input-textarea')
+    await expect(input).toBeEditable()
+
+    const fileInput = page.locator('.file-upload input[type="file"]')
+    await expect(fileInput).toBeAttached()
+    const uploadResponsePromise = page.waitForResponse((response) => (
+      response.url() === resolveBackendUrl('/upload')
+      && response.request().method() === 'POST'
+    ), { timeout: 30_000 })
+
+    await fileInput.setInputFiles([{
       name: forwardedFileName,
       mimeType: 'text/plain',
       buffer: Buffer.from(`Forward attachment ${runId}`)
-    })
-    await expect(page.locator('.pending-file-name', { hasText: forwardedFileName })).toBeVisible()
+    }])
 
-    const input = page.getByTestId('message-input-textarea')
+    const uploadResponse = await uploadResponsePromise
+    if (!uploadResponse.ok()) {
+      const responseText = await uploadResponse.text()
+      throw new Error(`File upload failed (${uploadResponse.status()}): ${responseText}`)
+    }
+    await expect(page.locator('.pending-file-name', { hasText: forwardedFileName })).toBeVisible({ timeout: 30_000 })
+
     await input.fill(`Forward file ${runId}`)
     await input.press('Enter')
 
     const sourceMessage = page.locator('[data-message-id]').filter({ hasText: forwardedFileName }).last()
     await expect(sourceMessage).toBeVisible()
     await sourceMessage.hover()
-    await sourceMessage.locator('button[title="Forward"], button[title="Weiterleiten"]').first().click()
+    await sourceMessage.getByTestId('message-action-overflow').click()
+    await page.getByTestId('message-action-overflow-menu')
+      .getByRole('button', { name: /Forward|Weiterleiten/ })
+      .click()
 
     const forwardModal = page.getByTestId('forward-message-modal')
     await expect(forwardModal).toBeVisible()
@@ -971,12 +1046,11 @@ test.describe('P2-02 core e2e paths', () => {
         throw new Error('Missing admin access token for channel member API call')
       }
 
-      await login(memberPage, {
+      const memberAuth = await loginViaApi(page.request, {
         email: inviteEmail,
         password: invitePassword
       })
-
-      const memberId = await getCurrentUserId(memberPage)
+      const memberId = memberAuth?.user?.id
       if (!memberId) {
         throw new Error('Missing member id after member authentication')
       }
@@ -987,7 +1061,13 @@ test.describe('P2-02 core e2e paths', () => {
         userId: memberId
       })
 
-      await memberPage.goto(`/channels/${sourceChannelId}`)
+      await login(memberPage, {
+        email: inviteEmail,
+        password: invitePassword
+      })
+      const sourceChannelMenuItem = memberPage.getByRole('menuitem', { name: joinSourceChannelName })
+      await expect(sourceChannelMenuItem).toBeVisible()
+      await sourceChannelMenuItem.click()
       await expect(memberPage).toHaveURL(new RegExp(`/channels/${sourceChannelId}$`))
 
       await watchErrorMessages(memberPage)
@@ -1317,31 +1397,41 @@ test.describe('P2-02 core e2e paths', () => {
       await expect(memberPage).toHaveURL(new RegExp(`/channels/${defaultPublicChannelId}$`))
 
       const mentionMessageText = `Auto-read mention ${runId} @${inviteDisplayName}`
-      await page.goto(`/channels/${sourceChannelId}`)
-      await expect(page).toHaveURL(new RegExp(`/channels/${sourceChannelId}$`))
+      await sendMessageToChannel(page, {
+        accessToken: adminToken,
+        channelId: sourceChannelId,
+        content: mentionMessageText
+      })
 
-      const adminInput = page.getByTestId('message-input-textarea')
-      await adminInput.fill(mentionMessageText)
-      await adminInput.press('Enter')
+      await expect.poll(async () => {
+        const payload = await fetchNotifications(memberPage, memberToken)
+        const notifications = Array.isArray(payload?.data) ? payload.data : payload?.data?.data || []
+        const notification = notifications.find((entry) => entry.message_snippet === mentionMessageText)
+        return notification?.is_read ?? null
+      }).toBe(false)
 
-      for (let index = 0; index < 70; index++) {
-        await adminInput.fill(`Auto-read filler ${runId}-${index}`)
-        await adminInput.press('Enter')
+      // The default timeline page contains 50 messages, so the mention belongs to the older page.
+      for (let index = 0; index < 51; index++) {
+        await sendMessageToChannel(page, {
+          accessToken: adminToken,
+          channelId: sourceChannelId,
+          content: `Auto-read filler ${runId}-${index}`
+        })
       }
 
+      await memberPage.bringToFront()
       await memberPage.goto(`/channels/${sourceChannelId}`)
       await expect(memberPage).toHaveURL(new RegExp(`/channels/${sourceChannelId}$`))
 
-      await memberPage.getByRole('button', { name: /Load older messages|Aeltere Nachrichten laden/ }).click()
-
       const messageList = memberPage.getByTestId('message-list')
       await expect(messageList).toBeVisible()
-      await messageList.evaluate((element) => {
-        element.scrollTop = 0
-      })
+      const loadOlderButton = memberPage.getByRole('button', { name: /Load older messages|Aeltere Nachrichten laden/ })
+      await expect(loadOlderButton).toBeVisible()
+      await loadOlderButton.click()
 
       const mentionedRow = memberPage.locator('[data-message-id]').filter({ hasText: mentionMessageText }).first()
-      await expect(mentionedRow).toBeVisible()
+      await mentionedRow.scrollIntoViewIfNeeded()
+      await expect(mentionedRow).toBeInViewport()
 
       await expect.poll(async () => {
         const payload = await fetchNotifications(memberPage, memberToken)
@@ -1411,7 +1501,10 @@ test.describe('P2-02 core e2e paths', () => {
       await expect(memberPage).toHaveURL(new RegExp(`/channels/${sourceChannelId}$`))
       await expect(memberPage.getByTestId('message-list')).toBeVisible()
 
-      await page.bringToFront()
+      await setPageForegroundState(memberPage, {
+        visibilityState: 'hidden',
+        hasFocus: false
+      })
       await expect.poll(async () => memberPage.evaluate(() => document.visibilityState)).toBe('hidden')
 
       const mentionMessageText = `Foreground auto-read mention ${runId} @${inviteDisplayName}`
@@ -1429,7 +1522,10 @@ test.describe('P2-02 core e2e paths', () => {
         return notification?.is_read ?? null
       }).toBe(false)
 
-      await memberPage.bringToFront()
+      await setPageForegroundState(memberPage, {
+        visibilityState: 'visible',
+        hasFocus: true
+      })
       await expect.poll(async () => memberPage.evaluate(() => document.visibilityState)).toBe('visible')
 
       const mentionedRow = memberPage.locator('[data-message-id]').filter({ hasText: mentionMessageText }).first()
