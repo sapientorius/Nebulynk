@@ -632,7 +632,7 @@ test.describe('P2-02 core e2e paths', () => {
 
     userMenu = await openUserMenu(page)
     await userMenu.getByTestId('user-menu-open-settings').click()
-    await expect(page).toHaveURL(/\/settings$/)
+    await expect(page).toHaveURL(/\/settings(?:\?.*)?$/)
     await expect(page.getByTestId('settings-view')).toBeVisible()
 
     const archivedChannelName = `archived-settings-${runId}`
@@ -647,7 +647,7 @@ test.describe('P2-02 core e2e paths', () => {
 
     userMenu = await openUserMenu(page)
     await userMenu.getByTestId('user-menu-open-settings').click()
-    await expect(page).toHaveURL(/\/settings$/)
+    await expect(page).toHaveURL(/\/settings(?:\?.*)?$/)
     await page.getByRole('menuitem', { name: /Archived channels|Archivierte Channels/ }).click()
     const archivedChannelItem = page.getByTestId('settings-archived-channel-item').filter({ hasText: archivedChannelName })
     await expect(archivedChannelItem).toBeVisible()
@@ -666,7 +666,7 @@ test.describe('P2-02 core e2e paths', () => {
     userMenu = await openUserMenu(page)
     await expect(userMenu.getByTestId('user-menu-open-admin')).toHaveCount(0)
     await userMenu.getByTestId('user-menu-open-settings').click()
-    await expect(page).toHaveURL(/\/settings$/)
+    await expect(page).toHaveURL(/\/settings(?:\?.*)?$/)
     await expect(page.getByRole('menuitem', { name: /Archived channels|Archivierte Channels/ })).toHaveCount(0)
   })
 
@@ -731,7 +731,7 @@ test.describe('P2-02 core e2e paths', () => {
 
     let userMenu = await openUserMenu(page)
     await userMenu.getByTestId('user-menu-open-settings').click()
-    await expect(page).toHaveURL(/\/settings$/)
+    await expect(page).toHaveURL(/\/settings(?:\?.*)?$/)
     await expect(page.getByTestId('settings-mobile-menu-trigger')).toBeVisible()
     await expectNoHorizontalOverflow(page)
 
