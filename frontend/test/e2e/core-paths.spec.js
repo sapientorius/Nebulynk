@@ -539,7 +539,6 @@ test.describe('P2-02 core e2e paths', () => {
     const hasDefaultChannel = visibleChannels.some((channel) => channel.id === defaultPublicChannelId)
     expect(hasDefaultChannel).toBe(true)
 
-    await page.reload()
     await page.goto(`/channels/${defaultPublicChannelId}`)
     await expect(page).toHaveURL(/\/channels\/.+/)
 
@@ -592,7 +591,7 @@ test.describe('P2-02 core e2e paths', () => {
     await page.keyboard.press('Escape')
     await expect(datePanel).toBeHidden()
 
-    await reminderSheet.getByRole('button', { name: /1 (hour|stunde)/i }).click()
+    await reminderSheet.getByTestId('message-reminder-option-1h').click()
     await expect(reminderSheet).toBeHidden()
     await expectNoHorizontalOverflow(page)
   })

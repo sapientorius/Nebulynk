@@ -117,6 +117,7 @@ describe('MessageActions', () => {
     expect(reminderMenuSource).toContain(':to="datePickerTo"')
     expect(source).toContain('date-picker-to="body"')
     expect(reminderMenuSource).toContain('data-testid="message-reminder-menu"')
+    expect(reminderMenuSource).toContain('message-reminder-option-${option.key}')
   })
 
   it('keeps the hover toolbar spacing modestly roomier without expanding the overflow menu', () => {

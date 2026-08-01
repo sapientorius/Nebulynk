@@ -17,13 +17,26 @@ services:
       - nebulynk_redis_data:/data
     restart: always
 
-  # 3. Object storage (S3, Garage default)
+  # 3. Prepare persistent Garage volumes for the unprivileged Garage process.
+  garage-volume-init:
+    image: alpine:3.21.5
+    user: "0:0"
+    command: ["sh", "-ec", "chown -R 65532:65532 /var/lib/garage/meta /var/lib/garage/data"]
+    volumes:
+      - nebulynk_garage_meta:/var/lib/garage/meta
+      - nebulynk_garage_data:/var/lib/garage/data
+    restart: "no"
+
+  # 4. Object storage (S3, Garage default)
   garage:
     build:
       context: .
       dockerfile: garage.Dockerfile
       args:
         GARAGE_IMAGE: ${NEBULYNK_GARAGE_IMAGE:-dxflrs/garage:v2.3.0}
+    depends_on:
+      garage-volume-init:
+        condition: service_completed_successfully
     command: /garage server --single-node --default-bucket
     environment:
       GARAGE_RPC_SECRET: ${GARAGE_RPC_SECRET:?GARAGE_RPC_SECRET must be set for Garage}
@@ -37,7 +50,7 @@ services:
       - "3900:3900" # API / S3 public asset endpoint
     restart: always
 
-  # 4. LiveKit server (voice/video)
+  # 5. LiveKit server (voice/video)
   livekit:
     build:
       context: .
@@ -76,7 +89,7 @@ services:
       - garage
     restart: always
 
-  # 5. Backend API
+  # 6. Backend API
   backend:
     build:
       context: .
@@ -159,7 +172,7 @@ services:
       - livekit-egress
     restart: always
 
-  # 6. Frontend
+  # 7. Frontend
   frontend:
     build:
       context: .
