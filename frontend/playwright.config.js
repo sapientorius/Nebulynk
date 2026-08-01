@@ -13,10 +13,11 @@ const postgresDb = process.env.E2E_POSTGRES_DB || 'nebulynk_e2e'
 const frontendServeCommand = shouldUsePreviewFrontend
   ? 'npm run e2e:security:serve'
   : 'npm run e2e:dev'
+const screenshotsSpec = /screenshots\.spec\.js$/
+const corePathsSpec = /core-paths\.spec\.js$/
 
 export default defineConfig({
   testDir: './test/e2e',
-  testIgnore: /screenshots\.spec\.js$/,
   timeout: 90_000,
   expect: {
     timeout: 10_000
@@ -24,6 +25,17 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   retries: isCI ? 1 : 0,
+  projects: [
+    {
+      name: 'onboarding',
+      testMatch: corePathsSpec
+    },
+    {
+      name: 'e2e',
+      dependencies: ['onboarding'],
+      testIgnore: [corePathsSpec, screenshotsSpec]
+    }
+  ],
   reporter: isCI
     ? [['github'], ['html', { outputFolder: 'playwright-report', open: 'never' }]]
     : [['list'], ['html', { outputFolder: 'playwright-report', open: 'never' }]],

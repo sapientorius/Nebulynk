@@ -60,7 +60,7 @@ jobs:
         uses: gitleaks/gitleaks-action@v2
 
       - name: Filesystem vulnerability and config scan
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: fs
           scan-ref: .
@@ -93,6 +93,7 @@ jobs:
       POSTGRES_PASSWORD: postgres
       POSTGRES_ADMIN_DB: postgres
       E2E_POSTGRES_DB: nebulynk_e2e
+      E2E_USE_PREVIEW_FRONTEND: 'true'
     steps:
       - name: Checkout
         uses: actions/checkout@v4

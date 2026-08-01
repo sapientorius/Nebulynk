@@ -18,6 +18,13 @@ export default defineConfig({
   timeout: 180_000,
   testIgnore: [],
   testMatch: 'screenshots.spec.js',
+  projects: [
+    {
+      name: 'screenshots',
+      testIgnore: [],
+      testMatch: 'screenshots.spec.js'
+    }
+  ],
   use: {
     ...baseConfig.use,
     baseURL: screenshotsFrontendUrl,
