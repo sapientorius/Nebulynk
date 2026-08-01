@@ -42,8 +42,8 @@ services:
         NODE_IMAGE: ${NEBULYNK_NODE_IMAGE:-node:22.23.1-alpine3.24}
         NGINX_IMAGE: ${NEBULYNK_NGINX_IMAGE:-nginxinc/nginx-unprivileged:1.31-alpine3.23@sha256:6320020c7da8714feab524e02c08c5a1958675c4e68700e93a2fd8970b065786}
         VITE_API_URL: ${VITE_API_URL:?VITE_API_URL must be set}
-        VITE_LIVEKIT_URL: ${VITE_LIVEKIT_URL:?VITE_LIVEKIT_URL must be set}
-        VITE_VAPID_PUBLIC_KEY: ${VITE_VAPID_PUBLIC_KEY:-}
+        VITE_LIVEKIT_URL: ${LIVEKIT_PUBLIC_URL:?LIVEKIT_PUBLIC_URL must be set}
+        VITE_VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
         VITE_AUTH_CSRF_COOKIE_NAME: ${VITE_AUTH_CSRF_COOKIE_NAME:-nebulynk_csrf_token}
     restart: unless-stopped
     depends_on:

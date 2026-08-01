@@ -78,7 +78,8 @@ npm run dev:desktop:ptt-helper
 
 - [Product Overview](docs/PROJECT_BRIEF.md)
 - [Architecture Overview](docs/ARCHITECTURE.md)
-- [Self-Hosting with Docker and Coolify](docs/SELF_HOSTING.md)
+- [Deploying with Coolify](docs/COOLIFY.md)
+- [Self-Hosting with Docker](docs/SELF_HOSTING.md)
 - [Secure Self-Hosting](docs/security-hardening.md)
 - [Platform Update Architecture](docs/PLATFORM_UPDATES.md)
 - [Release Process](docs/RELEASING.md)
