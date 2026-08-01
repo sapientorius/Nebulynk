@@ -27,12 +27,10 @@ Four HTTPS/WSS endpoints are recommended for a public instance. Replace
 | Garage/S3 | `https://files.example.com` | Signed URLs for files and recordings |
 
 Besides these HTTP(S) endpoints, LiveKit requires direct media connections.
-Open at least TCP `7881` and the UDP port configured in `livekit.yaml`
-(`7882`). The included Compose files currently publish TCP `7881` and the UDP
-range `50000-50100`, while `livekit.yaml` sets `udp_port: 7882`. The Compose
-port mapping and the LiveKit configuration must agree for a public deployment:
-publish `7882/udp`, or change both sides to the desired UDP range. Otherwise,
-audio and video connections can fail.
+Open TCP `7881` and UDP `7882`. The supplied Compose files and
+[`livekit.yaml`](../livekit.yaml) both use UDP `7882`. Do not publish a
+different UDP port or range without changing the LiveKit configuration too;
+otherwise audio and video connections can fail.
 
 You need:
 
@@ -47,13 +45,32 @@ Do not expose the database, Redis, or the internal S3 and LiveKit control
 endpoints publicly. Only the deliberately routed HTTP(S) endpoints and the
 required LiveKit media ports should be open in the firewall.
 
+## Choose the production channel
+
+The supported standard source is the official repository
+[`sapientorius/Nebulynk`](https://github.com/sapientorius/Nebulynk) on the
+protected `stable` branch. Never deploy `main` in production. Choose one of
+these two intentional update policies before the first deployment:
+
+| Channel | Use it when | Update behavior |
+| --- | --- | --- |
+| `stable` | You want the supported release-ready stream and timely security fixes. | Fetch and fast-forward `stable`, then rebuild and redeploy after reviewing the Update Center and release notes. |
+| `vX.Y.Z` tag | You need an exactly reproducible, change-controlled deployment. | Remain on the immutable tag until you deliberately move to a newer tag. |
+
+`stable` is the recommended default. It contains only release-ready commits;
+an immutable tag is the audit-friendly snapshot of a particular release.
+Forks and source copies are not a supported substitute for the official update
+feed or release process.
+
 ## Configuration
 
 Store secrets only in the deployment environment, Coolify, or a secret
-manager. `.env` is ignored by Git and must not be committed. See
-[`.env.example`](../.env.example) for the full local-development reference;
-the tables below cover values relevant to the supplied production Compose
-files.
+manager. `.env.*` files are ignored by Git and must not be committed. Start a
+manual production deployment from
+[`.env.production.example`](../.env.production.example); use
+[`.env.example`](../.env.example) only as the full local-development
+reference. The tables below cover values relevant to the supplied production
+Compose files.
 
 For example, generate strong values with:
 
@@ -125,7 +142,8 @@ included `livekit-egress.yaml` uses `nebulynk-files`.
 | --- | --- | --- |
 | Sessions and operation | `AUTH_BROWSER_ACCESS_TOKEN_TTL`, `AUTH_REFRESH_TOKEN_TTL`, `AUTH_REMEMBER_REFRESH_TOKEN_TTL`, `AUTH_COOKIE_DOMAIN`, `AUTH_REFRESH_COOKIE_NAME`, `AUTH_CSRF_COOKIE_NAME`, `LOG_LEVEL`, `BACKEND_PORT` | Use for a non-default session policy, cookie domain, logging level, or port. Defaults are in `.env.example`. |
 | Abuse protection | `RATE_LIMIT_DRIVER=redis`, `AUTHENTICATION_RATE_LIMIT_IP_LIMIT`, `AI_PROVIDER_BASE_URL_ALLOWLIST` | Redis is the recommended rate-limit store in production. Set an AI allowlist only for intentionally trusted HTTPS endpoints. |
-| Docker host ports | `POSTGRES_PORT`, `REDIS_PORT`, `STORAGE_S3_PORT`, `LIVEKIT_PORT` | Only change these to alter the ports published on the host by the standard Compose stack. They are usually unnecessary with Coolify or behind a reverse proxy. |
+| Docker host ports | `POSTGRES_PORT`, `REDIS_PORT`, `STORAGE_S3_PORT`, `LIVEKIT_PORT`, `BACKEND_PORT`, `FRONTEND_PORT` | In the supplied self-hosted stack these bind to `127.0.0.1` for the host reverse proxy. LiveKit TCP `7881` and UDP `7882` remain public media ports. Change host ports only when the proxy configuration changes too. |
+| Container image pins | `NEBULYNK_NODE_IMAGE`, `NEBULYNK_NGINX_IMAGE`, `NEBULYNK_POSTGRES_IMAGE`, `NEBULYNK_REDIS_IMAGE`, `NEBULYNK_GARAGE_IMAGE`, `NEBULYNK_LIVEKIT_SERVER_IMAGE`, `NEBULYNK_LIVEKIT_EGRESS_IMAGE` | Defaults are reviewed image versions. Override only after separately reviewing the upstream image release and testing it in a staging instance. |
 | Uploads and recordings | `MAX_FILE_SIZE`, `UPLOAD_MAX_FILE_SIZE_MB`, `UPLOAD_IMAGE_MAX_DIMENSION_PX`, `UPLOAD_IMAGE_COMPRESSION_QUALITY`, `VIDEO_BACKGROUND_MAX_PER_USER`, `MEETING_TRANSCRIPT_WAIT_TIMEOUT_MS` | Use when default size or timeout limits do not fit your deployment. |
 | AI and transcript limits | `MEETING_AI_PROMPT_TRANSCRIPT_SEGMENTS`, `MEETING_AI_PROMPT_CHAT_MESSAGES`, `MEETING_AI_PROMPT_TRANSCRIPT_EXCERPT_CHARS`, `MESSAGE_SUMMARY_MIN_CHARS`, `MESSAGE_SUMMARY_MAX_CONTEXT_CHARS`, `SILENCE_DETECT_THRESHOLD_DB`, `SILENCE_DETECT_MIN_DURATION_SEC`, `SILENCE_DETECT_MIN_SPEECH_SEC` | Use only for deliberate capacity or quality tuning. Provider credentials are stored through the administration interface and protected by `AI_SECRET_KEY`. |
 | Email | `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_IGNORE_TLS`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`, `SMTP_FROM_NAME` | Required for invitations and security-update digests. Sending remains disabled without `SMTP_HOST`; feed checks and the update center continue to work. |
@@ -141,62 +159,84 @@ for new deployments.
 
 ## Docker on a self-managed host
 
-The existing [`docker-compose.yml`](../docker-compose.yml) stack contains the
-persistent dependencies (PostgreSQL, Redis, Garage, LiveKit, and Egress). It
-does not currently include application containers. Start the backend and
-frontend from their existing Dockerfiles in the same Compose network. Always
-use a fixed project name so the network name is predictable.
+Use the two supplied Compose files together. The base
+[`docker-compose.yml`](../docker-compose.yml) declares the persistent
+dependencies; [`docker-compose.self-hosted.yml`](../docker-compose.self-hosted.yml)
+adds the backend and frontend, production-only loopback bindings, and root
+build contexts. Do not start the base file alone for a production instance.
 
-1. Clone the repository and create a production `.env.production` file that is
-   not committed, following the tables above. This stack particularly needs
-   `GARAGE_RPC_SECRET`, storage credentials, and LiveKit credentials.
-2. Start the infrastructure with a fixed project name:
+1. Clone the official `stable` branch and create the ignored production
+   environment file:
 
    ```bash
-   docker compose -p nebulynk --env-file .env.production up -d
+   git clone --branch stable --single-branch https://github.com/sapientorius/Nebulynk.git
+   cd Nebulynk
+   cp .env.production.example .env.production
+   chmod 600 .env.production
    ```
 
-3. Build the backend image and start it in the Compose network. These `-e`
-   values override the local-host defaults in `.env.example`:
+   For a pinned deployment, replace `stable` above with a released tag such as
+   `v0.2.1`. Do not substitute `main`.
+
+2. Edit `.env.production`. Replace every `CHANGE_ME` value, set the four public
+   domains, and leave `NODE_ENV=production`, `TRUST_PROXY=true`, and
+   `FRONTEND_PORT=8080`. `VITE_API_URL` and `VITE_LIVEKIT_URL` are required
+   build values, not secrets.
+
+3. Render the Compose configuration before changing server state. This catches
+   missing required variables and shows the final service definitions:
 
    ```bash
-   docker build -t nebulynk-backend ./backend
-   docker run -d --name nebulynk-backend --restart unless-stopped \
-     --network nebulynk_default --env-file .env.production \
-     -e POSTGRES_HOST=postgres -e POSTGRES_PORT=5432 \
-     -e REDIS_HOST=redis -e REDIS_PORT=6379 \
-     -e STORAGE_S3_ENDPOINT=http://garage:3900 \
-     -e LIVEKIT_HOST=http://livekit:7880 \
-     -e LIVEKIT_WS_URL=ws://livekit:7880 \
-     -e MEETING_RECORDINGS_S3_ENDPOINT=http://garage:3900 \
-     -e MEETING_RECORDINGS_EGRESS_S3_ENDPOINT=http://garage:3900 \
-     -p 3030:3030 nebulynk-backend
+   docker compose -p nebulynk --env-file .env.production \
+     -f docker-compose.yml -f docker-compose.self-hosted.yml config --quiet
    ```
 
-4. Build and start the frontend with public HTTPS/WSS URLs. The values are
-   included in the generated JavaScript:
+4. Build and start all services. Docker only publishes the frontend, backend,
+   Garage API, and LiveKit signalling to loopback. A reverse proxy on the host
+   should route the four public domains to those ports.
 
    ```bash
-   docker build -t nebulynk-frontend ./frontend \
-     --build-arg VITE_API_URL=https://api.example.com \
-     --build-arg VITE_LIVEKIT_URL=wss://livekit.example.com \
-     --build-arg VITE_VAPID_PUBLIC_KEY=PUBLIC_VAPID_KEY \
-     --build-arg VITE_AUTH_CSRF_COOKIE_NAME=nebulynk_csrf_token
-   docker run -d --name nebulynk-frontend --restart unless-stopped \
-     -p 8080:8080 nebulynk-frontend
+   docker compose -p nebulynk --env-file .env.production \
+     -f docker-compose.yml -f docker-compose.self-hosted.yml \
+     up -d --build --remove-orphans
    ```
 
 5. Configure the reverse proxy and firewall: route the frontend, backend,
-   LiveKit WebSocket, and Garage S3 endpoints to their container ports,
+   LiveKit WebSocket, and Garage S3 endpoints to their loopback ports,
    terminate TLS, and pass `X-Forwarded-Proto: https` to the backend. Do not
-   expose PostgreSQL or Redis. Observe the LiveKit UDP-port alignment described
-   above. For external LiveKit access, do not retain `--node-ip 127.0.0.1` from
-   the base Compose file; remove it or replace it with the server IP reachable
-   by clients.
+   expose PostgreSQL, Redis, or the LiveKit control port. Permit public TCP
+   `7881` and UDP `7882` for LiveKit media in addition to the proxy routes.
 
-Back up PostgreSQL and the Garage volumes before an update. Then update images,
-rebuild the backend and frontend, and replace both application containers. Do
-not use `docker compose down -v` when data must be retained.
+### Updating a manual Docker deployment
+
+Before every update, back up PostgreSQL and both Garage volumes, test a
+restore, then review the in-app Update Center and the release-specific upgrade
+notes. The Update Center informs; it never changes containers for you.
+
+For the recommended `stable` channel, use only a fast-forward update from the
+official remote and rebuild the same Compose stack:
+
+```bash
+git fetch origin stable
+git switch stable
+git pull --ff-only origin stable
+docker compose -p nebulynk --env-file .env.production \
+  -f docker-compose.yml -f docker-compose.self-hosted.yml \
+  up -d --build --remove-orphans
+```
+
+For a tag-pinned deployment, replace `v0.2.1` with the reviewed target release:
+
+```bash
+git fetch --tags origin
+git switch --detach v0.2.1
+docker compose -p nebulynk --env-file .env.production \
+  -f docker-compose.yml -f docker-compose.self-hosted.yml \
+  up -d --build --remove-orphans
+```
+
+Do not use `docker compose down -v` during an update: it removes the database
+and Garage volumes.
 
 ## Deploying with Coolify
 
@@ -204,10 +244,13 @@ Coolify manages builds, containers, domains, and TLS. The repository includes
 [`docker-compose.coolify.yml`](../docker-compose.coolify.yml) for this purpose;
 it contains every Nebulynk service.
 
-1. Create a project and a Docker Compose resource in Coolify from the
-   repository. Select `docker-compose.coolify.yml` as the Compose file and use
-   the protected `stable` branch or an immutable `vX.Y.Z` tag. `main` is not a
-   supported production channel.
+1. Create a project and a Docker Compose resource from
+   `https://github.com/sapientorius/Nebulynk`. Select
+   `docker-compose.coolify.yml` as the Compose file. Set the source reference
+   to `stable` for the recommended production channel, or to an immutable
+   `vX.Y.Z` tag for a change-controlled installation. Never use `main`.
+   Enable automatic deploys only for the `stable` policy; a tag-pinned resource
+   should move only after an administrator deliberately selects a newer tag.
 2. Add the values from the tables above as Coolify environment variables. Set
    at least `POSTGRES_PASSWORD`, `GARAGE_RPC_SECRET`, `JWT_SECRET`,
    `AI_SECRET_KEY`, `STORAGE_S3_ACCESS_KEY`, `STORAGE_S3_SECRET_KEY`,
@@ -227,13 +270,15 @@ it contains every Nebulynk service.
    build arguments come from `COOLIFY_URL_BACKEND`,
    `COOLIFY_URL_LIVEKIT_WSS`, `VITE_VAPID_PUBLIC_KEY`, and
    `AUTH_CSRF_COOKIE_NAME`. Set `LIVEKIT_PUBLIC_URL` to the same WSS URL.
-4. Open direct LiveKit media ports in Coolify and the server firewall as well.
-   TCP `7881` and the UDP port actually configured in `livekit.yaml` must be
-   reachable by clients; an HTTP proxy alone is not sufficient.
+4. Open direct LiveKit media ports in Coolify and the server firewall as well:
+   TCP `7881` and UDP `7882` must be reachable by clients. An HTTP proxy alone
+   is not sufficient.
 5. Deploy and check every service log. Changing `VITE_*`,
    `COOLIFY_URL_BACKEND`, or `COOLIFY_URL_LIVEKIT_WSS` requires a full frontend
    rebuild. A normal backend or configuration change only requires a resource
-   redeploy.
+   redeploy. Optionally set `NEBULYNK_BUILD_SHA` and
+   `NEBULYNK_BUILD_TIME` from the selected source revision so administrators
+   can correlate the running build with the deployment.
 
 Coolify creates persistent volumes for the Compose volumes. Back up
 `nebulynk_postgres_data`, `nebulynk_garage_meta`, and
@@ -264,9 +309,10 @@ restore test; apply security updates promptly.
 The administration area contains an informational **Updates** center. It
 checks the signed stable feed, lists every release between the installed and
 latest versions, and sends security digests to active platform administrators
-when SMTP is configured. It never installs or deploys an update. Apply an
-update manually from `stable` or an immutable release tag after reviewing its
-backup, downtime, and migration notes.
+when SMTP is configured. It never installs, pulls, or deploys an update. Apply
+an update only with the `stable` fast-forward procedure or by deliberately
+moving to a newer immutable tag after reviewing the release's backup, downtime,
+and migration notes.
 
 Only the platform owner can disable checks, and doing so also stops new
 security email notices. The last verified catalog remains visible but becomes

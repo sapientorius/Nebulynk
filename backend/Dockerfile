@@ -1,19 +1,24 @@
-FROM node:22-alpine
+ARG NODE_IMAGE=node:22.23.1-alpine3.24
+FROM ${NODE_IMAGE}
 
 WORKDIR /app
 
 RUN apk add --no-cache ffmpeg
 
-# Dependencies
-COPY package*.json ./
-RUN npm i --omit=dev
+# Install exactly the production dependencies recorded in the root workspace
+# lockfile. The build context must be the repository root.
+COPY package.json package-lock.json ./
+COPY backend/package.json ./backend/package.json
+RUN npm ci --omit=dev --workspace=backend
 
-# Source
-COPY . .
+# Application source
+COPY backend ./backend
 
 RUN chown -R node:node /app
 
 USER node
+
+WORKDIR /app/backend
 
 # Port
 EXPOSE 3030

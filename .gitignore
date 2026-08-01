@@ -5,6 +5,8 @@ dist-release-notes/
 dist-update-feed/
 .env
 .env.local
+.env.*
+!.env.production.example
 *.log
 .DS_Store
 Thumbs.db

@@ -67,10 +67,12 @@ npm run dev:desktop:ptt-helper
 
 > **Update notice for existing installations:** `v0.2.0` is the first release
 > with signed in-app update and security notices for platform administrators.
-> Installations on `v0.1.0` must update once manually. Production deployments
-> should follow the protected `stable` branch or an immutable `vX.Y.Z` tag;
-> `main` is not a supported production channel. The update center is
-> informational and never installs or deploys an update.
+> Installations on `v0.1.0` must update once manually. The standard production
+> source is [`sapientorius/Nebulynk`](https://github.com/sapientorius/Nebulynk)
+> on the protected `stable` branch. Use an immutable `vX.Y.Z` tag when a
+> deployment must remain pinned to one exact release. `main` is not a
+> supported production channel. The update center is informational and never
+> installs or deploys an update.
 
 ## Documentation
 

@@ -1,10 +1,10 @@
 services:
   postgres:
-    image: postgres:17-alpine
+    image: ${NEBULYNK_POSTGRES_IMAGE:-postgres:17-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193}
     container_name: nebulynk-postgres
     restart: unless-stopped
     ports:
-      - "${POSTGRES_PORT:-5433}:5432"
+      - "127.0.0.1:${POSTGRES_PORT:-5433}:5432"
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-nebulynk}
       POSTGRES_USER: ${POSTGRES_USER:-nebulynk}
@@ -13,20 +13,20 @@ services:
       - postgres_data:/var/lib/postgresql/data
 
   redis:
-    image: redis:7-alpine
+    image: ${NEBULYNK_REDIS_IMAGE:-redis:7.4.7-alpine3.21}
     container_name: nebulynk-redis
     restart: unless-stopped
     ports:
-      - "${REDIS_PORT:-6379}:6379"
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
     volumes:
       - redis_data:/data
 
   garage:
-    image: dxflrs/garage:v2.3.0
+    image: ${NEBULYNK_GARAGE_IMAGE:-dxflrs/garage:v2.3.0}
     container_name: nebulynk-garage
     restart: unless-stopped
     ports:
-      - "${STORAGE_S3_PORT:-3900}:3900"
+      - "127.0.0.1:${STORAGE_S3_PORT:-3900}:3900"
     environment:
       GARAGE_RPC_SECRET: ${GARAGE_RPC_SECRET:?GARAGE_RPC_SECRET must be set for Garage}
       GARAGE_DEFAULT_ACCESS_KEY: ${STORAGE_S3_ACCESS_KEY:-${MINIO_ACCESS_KEY:-nebulynk}}
@@ -39,23 +39,23 @@ services:
       - garage_data:/var/lib/garage/data
 
   livekit:
-    image: livekit/livekit-server
+    image: ${NEBULYNK_LIVEKIT_SERVER_IMAGE:-livekit/livekit-server:v1.13.4}
     container_name: nebulynk-livekit
     restart: unless-stopped
     depends_on:
       - redis
     ports:
-      - "${LIVEKIT_PORT:-7880}:7880"
+      - "127.0.0.1:${LIVEKIT_PORT:-7880}:7880"
       - "7881:7881"
-      - "50000-50100:50000-50100/udp"
+      - "7882:7882/udp"
     environment:
       LIVEKIT_KEYS: "${LIVEKIT_API_KEY:-qccdazotxntstqizhlqgkcdflfpkndao}: ${LIVEKIT_API_SECRET:-qccdazotxntstqizhlqgkcdflfpkndao}"
-    command: --config /etc/livekit.yaml --node-ip 127.0.0.1
+    command: --config /etc/livekit.yaml
     volumes:
       - ./livekit.yaml:/etc/livekit.yaml:ro
 
   livekit-egress:
-    image: livekit/egress
+    image: ${NEBULYNK_LIVEKIT_EGRESS_IMAGE:-livekit/egress:v1.13.0}
     container_name: nebulynk-livekit-egress
     restart: unless-stopped
     command: --config /etc/livekit-egress.yaml

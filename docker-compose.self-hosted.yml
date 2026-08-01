@@ -1,0 +1,52 @@
+# Combine with docker-compose.yml for a complete self-hosted Nebulynk stack:
+# docker compose -f docker-compose.yml -f docker-compose.self-hosted.yml --env-file .env.production up -d --build
+#
+# The primary reverse proxy is expected to run on the host and reaches the
+# frontend, backend, Garage, and LiveKit signalling ports through loopback.
+# LiveKit TCP 7881 and UDP 7882 remain directly reachable for WebRTC media.
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+      args:
+        NODE_IMAGE: ${NEBULYNK_NODE_IMAGE:-node:22.23.1-alpine3.24}
+    restart: unless-stopped
+    env_file:
+      - ${NEBULYNK_ENV_FILE:-.env.production}
+    environment:
+      NODE_ENV: production
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      STORAGE_S3_ENDPOINT: http://garage:3900
+      LIVEKIT_HOST: http://livekit:7880
+      LIVEKIT_WS_URL: ws://livekit:7880
+      MEETING_RECORDINGS_S3_ENDPOINT: http://garage:3900
+      MEETING_RECORDINGS_EGRESS_S3_ENDPOINT: http://garage:3900
+    depends_on:
+      - postgres
+      - redis
+      - garage
+      - livekit
+      - livekit-egress
+    ports:
+      - "127.0.0.1:${BACKEND_PORT:-3030}:3030"
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      args:
+        NODE_IMAGE: ${NEBULYNK_NODE_IMAGE:-node:22.23.1-alpine3.24}
+        NGINX_IMAGE: ${NEBULYNK_NGINX_IMAGE:-nginxinc/nginx-unprivileged:1.31-alpine3.23@sha256:6320020c7da8714feab524e02c08c5a1958675c4e68700e93a2fd8970b065786}
+        VITE_API_URL: ${VITE_API_URL:?VITE_API_URL must be set}
+        VITE_LIVEKIT_URL: ${VITE_LIVEKIT_URL:?VITE_LIVEKIT_URL must be set}
+        VITE_VAPID_PUBLIC_KEY: ${VITE_VAPID_PUBLIC_KEY:-}
+        VITE_AUTH_CSRF_COOKIE_NAME: ${VITE_AUTH_CSRF_COOKIE_NAME:-nebulynk_csrf_token}
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "127.0.0.1:${FRONTEND_PORT:-8080}:8080"

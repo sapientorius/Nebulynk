@@ -1,3 +1,4 @@
-FROM dxflrs/garage:v2.3.0
+ARG GARAGE_IMAGE=dxflrs/garage:v2.3.0
+FROM ${GARAGE_IMAGE}
 
 COPY garage.toml /etc/garage.toml

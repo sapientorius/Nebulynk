@@ -1,7 +1,7 @@
 services:
   # 1. Database (reachable internally as 'postgres')
   postgres:
-    image: postgres:17-alpine
+    image: ${NEBULYNK_POSTGRES_IMAGE:-postgres:17-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193}
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-nebulynk}
       POSTGRES_USER: ${POSTGRES_USER:-nebulynk}
@@ -12,7 +12,7 @@ services:
 
   # 2. Cache (reachable internally as 'redis')
   redis:
-    image: redis:7-alpine
+    image: ${NEBULYNK_REDIS_IMAGE:-redis:7.4.7-alpine3.21}
     volumes:
       - nebulynk_redis_data:/data
     restart: always
@@ -22,6 +22,8 @@ services:
     build:
       context: .
       dockerfile: garage.Dockerfile
+      args:
+        GARAGE_IMAGE: ${NEBULYNK_GARAGE_IMAGE:-dxflrs/garage:v2.3.0}
     command: /garage server --single-node --default-bucket
     environment:
       GARAGE_RPC_SECRET: ${GARAGE_RPC_SECRET:?GARAGE_RPC_SECRET must be set for Garage}
@@ -40,11 +42,13 @@ services:
     build:
       context: .
       dockerfile: livekit.Dockerfile
+      args:
+        LIVEKIT_SERVER_IMAGE: ${NEBULYNK_LIVEKIT_SERVER_IMAGE:-livekit/livekit-server:v1.13.4}
     command: --config /livekit.yaml
     ports:
       - "7880:7880" # API/Signal
       - "7881:7881" # TCP
-      - "50000-50100:50000-50100/udp" # WebRTC range
+      - "7882:7882/udp" # WebRTC UDP, matching livekit.yaml
     environment:
       LIVEKIT_KEYS: "${LIVEKIT_API_KEY}: ${LIVEKIT_API_SECRET}"
     restart: always
@@ -53,6 +57,8 @@ services:
     build:
       context: .
       dockerfile: livekit-egress.Dockerfile
+      args:
+        LIVEKIT_EGRESS_IMAGE: ${NEBULYNK_LIVEKIT_EGRESS_IMAGE:-livekit/egress:v1.13.0}
     command: --config /livekit-egress.yaml
     environment:
       EGRESS_CONFIG_FILE: /livekit-egress.yaml
@@ -73,8 +79,10 @@ services:
   # 5. Backend API
   backend:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/Dockerfile
+      args:
+        NODE_IMAGE: ${NEBULYNK_NODE_IMAGE:-node:22.23.1-alpine3.24}
     environment:
       NODE_ENV: production
       # Required production secrets. Backend startup rejects missing or placeholder
@@ -154,9 +162,11 @@ services:
   # 6. Frontend
   frontend:
     build:
-      context: ./frontend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: frontend/Dockerfile
       args:
+        NODE_IMAGE: ${NEBULYNK_NODE_IMAGE:-node:22.23.1-alpine3.24}
+        NGINX_IMAGE: ${NEBULYNK_NGINX_IMAGE:-nginxinc/nginx-unprivileged:1.31-alpine3.23@sha256:6320020c7da8714feab524e02c08c5a1958675c4e68700e93a2fd8970b065786}
         # These URLs are baked into frontend build output
         VITE_API_URL: ${COOLIFY_URL_BACKEND}
         VITE_LIVEKIT_URL: ${COOLIFY_URL_LIVEKIT_WSS}
