@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "version": "0.2.1",
+  "revision": 1,
+  "channel": "stable",
+  "published_at": "2026-08-01T00:00:00.000Z",
+  "title": {
+    "de": "Nebulynk 0.2.1",
+    "en": "Nebulynk 0.2.1"
+  },
+  "summary": {
+    "de": "Stabilisiert die Veroeffentlichung des signierten Update-Feeds bei unveraenderlichen GitHub-Releases.",
+    "en": "Stabilizes publication of the signed update feed when using immutable GitHub releases."
+  },
+  "changes": [
+    {
+      "category": "fix",
+      "title": {
+        "de": "Wiederholbare Feed-Veroeffentlichung",
+        "en": "Retry-safe feed publication"
+      },
+      "description": {
+        "de": "Ein erneuter Release-Workflow veraendert einen bereits unveraenderlichen GitHub-Release nicht mehr und kann den signierten Pages-Feed weiterhin bereitstellen.",
+        "en": "A rerun no longer changes an already immutable GitHub release and can still publish the signed Pages feed."
+      }
+    }
+  ],
+  "security": [],
+  "upgrade": {
+    "backup_required": false,
+    "downtime_expected": true,
+    "breaking": false,
+    "manual_steps": {
+      "de": [
+        "Backend und Frontend aus dem gemeinsamen Release-Tag v0.2.1 neu bereitstellen."
+      ],
+      "en": [
+        "Redeploy backend and frontend from the shared v0.2.1 release tag."
+      ]
+    },
+    "docs_url": "https://github.com/sapientorius/Nebulynk/blob/v0.2.1/docs/SELF_HOSTING.md"
+  }
+}

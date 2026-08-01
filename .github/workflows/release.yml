@@ -85,13 +85,14 @@ jobs:
       - name: Render bilingual release notes and changelog
         run: npm run release:notes
 
-      - name: Create GitHub release
+      - name: Create immutable GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           if gh release view "${{ github.ref_name }}" >/dev/null 2>&1; then
-            gh release edit "${{ github.ref_name }}" --title "Nebulynk ${{ github.ref_name }}" --notes-file dist-release-notes/release-notes.md
-            gh release upload "${{ github.ref_name }}" dist-release-notes/CHANGELOG.md --clobber
+            # Published immutable releases and their assets must never be changed.
+            # A rerun may still safely rebuild and publish the signed Pages feed.
+            echo "GitHub release ${{ github.ref_name }} already exists; leaving immutable release unchanged."
           else
             gh release create "${{ github.ref_name }}" --verify-tag --title "Nebulynk ${{ github.ref_name }}" --notes-file dist-release-notes/release-notes.md dist-release-notes/CHANGELOG.md
           fi

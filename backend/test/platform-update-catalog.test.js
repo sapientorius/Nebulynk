@@ -8,6 +8,7 @@ import {
   validateReleaseDocument,
   verifyReleaseDigest
 } from '../src/lib/platform-update-catalog.js'
+import { PLATFORM_VERSION } from '../src/lib/build-info.js'
 import { PlatformUpdateManager } from '../src/lib/platform-updates.js'
 import { createMemoryDb } from './helpers/memory-db.js'
 
@@ -292,6 +293,7 @@ test('security delivery selects active member admins, bundles releases, retries 
   const catalog = {
     releases: [
       release('0.2.0'),
+      release(PLATFORM_VERSION),
       release('0.3.0', { security: [advisory('low', '<0.3.0')] }),
       release('0.4.0', { security: [advisory('critical', '<0.4.0')] })
     ]
@@ -325,7 +327,7 @@ test('a detected downgrade invalidates old acknowledgements and security deliver
   const state = await manager.getState()
 
   assert.equal(await manager.prepareInstalledVersion('downgrade-lease', state), true)
-  assert.equal(db.tables.platform_update_state[0].observed_version, '0.2.0')
+  assert.equal(db.tables.platform_update_state[0].observed_version, PLATFORM_VERSION)
   assert.equal(db.tables.platform_update_acknowledgements.length, 0)
   assert.equal(db.tables.platform_update_email_deliveries.length, 0)
 })
