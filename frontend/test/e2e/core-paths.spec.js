@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { getAuthFromBrowserSession } from './auth-helpers.js'
+import { getAuthFromBrowserSession, loginViaApi } from './auth-helpers.js'
 import { readSharedState, writeSharedState } from './shared-state.js'
 import { resolveBackendUrl } from './test-urls.js'
 
@@ -285,6 +285,24 @@ async function expectNoHorizontalOverflow(page) {
   expect(hasOverflow).toBe(false)
 }
 
+async function setPageForegroundState(page, { visibilityState, hasFocus }) {
+  await page.evaluate(({ nextVisibilityState, nextHasFocus }) => {
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      value: nextVisibilityState
+    })
+    Object.defineProperty(document, 'hasFocus', {
+      configurable: true,
+      value: () => nextHasFocus
+    })
+    document.dispatchEvent(new Event('visibilitychange'))
+    window.dispatchEvent(new Event(nextHasFocus ? 'focus' : 'blur'))
+  }, {
+    nextVisibilityState: visibilityState,
+    nextHasFocus: hasFocus
+  })
+}
+
 async function injectInstallPrompt(page, outcome = 'accepted') {
   await page.evaluate((nextOutcome) => {
     const event = new Event('beforeinstallprompt')
@@ -420,7 +438,7 @@ test.describe('P2-02 core e2e paths', () => {
       ]
     })
 
-    await page.route('**/platform-updates**', async (route) => {
+    await page.route(`${resolveBackendUrl('/platform-updates')}**`, async (route) => {
       const request = route.request()
       if (request.method() === 'POST' && request.url().endsWith('/acknowledgements')) acknowledged = true
       if (request.method() === 'PATCH' && request.url().endsWith('/settings')) checksEnabled = false
@@ -641,7 +659,8 @@ test.describe('P2-02 core e2e paths', () => {
     await createChannelFromSidebar(page, { name: archivedChannelName, type: 'private' })
     await expect(page.locator('.channel-name', { hasText: archivedChannelName })).toBeVisible()
 
-    await page.getByRole('button', { name: /Channel settings|Channel-Einstellungen/ }).click()
+    await page.getByTestId('channel-header-overflow-trigger').click()
+    await page.getByTestId('channel-header-settings').click()
     await page.getByRole('button', { name: /Archive channel|Channel archivieren/ }).click()
     await expect(page.locator('.channel-name', { hasText: archivedChannelName })).toHaveCount(0)
 
@@ -826,7 +845,10 @@ test.describe('P2-02 core e2e paths', () => {
     const sourceMessage = page.locator('[data-message-id]').filter({ hasText: forwardedFileName }).last()
     await expect(sourceMessage).toBeVisible()
     await sourceMessage.hover()
-    await sourceMessage.locator('button[title="Forward"], button[title="Weiterleiten"]').first().click()
+    await sourceMessage.getByTestId('message-action-overflow').click()
+    await page.getByTestId('message-action-overflow-menu')
+      .getByRole('button', { name: /Forward|Weiterleiten/ })
+      .click()
 
     const forwardModal = page.getByTestId('forward-message-modal')
     await expect(forwardModal).toBeVisible()
@@ -990,12 +1012,11 @@ test.describe('P2-02 core e2e paths', () => {
         throw new Error('Missing admin access token for channel member API call')
       }
 
-      await login(memberPage, {
+      const memberAuth = await loginViaApi(page.request, {
         email: inviteEmail,
         password: invitePassword
       })
-
-      const memberId = await getCurrentUserId(memberPage)
+      const memberId = memberAuth?.user?.id
       if (!memberId) {
         throw new Error('Missing member id after member authentication')
       }
@@ -1006,7 +1027,13 @@ test.describe('P2-02 core e2e paths', () => {
         userId: memberId
       })
 
-      await memberPage.goto(`/channels/${sourceChannelId}`)
+      await login(memberPage, {
+        email: inviteEmail,
+        password: invitePassword
+      })
+      const sourceChannelMenuItem = memberPage.getByRole('menuitem', { name: joinSourceChannelName })
+      await expect(sourceChannelMenuItem).toBeVisible()
+      await sourceChannelMenuItem.click()
       await expect(memberPage).toHaveURL(new RegExp(`/channels/${sourceChannelId}$`))
 
       await watchErrorMessages(memberPage)
@@ -1430,7 +1457,10 @@ test.describe('P2-02 core e2e paths', () => {
       await expect(memberPage).toHaveURL(new RegExp(`/channels/${sourceChannelId}$`))
       await expect(memberPage.getByTestId('message-list')).toBeVisible()
 
-      await page.bringToFront()
+      await setPageForegroundState(memberPage, {
+        visibilityState: 'hidden',
+        hasFocus: false
+      })
       await expect.poll(async () => memberPage.evaluate(() => document.visibilityState)).toBe('hidden')
 
       const mentionMessageText = `Foreground auto-read mention ${runId} @${inviteDisplayName}`
@@ -1448,7 +1478,10 @@ test.describe('P2-02 core e2e paths', () => {
         return notification?.is_read ?? null
       }).toBe(false)
 
-      await memberPage.bringToFront()
+      await setPageForegroundState(memberPage, {
+        visibilityState: 'visible',
+        hasFocus: true
+      })
       await expect.poll(async () => memberPage.evaluate(() => document.visibilityState)).toBe('visible')
 
       const mentionedRow = memberPage.locator('[data-message-id]').filter({ hasText: mentionMessageText }).first()
