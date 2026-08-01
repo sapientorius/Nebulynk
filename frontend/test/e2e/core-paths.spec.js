@@ -167,6 +167,25 @@ async function addMemberToChannel(page, { accessToken, channelId, userId }) {
   }
 }
 
+async function sendMessageToChannel(page, { accessToken, channelId, content }) {
+  const response = await page.request.post(resolveBackendUrl('/messages'), {
+    headers: {
+      Authorization: `Bearer ${accessToken}`
+    },
+    data: {
+      channel_id: channelId,
+      content
+    }
+  })
+
+  if (!response.ok()) {
+    const responseText = await response.text()
+    throw new Error(`Message API failed (${response.status()}): ${responseText}`)
+  }
+
+  return response.json()
+}
+
 async function createMeetingGuestInviteLink(page, { accessToken, meetingId, expiresAt = null }) {
   const payload = { action: 'create_invite_link' }
   if (expiresAt) {
@@ -1378,31 +1397,41 @@ test.describe('P2-02 core e2e paths', () => {
       await expect(memberPage).toHaveURL(new RegExp(`/channels/${defaultPublicChannelId}$`))
 
       const mentionMessageText = `Auto-read mention ${runId} @${inviteDisplayName}`
-      await page.goto(`/channels/${sourceChannelId}`)
-      await expect(page).toHaveURL(new RegExp(`/channels/${sourceChannelId}$`))
+      await sendMessageToChannel(page, {
+        accessToken: adminToken,
+        channelId: sourceChannelId,
+        content: mentionMessageText
+      })
 
-      const adminInput = page.getByTestId('message-input-textarea')
-      await adminInput.fill(mentionMessageText)
-      await adminInput.press('Enter')
+      await expect.poll(async () => {
+        const payload = await fetchNotifications(memberPage, memberToken)
+        const notifications = Array.isArray(payload?.data) ? payload.data : payload?.data?.data || []
+        const notification = notifications.find((entry) => entry.message_snippet === mentionMessageText)
+        return notification?.is_read ?? null
+      }).toBe(false)
 
-      for (let index = 0; index < 70; index++) {
-        await adminInput.fill(`Auto-read filler ${runId}-${index}`)
-        await adminInput.press('Enter')
+      // The default timeline page contains 50 messages, so the mention belongs to the older page.
+      for (let index = 0; index < 51; index++) {
+        await sendMessageToChannel(page, {
+          accessToken: adminToken,
+          channelId: sourceChannelId,
+          content: `Auto-read filler ${runId}-${index}`
+        })
       }
 
+      await memberPage.bringToFront()
       await memberPage.goto(`/channels/${sourceChannelId}`)
       await expect(memberPage).toHaveURL(new RegExp(`/channels/${sourceChannelId}$`))
 
-      await memberPage.getByRole('button', { name: /Load older messages|Aeltere Nachrichten laden/ }).click()
-
       const messageList = memberPage.getByTestId('message-list')
       await expect(messageList).toBeVisible()
-      await messageList.evaluate((element) => {
-        element.scrollTop = 0
-      })
+      const loadOlderButton = memberPage.getByRole('button', { name: /Load older messages|Aeltere Nachrichten laden/ })
+      await expect(loadOlderButton).toBeVisible()
+      await loadOlderButton.click()
 
       const mentionedRow = memberPage.locator('[data-message-id]').filter({ hasText: mentionMessageText }).first()
-      await expect(mentionedRow).toBeVisible()
+      await mentionedRow.scrollIntoViewIfNeeded()
+      await expect(mentionedRow).toBeInViewport()
 
       await expect.poll(async () => {
         const payload = await fetchNotifications(memberPage, memberToken)
