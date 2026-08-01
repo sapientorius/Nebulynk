@@ -831,14 +831,26 @@ test.describe('P2-02 core e2e paths', () => {
     await page.getByRole('menuitem', { name: sourceChannelName }).click()
     await expect(page).toHaveURL(new RegExp(`/channels/${sourceChannelId}$`))
 
-    await page.locator('.file-upload input[type="file"]').setInputFiles({
+    const input = page.getByTestId('message-input-textarea')
+    await expect(input).toBeEditable()
+
+    const fileInput = page.locator('.file-upload input[type="file"]')
+    await expect(fileInput).toBeAttached()
+    const uploadResponsePromise = page.waitForResponse((response) => (
+      response.url() === resolveBackendUrl('/upload')
+      && response.request().method() === 'POST'
+    ), { timeout: 30_000 })
+
+    await fileInput.setInputFiles([{
       name: forwardedFileName,
       mimeType: 'text/plain',
       buffer: Buffer.from(`Forward attachment ${runId}`)
-    })
-    await expect(page.locator('.pending-file-name', { hasText: forwardedFileName })).toBeVisible()
+    }])
 
-    const input = page.getByTestId('message-input-textarea')
+    const uploadResponse = await uploadResponsePromise
+    expect(uploadResponse.ok()).toBe(true)
+    await expect(page.locator('.pending-file-name', { hasText: forwardedFileName })).toBeVisible({ timeout: 30_000 })
+
     await input.fill(`Forward file ${runId}`)
     await input.press('Enter')
 
