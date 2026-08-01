@@ -4,6 +4,7 @@ import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import vueDevTools from 'vite-plugin-vue-devtools'
 import { buildFrontendContentSecurityPolicy, resolveFrontendConnectSourceOrigins } from './security-headers.config.js'
+import { markdownItLinkifyInteropPlugin } from './scripts/markdown-it-linkify-interop.mjs'
 
 const MEDIAPIPE_TASKS_VISION_WASM_PATH = '/vendor/mediapipe/tasks-vision/0.10.14/wasm'
 const MEDIAPIPE_SELFIE_SEGMENTER_MODEL_PATH = '/vendor/mediapipe/models/selfie_segmenter/float16/latest/selfie_segmenter.tflite'
@@ -76,6 +77,7 @@ const previewSecurityHeaders = {
 export default defineConfig({
   plugins: [
     selfHostedLivekitTrackProcessorAssetsPlugin(),
+    markdownItLinkifyInteropPlugin(),
     vue(),
     vueDevTools(),
   ],

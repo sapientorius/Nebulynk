@@ -1,11 +1,11 @@
 import { expect, test } from '@playwright/test'
 import { getAuthFromBrowserSession } from './auth-helpers.js'
-import { writeSharedState } from './shared-state.js'
+import { readSharedState, writeSharedState } from './shared-state.js'
 import { resolveBackendUrl } from './test-urls.js'
 
 const runId = Date.now().toString(36)
-const adminEmail = `admin.${runId}@example.com`
-const adminPassword = 'AdminPassw0rd!'
+let adminEmail = `admin.${runId}@example.com`
+let adminPassword = 'AdminPassw0rd!'
 const adminDisplayName = 'E2E Admin'
 const platformName = `Nebulynk E2E ${runId}`
 const inviteEmail = `member.${runId}@example.com`
@@ -24,6 +24,19 @@ async function login(page, { email, password }) {
   await page.getByTestId('login-submit').click()
   await expect(page).toHaveURL(/\/channels/)
   await expect(page.getByTestId('app-view')).toBeVisible()
+}
+
+async function waitForBootstrapView(page) {
+  await expect.poll(async () => {
+    if (await page.getByTestId('setup-view').isVisible().catch(() => false)) return 'setup'
+    if (await page.getByTestId('login-view').isVisible().catch(() => false)) return 'login'
+    return ''
+  }, { timeout: 15_000 }).not.toBe('')
+
+  if (await page.getByTestId('setup-view').isVisible().catch(() => false)) return 'setup'
+  if (await page.getByTestId('login-view').isVisible().catch(() => false)) return 'login'
+
+  throw new Error(`Neither setup nor login view became visible during onboarding (url=${page.url()}).`)
 }
 
 async function ensureAdminLogin(page) {
@@ -312,18 +325,29 @@ test.describe('P2-02 core e2e paths', () => {
 
   test('setup and first login', async ({ page }) => {
     await page.goto('/setup')
-    await expect(page.getByTestId('setup-view')).toBeVisible()
+    const bootstrapView = await waitForBootstrapView(page)
 
-    await page.getByTestId('setup-platform-name').fill(platformName)
-    await page.getByTestId('setup-next').click()
+    if (bootstrapView === 'setup') {
+      await page.getByTestId('setup-platform-name').fill(platformName)
+      await page.getByTestId('setup-next').click()
 
-    await page.getByTestId('setup-display-name').fill(adminDisplayName)
-    await page.getByTestId('setup-email').fill(adminEmail)
-    await page.getByTestId('setup-password').fill(adminPassword)
-    await page.getByTestId('setup-submit').click()
+      await page.getByTestId('setup-display-name').fill(adminDisplayName)
+      await page.getByTestId('setup-email').fill(adminEmail)
+      await page.getByTestId('setup-password').fill(adminPassword)
+      await page.getByTestId('setup-submit').click()
 
-    await expect(page.getByTestId('setup-go-login')).toBeVisible()
-    await page.getByTestId('setup-go-login').click()
+      await expect(page.getByTestId('setup-go-login')).toBeVisible()
+      await writeSharedState({ adminEmail, adminPassword })
+      await page.getByTestId('setup-go-login').click()
+    } else {
+      const sharedState = await readSharedState()
+      if (!sharedState?.adminEmail || !sharedState?.adminPassword) {
+        throw new Error(`Platform was already initialized before onboarding, but no retry credentials were available (url=${page.url()}).`)
+      }
+
+      adminEmail = sharedState.adminEmail
+      adminPassword = sharedState.adminPassword
+    }
 
     await login(page, {
       email: adminEmail,
@@ -339,10 +363,6 @@ test.describe('P2-02 core e2e paths', () => {
     }
     defaultPublicChannelId = await resolveDefaultPublicChannelId(page, accessToken)
 
-    await writeSharedState({
-      adminEmail,
-      adminPassword
-    })
   })
 
   test('platform update center shows release gaps, acknowledgement, and owner disable warning', async ({ page }) => {

@@ -13,6 +13,8 @@ describe('platform update administration UI', () => {
     expect(source).toContain('release.upgrade?.downtime_expected')
     expect(source).toContain('status?.can_manage_checks')
     expect(source).toContain('DISABLE_UPDATE_CHECKS')
+    expect(source).toContain(":input-props=\"{ 'data-testid': 'platform-update-disable-confirmation' }\"")
+    expect(source).toContain(":input-props=\"{ 'data-testid': 'platform-update-disable-password' }\"")
     expect(source).toContain("method: 'passkey'")
     expect(source).not.toContain('installUpdate')
   })
