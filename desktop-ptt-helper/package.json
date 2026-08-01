@@ -1,0 +1,15 @@
+{
+  "name": "desktop-ptt-helper",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tauri dev",
+    "dev:rtk": "rtk tauri dev",
+    "build": "tauri build",
+    "build:rtk": "rtk tauri build"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.0.0"
+  }
+}

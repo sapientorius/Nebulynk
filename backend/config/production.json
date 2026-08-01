@@ -1,0 +1,7 @@
+{
+  "host": "PRODUCTION_HOST",
+  "port": "PRODUCTION_PORT",
+  "authentication": {
+    "secret": "PRODUCTION_JWT_SECRET"
+  }
+}

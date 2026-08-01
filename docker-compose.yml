@@ -1,0 +1,83 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: nebulynk-postgres
+    restart: unless-stopped
+    ports:
+      - "${POSTGRES_PORT:-5433}:5432"
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-nebulynk}
+      POSTGRES_USER: ${POSTGRES_USER:-nebulynk}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-nebulynk_dev_password}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    container_name: nebulynk-redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+
+  garage:
+    image: dxflrs/garage:v2.3.0
+    container_name: nebulynk-garage
+    restart: unless-stopped
+    ports:
+      - "${STORAGE_S3_PORT:-3900}:3900"
+    environment:
+      GARAGE_RPC_SECRET: ${GARAGE_RPC_SECRET:?GARAGE_RPC_SECRET must be set for Garage}
+      GARAGE_DEFAULT_ACCESS_KEY: ${STORAGE_S3_ACCESS_KEY:-${MINIO_ACCESS_KEY:-nebulynk}}
+      GARAGE_DEFAULT_SECRET_KEY: ${STORAGE_S3_SECRET_KEY:-${MINIO_SECRET_KEY:-nebulynk_dev_password}}
+      GARAGE_DEFAULT_BUCKET: ${STORAGE_S3_BUCKET:-${MINIO_BUCKET:-nebulynk-files}}
+    command: /garage server --single-node --default-bucket
+    volumes:
+      - ./garage.toml:/etc/garage.toml:ro
+      - garage_meta:/var/lib/garage/meta
+      - garage_data:/var/lib/garage/data
+
+  livekit:
+    image: livekit/livekit-server
+    container_name: nebulynk-livekit
+    restart: unless-stopped
+    depends_on:
+      - redis
+    ports:
+      - "${LIVEKIT_PORT:-7880}:7880"
+      - "7881:7881"
+      - "50000-50100:50000-50100/udp"
+    environment:
+      LIVEKIT_KEYS: "${LIVEKIT_API_KEY:-qccdazotxntstqizhlqgkcdflfpkndao}: ${LIVEKIT_API_SECRET:-qccdazotxntstqizhlqgkcdflfpkndao}"
+    command: --config /etc/livekit.yaml --node-ip 127.0.0.1
+    volumes:
+      - ./livekit.yaml:/etc/livekit.yaml:ro
+
+  livekit-egress:
+    image: livekit/egress
+    container_name: nebulynk-livekit-egress
+    restart: unless-stopped
+    command: --config /etc/livekit-egress.yaml
+    depends_on:
+      - livekit
+      - redis
+      - garage
+    environment:
+      EGRESS_CONFIG_FILE: /etc/livekit-egress.yaml
+      # Keep these as the single source of truth. Do not duplicate LiveKit
+      # credentials or ws_url inside livekit-egress.yaml.
+      LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:-qccdazotxntstqizhlqgkcdflfpkndao}
+      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:-qccdazotxntstqizhlqgkcdflfpkndao}
+      LIVEKIT_WS_URL: ${LIVEKIT_WS_URL:-ws://livekit:7880}
+      AWS_ACCESS_KEY_ID: ${STORAGE_S3_ACCESS_KEY:-${MINIO_ACCESS_KEY:-nebulynk}}
+      AWS_SECRET_ACCESS_KEY: ${STORAGE_S3_SECRET_KEY:-${MINIO_SECRET_KEY:-nebulynk_dev_password}}
+      AWS_DEFAULT_REGION: ${STORAGE_S3_REGION:-${MEETING_RECORDINGS_S3_REGION:-us-east-1}}
+    volumes:
+      - ./livekit-egress.yaml:/etc/livekit-egress.yaml:ro
+
+volumes:
+  postgres_data:
+  redis_data:
+  garage_meta:
+  garage_data:

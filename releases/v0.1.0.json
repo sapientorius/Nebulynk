@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "version": "0.1.0",
+  "revision": 1,
+  "channel": "stable",
+  "published_at": "2026-07-31T00:00:00.000Z",
+  "title": {
+    "de": "Nebulynk 0.1.0",
+    "en": "Nebulynk 0.1.0"
+  },
+  "summary": {
+    "de": "Historische Baseline der selbst gehosteten Nebulynk-Plattform.",
+    "en": "Historical baseline of the self-hosted Nebulynk platform."
+  },
+  "changes": [
+    {
+      "category": "improvement",
+      "title": {
+        "de": "Baseline fuer kuenftige Update-Vergleiche",
+        "en": "Baseline for future update comparisons"
+      },
+      "description": {
+        "de": "Dieser Eintrag markiert den Ausgangspunkt des maschinenlesbaren Release-Katalogs.",
+        "en": "This entry marks the starting point of the machine-readable release catalog."
+      }
+    }
+  ],
+  "security": [],
+  "upgrade": {
+    "backup_required": true,
+    "downtime_expected": true,
+    "breaking": false,
+    "manual_steps": {
+      "de": [],
+      "en": []
+    },
+    "docs_url": "https://github.com/stylefieber/Nebulynk/blob/v0.1.0/docs/SELF_HOSTING.md"
+  }
+}

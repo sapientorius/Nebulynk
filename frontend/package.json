@@ -1,0 +1,57 @@
+{
+  "name": "frontend",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "prepare:video-assets": "node scripts/prepare-video-assets.mjs",
+    "prepare:video-assets:rtk": "rtk node scripts/prepare-video-assets.mjs",
+    "dev": "node scripts/prepare-video-assets.mjs && vite",
+    "dev:rtk": "rtk node scripts/prepare-video-assets.mjs && rtk vite",
+    "e2e:dev": "vite --host 127.0.0.1 --port 4173 --strictPort",
+    "e2e:dev:rtk": "rtk vite --host 127.0.0.1 --port 4173 --strictPort",
+    "e2e:security:serve": "npm run build && vite preview --host 127.0.0.1 --port 4173 --strictPort",
+    "e2e:security:serve:rtk": "rtk npm run build:rtk && rtk vite preview --host 127.0.0.1 --port 4173 --strictPort",
+    "lint": "node scripts/lint.mjs",
+    "lint:rtk": "rtk node scripts/lint.mjs",
+    "test": "vitest run",
+    "test:rtk": "rtk vitest run",
+    "test:watch": "vitest",
+    "test:watch:rtk": "rtk vitest",
+    "test:e2e": "playwright test",
+    "test:e2e:rtk": "rtk playwright test",
+    "build": "node scripts/prepare-video-assets.mjs && vite build -l error",
+    "build:rtk": "rtk node scripts/prepare-video-assets.mjs && rtk vite build -l error",
+    "preview": "vite preview",
+    "preview:rtk": "rtk vite preview"
+  },
+  "dependencies": {
+    "@livekit/track-processors": "^0.6.1",
+    "@paralleldrive/cuid2": "^2.3.0",
+    "@simplewebauthn/browser": "^13.3.0",
+    "@tauri-apps/api": "^2.0.0",
+    "@vicons/ionicons5": "^0.13.0",
+    "axios": "^1.13.5",
+    "dompurify": "^3.3.3",
+    "livekit-client": "^2.17.2",
+    "markdown-it": "^14.2.0",
+    "markdown-it-task-lists": "^2.1.1",
+    "naive-ui": "^2.43.2",
+    "pinia": "^3.0.4",
+    "socket.io-client": "^4.8.3",
+    "vue": "^3.5.28",
+    "vue-router": "^5.0.2",
+    "zzfx": "^1.3.2"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.53.1",
+    "@vitejs/plugin-vue": "^6.0.4",
+    "vfonts": "^0.0.3",
+    "vite": "^7.3.1",
+    "vite-plugin-vue-devtools": "^8.0.6",
+    "vitest": "^4.0.18"
+  },
+  "engines": {
+    "node": "^20.19.0 || >=22.12.0"
+  }
+}

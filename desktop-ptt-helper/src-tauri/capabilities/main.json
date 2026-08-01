@@ -1,0 +1,12 @@
+{
+  "identifier": "main",
+  "description": "Capability set for the Nebulynk PTT Helper settings window.",
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    "core:default",
+    "core:event:default",
+    "allow-helper-commands"
+  ]
+}

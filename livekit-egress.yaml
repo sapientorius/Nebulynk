@@ -1,0 +1,13 @@
+# LiveKit connection settings are provided via env (`LIVEKIT_API_KEY`,
+# `LIVEKIT_API_SECRET`, `LIVEKIT_WS_URL`) so this file cannot drift from the
+# deployment's active credentials.
+insecure: true
+log_level: debug
+health_port: 8080
+
+redis:
+  address: redis:6379
+
+s3:
+  bucket: nebulynk-files
+  endpoint: http://garage:3900

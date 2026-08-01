@@ -1,0 +1,32 @@
+{
+  "host": "localhost",
+  "port": 3030,
+  "paginate": {
+    "default": 25,
+    "max": 100
+  },
+  "authentication": {
+    "entity": "user",
+    "service": "users",
+    "secret": "change-me-in-production",
+    "authStrategies": ["jwt", "local"],
+    "browserJwtOptions": {
+      "expiresIn": "15m"
+    },
+    "rememberJwtOptions": {
+      "expiresIn": "30d"
+    },
+    "jwtOptions": {
+      "header": {
+        "typ": "access"
+      },
+      "audience": "https://nebulynk.local",
+      "algorithm": "HS256",
+      "expiresIn": "1d"
+    },
+    "local": {
+      "usernameField": "email",
+      "passwordField": "password"
+    }
+  }
+}

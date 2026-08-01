@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://updates.nebulynk.net/schemas/release-v1.json",
+  "title": "Nebulynk stable release metadata",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "version",
+    "revision",
+    "channel",
+    "published_at",
+    "title",
+    "summary",
+    "changes",
+    "security",
+    "upgrade"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "version": { "type": "string", "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$" },
+    "revision": { "type": "integer", "minimum": 1 },
+    "channel": { "const": "stable" },
+    "published_at": { "type": "string", "format": "date-time" },
+    "title": { "$ref": "#/$defs/localizedText" },
+    "summary": { "$ref": "#/$defs/localizedText" },
+    "changes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["category", "title", "description"],
+        "properties": {
+          "category": { "enum": ["feature", "improvement", "fix", "breaking", "security"] },
+          "title": { "$ref": "#/$defs/localizedText" },
+          "description": { "$ref": "#/$defs/localizedText" }
+        }
+      }
+    },
+    "security": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["severity", "affected_versions", "summary"],
+        "properties": {
+          "severity": { "enum": ["low", "medium", "high", "critical"] },
+          "affected_versions": { "type": "string", "minLength": 1 },
+          "summary": { "$ref": "#/$defs/localizedText" },
+          "cve": { "type": "string", "pattern": "^CVE-[0-9]{4}-[0-9]{4,}$" },
+          "advisory_url": { "type": "string", "format": "uri", "pattern": "^https://" }
+        }
+      }
+    },
+    "upgrade": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["backup_required", "downtime_expected", "breaking", "manual_steps", "docs_url"],
+      "properties": {
+        "backup_required": { "type": "boolean" },
+        "downtime_expected": { "type": "boolean" },
+        "breaking": { "type": "boolean" },
+        "manual_steps": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["de", "en"],
+          "properties": {
+            "de": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+            "en": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+          }
+        },
+        "docs_url": { "type": "string", "format": "uri", "pattern": "^https://" }
+      }
+    }
+  },
+  "$defs": {
+    "localizedText": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["de", "en"],
+      "properties": {
+        "de": { "type": "string", "minLength": 1 },
+        "en": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

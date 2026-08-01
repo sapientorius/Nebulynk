@@ -1,0 +1,906 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Nebulynk Login Concepts</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #060816;
+        --bg-deep: #03040c;
+        --panel: rgba(10, 14, 30, 0.72);
+        --panel-strong: rgba(14, 20, 40, 0.88);
+        --panel-border: rgba(160, 192, 255, 0.18);
+        --text: rgba(245, 247, 255, 0.96);
+        --muted: rgba(200, 214, 255, 0.68);
+        --soft: rgba(183, 202, 255, 0.34);
+        --accent: #79d7ff;
+        --accent-strong: #8a8cff;
+        --accent-warm: #97f0d8;
+        --success: #62e0ba;
+        --shadow: 0 30px 80px rgba(0, 0, 0, 0.45);
+        --radius: 28px;
+        --input-bg: rgba(255, 255, 255, 0.05);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        min-height: 100%;
+      }
+
+      body {
+        margin: 0;
+        color: var(--text);
+        background:
+          radial-gradient(circle at top, rgba(92, 117, 255, 0.16), transparent 32%),
+          radial-gradient(circle at 80% 10%, rgba(63, 224, 214, 0.14), transparent 24%),
+          linear-gradient(180deg, #0a1022 0%, var(--bg) 45%, var(--bg-deep) 100%);
+        font-family: "Avenir Next", "Trebuchet MS", "Segoe UI", sans-serif;
+        overflow-x: hidden;
+      }
+
+      body::before,
+      body::after {
+        content: "";
+        position: fixed;
+        inset: -20%;
+        pointer-events: none;
+        z-index: 0;
+      }
+
+      body::before {
+        background:
+          radial-gradient(circle at 20% 30%, rgba(110, 161, 255, 0.2) 0, transparent 22%),
+          radial-gradient(circle at 78% 22%, rgba(93, 255, 214, 0.12) 0, transparent 18%),
+          radial-gradient(circle at 70% 78%, rgba(149, 110, 255, 0.16) 0, transparent 20%);
+        filter: blur(24px);
+        animation: drift 36s ease-in-out infinite alternate;
+      }
+
+      body::after {
+        background-image:
+          radial-gradient(circle, rgba(255, 255, 255, 0.55) 0 1px, transparent 1.4px),
+          radial-gradient(circle, rgba(131, 181, 255, 0.35) 0 1px, transparent 1.2px);
+        background-size: 180px 180px, 240px 240px;
+        background-position: 0 0, 80px 50px;
+        opacity: 0.22;
+        animation: starDrift 60s linear infinite;
+      }
+
+      main {
+        position: relative;
+        z-index: 1;
+        width: min(1320px, calc(100vw - 40px));
+        margin: 0 auto;
+        padding: 56px 0 72px;
+      }
+
+      .hero {
+        padding: 28px 0 24px;
+      }
+
+      .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 14px;
+        border: 1px solid rgba(129, 169, 255, 0.22);
+        border-radius: 999px;
+        background: rgba(15, 21, 43, 0.55);
+        color: var(--muted);
+        font-size: 12px;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        backdrop-filter: blur(14px);
+      }
+
+      .eyebrow::before {
+        content: "";
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--accent), var(--accent-warm));
+        box-shadow: 0 0 18px rgba(121, 215, 255, 0.7);
+      }
+
+      h1 {
+        margin: 18px 0 14px;
+        max-width: 760px;
+        font-size: clamp(2.5rem, 4.6vw, 4.9rem);
+        line-height: 0.98;
+        letter-spacing: -0.04em;
+        font-weight: 700;
+      }
+
+      .intro {
+        max-width: 760px;
+        color: var(--muted);
+        font-size: 1.05rem;
+        line-height: 1.7;
+      }
+
+      .concept-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 26px;
+        margin-top: 34px;
+      }
+
+      .concept {
+        position: relative;
+        min-height: 760px;
+        padding: 28px;
+        border-radius: 32px;
+        background:
+          linear-gradient(180deg, rgba(18, 26, 52, 0.76), rgba(8, 12, 27, 0.92)),
+          rgba(8, 10, 20, 0.6);
+        border: 1px solid var(--panel-border);
+        box-shadow: var(--shadow);
+        overflow: hidden;
+        isolation: isolate;
+      }
+
+      .concept::before,
+      .concept::after {
+        content: "";
+        position: absolute;
+        inset: auto;
+        border-radius: 50%;
+        filter: blur(16px);
+        pointer-events: none;
+      }
+
+      .concept::before {
+        width: 320px;
+        height: 320px;
+        top: -90px;
+        right: -120px;
+        background: radial-gradient(circle, rgba(121, 215, 255, 0.24), transparent 70%);
+      }
+
+      .concept::after {
+        width: 280px;
+        height: 280px;
+        bottom: -120px;
+        left: -90px;
+        background: radial-gradient(circle, rgba(130, 138, 255, 0.2), transparent 72%);
+      }
+
+      .variant-tag {
+        position: relative;
+        z-index: 2;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 7px 12px;
+        border-radius: 999px;
+        border: 1px solid rgba(160, 192, 255, 0.22);
+        color: rgba(225, 234, 255, 0.8);
+        font-size: 0.73rem;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        background: rgba(10, 15, 29, 0.5);
+      }
+
+      .variant-tag::before {
+        content: "";
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--accent);
+        box-shadow: 0 0 14px rgba(121, 215, 255, 0.7);
+      }
+
+      .concept-title {
+        position: relative;
+        z-index: 2;
+        margin: 20px 0 8px;
+        font-size: 1.65rem;
+        letter-spacing: -0.03em;
+      }
+
+      .concept-note {
+        position: relative;
+        z-index: 2;
+        margin: 0 0 22px;
+        color: var(--muted);
+        line-height: 1.6;
+      }
+
+      .login-shell {
+        position: relative;
+        min-height: 560px;
+        display: flex;
+        align-items: stretch;
+      }
+
+      .ambient {
+        position: absolute;
+        inset: 0;
+        overflow: hidden;
+        border-radius: 26px;
+        background:
+          radial-gradient(circle at 22% 26%, rgba(121, 215, 255, 0.12), transparent 26%),
+          radial-gradient(circle at 80% 18%, rgba(126, 138, 255, 0.14), transparent 23%),
+          radial-gradient(circle at 40% 82%, rgba(99, 255, 199, 0.08), transparent 24%);
+      }
+
+      .ambient span {
+        position: absolute;
+        inset: auto;
+        border-radius: 50%;
+        filter: blur(22px);
+        mix-blend-mode: screen;
+        opacity: 0.75;
+      }
+
+      .ambient span:nth-child(1) {
+        width: 220px;
+        height: 220px;
+        top: 12%;
+        left: 10%;
+        background: rgba(99, 141, 255, 0.3);
+        animation: nebulaFloat 20s ease-in-out infinite alternate;
+      }
+
+      .ambient span:nth-child(2) {
+        width: 180px;
+        height: 180px;
+        top: 52%;
+        right: 6%;
+        background: rgba(121, 215, 255, 0.18);
+        animation: nebulaFloat 24s ease-in-out infinite alternate-reverse;
+      }
+
+      .ambient span:nth-child(3) {
+        width: 260px;
+        height: 260px;
+        bottom: -8%;
+        left: 26%;
+        background: rgba(148, 123, 255, 0.16);
+        animation: nebulaFloat 26s ease-in-out infinite alternate;
+      }
+
+      .ambient .mist {
+        position: absolute;
+        inset: 8% -20% auto -10%;
+        height: 180px;
+        background: linear-gradient(90deg, transparent, rgba(184, 220, 255, 0.12), transparent);
+        filter: blur(18px);
+        animation: mistSweep 18s ease-in-out infinite;
+      }
+
+      .login-card {
+        position: relative;
+        z-index: 2;
+        margin-top: auto;
+        width: 100%;
+        padding: 26px;
+        border-radius: 26px;
+        background: linear-gradient(180deg, rgba(16, 22, 45, 0.86), rgba(8, 12, 27, 0.92));
+        border: 1px solid rgba(174, 196, 255, 0.2);
+        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.36);
+        backdrop-filter: blur(18px);
+      }
+
+      .kicker {
+        margin: 0 0 10px;
+        font-size: 0.78rem;
+        color: rgba(198, 215, 255, 0.78);
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+      }
+
+      .brand-line {
+        margin: 0;
+        font-size: clamp(2rem, 4vw, 3rem);
+        line-height: 1;
+        letter-spacing: -0.05em;
+        color: #f9fbff;
+      }
+
+      .subcopy {
+        margin: 14px 0 22px;
+        color: var(--muted);
+        line-height: 1.65;
+        max-width: 28ch;
+      }
+
+      .wordmark {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.02em;
+        position: relative;
+      }
+
+      .wordmark .letter {
+        display: inline-block;
+      }
+
+      .fields {
+        display: grid;
+        gap: 12px;
+      }
+
+      label {
+        display: grid;
+        gap: 7px;
+        font-size: 0.9rem;
+        color: rgba(230, 236, 255, 0.86);
+      }
+
+      input {
+        width: 100%;
+        padding: 14px 16px;
+        border-radius: 16px;
+        border: 1px solid rgba(170, 191, 255, 0.14);
+        background: var(--input-bg);
+        color: var(--text);
+        outline: none;
+        transition: border-color 220ms ease, box-shadow 220ms ease, background 220ms ease;
+      }
+
+      input::placeholder {
+        color: rgba(191, 204, 238, 0.44);
+      }
+
+      input:focus {
+        border-color: rgba(121, 215, 255, 0.48);
+        box-shadow: 0 0 0 4px rgba(121, 215, 255, 0.12);
+        background: rgba(255, 255, 255, 0.07);
+      }
+
+      .row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        margin: 16px 0 18px;
+        color: rgba(218, 226, 255, 0.74);
+        font-size: 0.9rem;
+      }
+
+      .checkbox {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .checkbox-mark {
+        width: 18px;
+        height: 18px;
+        border-radius: 6px;
+        border: 1px solid rgba(168, 191, 255, 0.28);
+        background: rgba(255, 255, 255, 0.06);
+        box-shadow: inset 0 0 0 4px rgba(8, 12, 27, 0.9);
+      }
+
+      .forgot {
+        color: rgba(155, 222, 255, 0.88);
+        text-decoration: none;
+      }
+
+      .cta {
+        width: 100%;
+        padding: 14px 18px;
+        border: 0;
+        border-radius: 16px;
+        color: #04101c;
+        background: linear-gradient(135deg, #93e8ff 0%, #83a4ff 48%, #8fe6d5 100%);
+        font-size: 0.98rem;
+        font-weight: 700;
+        letter-spacing: 0.01em;
+        box-shadow: 0 18px 28px rgba(97, 141, 255, 0.24);
+      }
+
+      .meta {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-top: 18px;
+        color: rgba(202, 212, 245, 0.62);
+        font-size: 0.82rem;
+      }
+
+      .signal {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .signal::before {
+        content: "";
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--success);
+        box-shadow: 0 0 14px rgba(98, 224, 186, 0.66);
+      }
+
+      .glow-cascade .wordmark .letter {
+        animation: glowLetter 6s ease-in-out infinite;
+        animation-delay: calc(var(--index) * 0.22s);
+      }
+
+      .glow-cascade .wordmark::after {
+        content: "";
+        position: absolute;
+        inset: -12px -8px;
+        background: radial-gradient(circle, rgba(121, 215, 255, 0.16), transparent 65%);
+        filter: blur(14px);
+        z-index: -1;
+        animation: breathe 7s ease-in-out infinite;
+      }
+
+      .mist-reveal .wordmark {
+        color: transparent;
+        background: linear-gradient(110deg, rgba(255, 255, 255, 0.18) 0%, #f8fbff 42%, rgba(147, 236, 255, 0.92) 60%, #f8fbff 100%);
+        background-size: 220% 100%;
+        -webkit-background-clip: text;
+        background-clip: text;
+        animation: revealGradient 10s ease-in-out infinite;
+      }
+
+      .mist-reveal .wordmark::before {
+        content: "";
+        position: absolute;
+        inset: -18px -16px;
+        background:
+          linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.76) 47%, transparent 55%),
+          radial-gradient(circle, rgba(121, 215, 255, 0.16), transparent 60%);
+        filter: blur(18px);
+        opacity: 0;
+        animation: textMist 10s ease-in-out infinite;
+      }
+
+      .mist-reveal .ambient .mist {
+        top: 20%;
+        animation-duration: 22s;
+      }
+
+      .orbit-trace .brand-wrap {
+        position: relative;
+        display: inline-block;
+      }
+
+      .orbit-trace .orbit-ring {
+        position: absolute;
+        inset: -24px -20px;
+        border-radius: 999px;
+        border: 1px solid rgba(153, 181, 255, 0.14);
+        opacity: 0.7;
+      }
+
+      .orbit-trace .orbit-ring::before {
+        content: "";
+        position: absolute;
+        width: 34px;
+        height: 8px;
+        top: 50%;
+        left: 50%;
+        border-radius: 999px;
+        background: linear-gradient(90deg, transparent, rgba(157, 235, 255, 0.95), transparent);
+        box-shadow: 0 0 16px rgba(157, 235, 255, 0.9);
+        transform-origin: center center;
+        animation: orbit 8s linear infinite;
+      }
+
+      .orbit-trace .login-card {
+        overflow: hidden;
+      }
+
+      .orbit-trace .login-card::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border-radius: inherit;
+        padding: 1px;
+        background: linear-gradient(130deg, rgba(121, 215, 255, 0.04), rgba(121, 215, 255, 0.36), rgba(143, 230, 213, 0.1), rgba(121, 215, 255, 0.04));
+        -webkit-mask:
+          linear-gradient(#fff 0 0) content-box,
+          linear-gradient(#fff 0 0);
+        -webkit-mask-composite: xor;
+        mask-composite: exclude;
+        animation: borderSweep 8s ease-in-out infinite;
+      }
+
+      .orbit-trace .wordmark .letter {
+        animation: orbitGlow 8s ease-in-out infinite;
+        animation-delay: calc(var(--index) * 0.12s);
+      }
+
+      @keyframes drift {
+        0% {
+          transform: translate3d(-2%, 0, 0) scale(1);
+        }
+        100% {
+          transform: translate3d(2%, 4%, 0) scale(1.08);
+        }
+      }
+
+      @keyframes starDrift {
+        0% {
+          transform: translate3d(0, 0, 0);
+        }
+        100% {
+          transform: translate3d(-80px, 40px, 0);
+        }
+      }
+
+      @keyframes nebulaFloat {
+        0% {
+          transform: translate3d(0, 0, 0) scale(1);
+        }
+        100% {
+          transform: translate3d(18px, -20px, 0) scale(1.08);
+        }
+      }
+
+      @keyframes mistSweep {
+        0%,
+        100% {
+          transform: translate3d(-8%, 0, 0);
+          opacity: 0.24;
+        }
+        50% {
+          transform: translate3d(10%, 12px, 0);
+          opacity: 0.48;
+        }
+      }
+
+      @keyframes glowLetter {
+        0%,
+        70%,
+        100% {
+          transform: translateY(0);
+          color: rgba(248, 251, 255, 0.92);
+          text-shadow: 0 0 0 rgba(121, 215, 255, 0);
+        }
+        16% {
+          transform: translateY(-1px);
+          color: #ffffff;
+          text-shadow:
+            0 0 12px rgba(121, 215, 255, 0.78),
+            0 0 28px rgba(137, 140, 255, 0.36);
+        }
+      }
+
+      @keyframes breathe {
+        0%,
+        100% {
+          transform: scale(0.96);
+          opacity: 0.34;
+        }
+        50% {
+          transform: scale(1.06);
+          opacity: 0.56;
+        }
+      }
+
+      @keyframes revealGradient {
+        0%,
+        18%,
+        100% {
+          background-position: 100% 50%;
+          filter: drop-shadow(0 0 0 rgba(121, 215, 255, 0));
+        }
+        42%,
+        64% {
+          background-position: 35% 50%;
+          filter: drop-shadow(0 0 20px rgba(121, 215, 255, 0.24));
+        }
+      }
+
+      @keyframes textMist {
+        0%,
+        18%,
+        100% {
+          opacity: 0;
+          transform: translateX(-28px);
+        }
+        32%,
+        58% {
+          opacity: 0.72;
+          transform: translateX(8px);
+        }
+      }
+
+      @keyframes orbit {
+        0% {
+          transform: translate(-50%, -50%) rotate(0deg) translateX(122px);
+        }
+        100% {
+          transform: translate(-50%, -50%) rotate(360deg) translateX(122px);
+        }
+      }
+
+      @keyframes borderSweep {
+        0%,
+        100% {
+          opacity: 0.34;
+          filter: saturate(1);
+        }
+        50% {
+          opacity: 0.74;
+          filter: saturate(1.2);
+        }
+      }
+
+      @keyframes orbitGlow {
+        0%,
+        82%,
+        100% {
+          color: rgba(248, 251, 255, 0.92);
+          text-shadow: none;
+        }
+        18%,
+        24% {
+          color: #ffffff;
+          text-shadow:
+            0 0 10px rgba(121, 215, 255, 0.7),
+            0 0 24px rgba(143, 230, 213, 0.28);
+        }
+      }
+
+      @media (max-width: 1180px) {
+        .concept-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .concept {
+          min-height: auto;
+        }
+
+        .login-shell {
+          min-height: 520px;
+        }
+
+        .subcopy {
+          max-width: 42ch;
+        }
+      }
+
+      @media (max-width: 720px) {
+        main {
+          width: min(100vw - 24px, 100%);
+          padding-top: 28px;
+          padding-bottom: 36px;
+        }
+
+        .hero {
+          padding-top: 12px;
+        }
+
+        .concept {
+          padding: 20px;
+          border-radius: 24px;
+        }
+
+        .login-shell {
+          min-height: 500px;
+        }
+
+        .login-card {
+          padding: 22px 18px 18px;
+        }
+
+        .row,
+        .meta {
+          flex-direction: column;
+          align-items: flex-start;
+        }
+
+        .brand-line {
+          font-size: 2.2rem;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          animation-duration: 0.01ms !important;
+          animation-iteration-count: 1 !important;
+          transition-duration: 0.01ms !important;
+          scroll-behavior: auto !important;
+        }
+
+        body::before,
+        body::after,
+        .ambient span,
+        .ambient .mist {
+          opacity: 0.22;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main id="prototype">
+      <section class="hero">
+        <div class="eyebrow">Login Concept Study</div>
+        <h1>Nebulynk darf sich beim ersten Blick ein bisschen magisch anfuehlen.</h1>
+        <p class="intro">
+          Drei statische Login-Prototypen mit langsamer Nebula-Atmosphaere, subtiler Tiefe und unterschiedlich inszeniertem
+          Wortmarken-Moment. Alle Varianten bleiben im business-tauglichen Rahmen und koennen spaeter gezielt in die echte
+          Login-Ansicht uebernommen werden.
+        </p>
+      </section>
+
+      <section class="concept-grid" aria-label="Nebulynk Login Konzepte">
+        <article class="concept glow-cascade">
+          <div class="variant-tag">Variante A</div>
+          <h2 class="concept-title">Letter Glow Cascade</h2>
+          <p class="concept-note">Nebulynk steht sofort im Raum, waehrend sich die Buchstaben nacheinander aufladen und sanft weiterglimmen.</p>
+
+          <div class="login-shell">
+            <div class="ambient" aria-hidden="true">
+              <span></span>
+              <span></span>
+              <span></span>
+              <div class="mist"></div>
+            </div>
+
+            <div class="login-card">
+              <p class="kicker">Team communication, ready when you are</p>
+              <h3 class="brand-line">
+                <span class="wordmark" aria-label="Nebulynk">
+                  <span class="letter" style="--index: 0">N</span>
+                  <span class="letter" style="--index: 1">e</span>
+                  <span class="letter" style="--index: 2">b</span>
+                  <span class="letter" style="--index: 3">u</span>
+                  <span class="letter" style="--index: 4">l</span>
+                  <span class="letter" style="--index: 5">y</span>
+                  <span class="letter" style="--index: 6">n</span>
+                  <span class="letter" style="--index: 7">k</span>
+                </span>
+              </h3>
+              <p class="subcopy">Fokus fuer Gespraeche, Meetings und Entscheidungen. Ruhig, klar und sofort einsatzbereit.</p>
+
+              <div class="fields">
+                <label>
+                  E-Mail
+                  <input type="email" placeholder="alex@company.com" />
+                </label>
+                <label>
+                  Passwort
+                  <input type="password" placeholder="Passwort" />
+                </label>
+              </div>
+
+              <div class="row">
+                <div class="checkbox">
+                  <span class="checkbox-mark" aria-hidden="true"></span>
+                  <span>Angemeldet bleiben</span>
+                </div>
+                <a class="forgot" href="#prototype">Passwort vergessen?</a>
+              </div>
+
+              <button class="cta" type="button">Einloggen</button>
+
+              <div class="meta">
+                <span class="signal">System status: calm and connected</span>
+                <span>Concept mood: immediate premium glow</span>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="concept mist-reveal">
+          <div class="variant-tag">Variante B</div>
+          <h2 class="concept-title">Reveal Through Mist</h2>
+          <p class="concept-note">Die Wortmarke wird aus einer weichen Nebelschicht heraus freigegeben und wirkt dadurch cineastisch, aber nicht laut.</p>
+
+          <div class="login-shell">
+            <div class="ambient" aria-hidden="true">
+              <span></span>
+              <span></span>
+              <span></span>
+              <div class="mist"></div>
+            </div>
+
+            <div class="login-card">
+              <p class="kicker">Where channels, voice and action align</p>
+              <h3 class="brand-line">
+                <span class="wordmark">Nebulynk</span>
+              </h3>
+              <p class="subcopy">Eine ruhige Buehne fuer Teams, die Klarheit wollen. Die Animation arbeitet mit Atmosphaere statt mit Geschwindigkeit.</p>
+
+              <div class="fields">
+                <label>
+                  E-Mail
+                  <input type="email" placeholder="teamlead@example.com" />
+                </label>
+                <label>
+                  Passwort
+                  <input type="password" placeholder="Dein Passwort" />
+                </label>
+              </div>
+
+              <div class="row">
+                <div class="checkbox">
+                  <span class="checkbox-mark" aria-hidden="true"></span>
+                  <span>Geraet merken</span>
+                </div>
+                <a class="forgot" href="#prototype">Support kontaktieren</a>
+              </div>
+
+              <button class="cta" type="button">Zur Plattform</button>
+
+              <div class="meta">
+                <span class="signal">Visual priority: atmospheric reveal</span>
+                <span>Concept mood: elegant and soft</span>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="concept orbit-trace">
+          <div class="variant-tag">Variante C</div>
+          <h2 class="concept-title">Orbit Trace</h2>
+          <p class="concept-note">Ein heller Umlauf zieht ueber die Wortmarke und aktiviert dabei kurz Text und Kartenkante fuer einen praezisen Sci-Fi-Akzent.</p>
+
+          <div class="login-shell">
+            <div class="ambient" aria-hidden="true">
+              <span></span>
+              <span></span>
+              <span></span>
+              <div class="mist"></div>
+            </div>
+
+            <div class="login-card">
+              <p class="kicker">Operational clarity with a little momentum</p>
+              <div class="brand-wrap">
+                <div class="orbit-ring" aria-hidden="true"></div>
+                <h3 class="brand-line">
+                  <span class="wordmark" aria-label="Nebulynk">
+                    <span class="letter" style="--index: 0">N</span>
+                    <span class="letter" style="--index: 1">e</span>
+                    <span class="letter" style="--index: 2">b</span>
+                    <span class="letter" style="--index: 3">u</span>
+                    <span class="letter" style="--index: 4">l</span>
+                    <span class="letter" style="--index: 5">y</span>
+                    <span class="letter" style="--index: 6">n</span>
+                    <span class="letter" style="--index: 7">k</span>
+                  </span>
+                </h3>
+              </div>
+              <p class="subcopy">Diese Richtung fuehlt sich etwas technischer an, bleibt aber mit langsamer Umlaufbahn angenehm und hochwertig.</p>
+
+              <div class="fields">
+                <label>
+                  E-Mail
+                  <input type="email" placeholder="admin@nebula.space" />
+                </label>
+                <label>
+                  Passwort
+                  <input type="password" placeholder="Sicheres Passwort" />
+                </label>
+              </div>
+
+              <div class="row">
+                <div class="checkbox">
+                  <span class="checkbox-mark" aria-hidden="true"></span>
+                  <span>Sitzung behalten</span>
+                </div>
+                <a class="forgot" href="#prototype">Single Sign-on</a>
+              </div>
+
+              <button class="cta" type="button">Workspace oeffnen</button>
+
+              <div class="meta">
+                <span class="signal">Motion focus: orbital light trace</span>
+                <span>Concept mood: confident and refined</span>
+              </div>
+            </div>
+          </div>
+        </article>
+      </section>
+    </main>
+  </body>
+  </html>

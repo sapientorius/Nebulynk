@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "version": "0.2.0",
+  "revision": 1,
+  "channel": "stable",
+  "published_at": "2026-08-01T00:00:00.000Z",
+  "title": {
+    "de": "Nebulynk 0.2.0",
+    "en": "Nebulynk 0.2.0"
+  },
+  "summary": {
+    "de": "Fuehrt den signierten Release-Katalog, das Update-Center und proaktive Security-Hinweise fuer Plattform-Admins ein.",
+    "en": "Introduces the signed release catalog, the update center, and proactive security notices for platform administrators."
+  },
+  "changes": [
+    {
+      "category": "feature",
+      "title": {
+        "de": "Update-Center fuer Plattform-Admins",
+        "en": "Update center for platform administrators"
+      },
+      "description": {
+        "de": "Zeigt die installierte und neueste Version sowie alle dazwischenliegenden Release-Informationen an.",
+        "en": "Shows the installed and latest version together with every release in between."
+      }
+    },
+    {
+      "category": "security",
+      "title": {
+        "de": "Vertrauenswuerdige Release-Informationen",
+        "en": "Trusted release information"
+      },
+      "description": {
+        "de": "Release-Indizes werden mit Ed25519 signiert und Release-Dokumente ueber SHA-256-Digests gebunden.",
+        "en": "Release indexes are signed with Ed25519 and release documents are bound through SHA-256 digests."
+      }
+    }
+  ],
+  "security": [],
+  "upgrade": {
+    "backup_required": true,
+    "downtime_expected": true,
+    "breaking": false,
+    "manual_steps": {
+      "de": [
+        "Vor dem Update PostgreSQL und die Garage-Volumes sichern.",
+        "Backend und Frontend aus demselben Release-Tag neu bereitstellen."
+      ],
+      "en": [
+        "Back up PostgreSQL and the Garage volumes before updating.",
+        "Redeploy backend and frontend from the same release tag."
+      ]
+    },
+    "docs_url": "https://github.com/stylefieber/Nebulynk/blob/v0.2.0/docs/SELF_HOSTING.md"
+  }
+}

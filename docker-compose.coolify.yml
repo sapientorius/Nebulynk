@@ -1,0 +1,173 @@
+services:
+  # 1. Database (reachable internally as 'postgres')
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-nebulynk}
+      POSTGRES_USER: ${POSTGRES_USER:-nebulynk}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - nebulynk_postgres_data:/var/lib/postgresql/data
+    restart: always
+
+  # 2. Cache (reachable internally as 'redis')
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - nebulynk_redis_data:/data
+    restart: always
+
+  # 3. Object storage (S3, Garage default)
+  garage:
+    build:
+      context: .
+      dockerfile: garage.Dockerfile
+    command: /garage server --single-node --default-bucket
+    environment:
+      GARAGE_RPC_SECRET: ${GARAGE_RPC_SECRET:?GARAGE_RPC_SECRET must be set for Garage}
+      GARAGE_DEFAULT_ACCESS_KEY: ${STORAGE_S3_ACCESS_KEY:-${MINIO_ROOT_USER:-nebulynk}}
+      GARAGE_DEFAULT_SECRET_KEY: ${STORAGE_S3_SECRET_KEY:-${MINIO_ROOT_PASSWORD}}
+      GARAGE_DEFAULT_BUCKET: ${STORAGE_S3_BUCKET:-nebulynk-files}
+    volumes:
+      - nebulynk_garage_meta:/var/lib/garage/meta
+      - nebulynk_garage_data:/var/lib/garage/data
+    ports:
+      - "3900:3900" # API / S3 public asset endpoint
+    restart: always
+
+  # 4. LiveKit server (voice/video)
+  livekit:
+    build:
+      context: .
+      dockerfile: livekit.Dockerfile
+    command: --config /livekit.yaml
+    ports:
+      - "7880:7880" # API/Signal
+      - "7881:7881" # TCP
+      - "50000-50100:50000-50100/udp" # WebRTC range
+    environment:
+      LIVEKIT_KEYS: "${LIVEKIT_API_KEY}: ${LIVEKIT_API_SECRET}"
+    restart: always
+
+  livekit-egress:
+    build:
+      context: .
+      dockerfile: livekit-egress.Dockerfile
+    command: --config /livekit-egress.yaml
+    environment:
+      EGRESS_CONFIG_FILE: /livekit-egress.yaml
+      # Keep these as the single source of truth. Do not duplicate LiveKit
+      # credentials or ws_url inside livekit-egress.yaml.
+      LIVEKIT_API_KEY: ${LIVEKIT_API_KEY}
+      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET}
+      LIVEKIT_WS_URL: ${LIVEKIT_WS_URL:-ws://livekit:7880}
+      AWS_ACCESS_KEY_ID: ${STORAGE_S3_ACCESS_KEY:-${MINIO_ROOT_USER:-nebulynk}}
+      AWS_SECRET_ACCESS_KEY: ${STORAGE_S3_SECRET_KEY:-${MINIO_ROOT_PASSWORD}}
+      AWS_DEFAULT_REGION: ${STORAGE_S3_REGION:-${MEETING_RECORDINGS_S3_REGION:-us-east-1}}
+    depends_on:
+      - livekit
+      - redis
+      - garage
+    restart: always
+
+  # 5. Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      NODE_ENV: production
+      # Required production secrets. Backend startup rejects missing or placeholder
+      # auth/storage/LiveKit secrets, and AI provider secrets should use a
+      # dedicated encryption key instead of falling back to auth.
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set for production}
+      AI_SECRET_KEY: ${AI_SECRET_KEY:-}
+      BACKEND_PORT: ${BACKEND_PORT:-3030}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      MAX_FILE_SIZE: ${MAX_FILE_SIZE:-26214400}
+      AUTHENTICATION_RATE_LIMIT_IP_LIMIT: ${AUTHENTICATION_RATE_LIMIT_IP_LIMIT:-}
+      AUTH_BROWSER_ACCESS_TOKEN_TTL: ${AUTH_BROWSER_ACCESS_TOKEN_TTL:-15m}
+      AUTH_REFRESH_TOKEN_TTL: ${AUTH_REFRESH_TOKEN_TTL:-1d}
+      AUTH_REMEMBER_REFRESH_TOKEN_TTL: ${AUTH_REMEMBER_REFRESH_TOKEN_TTL:-30d}
+      AUTH_REFRESH_COOKIE_NAME: ${AUTH_REFRESH_COOKIE_NAME:-nebulynk_refresh_session}
+      AUTH_CSRF_COOKIE_NAME: ${AUTH_CSRF_COOKIE_NAME:-nebulynk_csrf_token}
+      AUTH_COOKIE_DOMAIN: ${AUTH_COOKIE_DOMAIN:-}
+      RATE_LIMIT_DRIVER: ${RATE_LIMIT_DRIVER:-redis}
+      PASSKEY_RP_ID: ${PASSKEY_RP_ID:-}
+      AI_PROVIDER_BASE_URL_ALLOWLIST: ${AI_PROVIDER_BASE_URL_ALLOWLIST:-}
+      # Internal communication in Docker network
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-nebulynk}
+      POSTGRES_USER: ${POSTGRES_USER:-nebulynk}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      REDIS_HOST: redis
+      # S3-compatible storage (Garage by default)
+      STORAGE_S3_ENDPOINT: "http://garage:3900"
+      # Signed file URLs must target the S3/API public endpoint.
+      STORAGE_S3_PUBLIC_ENDPOINT: ${STORAGE_S3_PUBLIC_ENDPOINT:-${MINIO_PUBLIC_ENDPOINT}}
+      STORAGE_S3_ACCESS_KEY: ${STORAGE_S3_ACCESS_KEY:-${MINIO_ROOT_USER:-nebulynk}}
+      STORAGE_S3_SECRET_KEY: ${STORAGE_S3_SECRET_KEY:-${MINIO_ROOT_PASSWORD}}
+      STORAGE_S3_BUCKET: ${STORAGE_S3_BUCKET:-nebulynk-files}
+      STORAGE_S3_REGION: ${STORAGE_S3_REGION:-${MEETING_RECORDINGS_S3_REGION:-us-east-1}}
+      MEETING_RECORDINGS_PREFIX: meeting-recordings
+      MEETING_RECORDINGS_BUCKET: ${STORAGE_S3_BUCKET:-nebulynk-files}
+      MEETING_RECORDINGS_S3_ENDPOINT: "http://garage:3900"
+      MEETING_RECORDINGS_EGRESS_S3_ENDPOINT: "http://garage:3900"
+      MEETING_RECORDINGS_S3_REGION: ${STORAGE_S3_REGION:-${MEETING_RECORDINGS_S3_REGION:-us-east-1}}
+      MEETING_TRANSCRIPT_WAIT_TIMEOUT_MS: ${MEETING_TRANSCRIPT_WAIT_TIMEOUT_MS:-120000}
+      # LiveKit
+      LIVEKIT_HOST: "http://livekit:7880"
+      LIVEKIT_PUBLIC_URL: ${LIVEKIT_PUBLIC_URL}
+      LIVEKIT_API_KEY: ${LIVEKIT_API_KEY}
+      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET}
+      # KLIPY GIF API
+      KLIPY_API_KEY: ${KLIPY_API_KEY}
+      # Web Push (optional)
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-mailto:admin@example.com}
+      # E-Mail (optional)
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_IGNORE_TLS: ${SMTP_IGNORE_TLS:-false}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASS: ${SMTP_PASS}
+      SMTP_FROM: ${SMTP_FROM:-noreply@nebulynk.local}
+      # URL for CORS
+      FRONTEND_URL: ${COOLIFY_URL_FRONTEND}
+      # Coolify terminates TLS upstream, so backend cookies must trust forwarded https metadata.
+      TRUST_PROXY: ${TRUST_PROXY:-true}
+      # Public Ed25519 verification keyring for the signed official update feed.
+      NEBULYNK_UPDATE_PUBLIC_KEYS_JSON: ${NEBULYNK_UPDATE_PUBLIC_KEYS_JSON:-}
+      NEBULYNK_BUILD_SHA: ${NEBULYNK_BUILD_SHA:-}
+      NEBULYNK_BUILD_TIME: ${NEBULYNK_BUILD_TIME:-}
+    depends_on:
+      - postgres
+      - redis
+      - garage
+      - livekit
+      - livekit-egress
+    restart: always
+
+  # 6. Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        # These URLs are baked into frontend build output
+        VITE_API_URL: ${COOLIFY_URL_BACKEND}
+        VITE_LIVEKIT_URL: ${COOLIFY_URL_LIVEKIT_WSS}
+        VITE_VAPID_PUBLIC_KEY: ${VITE_VAPID_PUBLIC_KEY}
+        VITE_AUTH_CSRF_COOKIE_NAME: ${AUTH_CSRF_COOKIE_NAME:-nebulynk_csrf_token}
+    depends_on:
+      - backend
+    restart: always
+
+volumes:
+  nebulynk_postgres_data:
+  nebulynk_redis_data:
+  nebulynk_garage_meta:
+  nebulynk_garage_data:

@@ -1,0 +1,264 @@
+:root {
+  color-scheme: dark;
+  --bg: #10181a;
+  --panel: rgba(18, 33, 36, 0.92);
+  --panel-strong: rgba(24, 47, 52, 0.95);
+  --line: rgba(152, 201, 193, 0.16);
+  --text: rgba(244, 249, 247, 0.92);
+  --muted: rgba(187, 214, 209, 0.72);
+  --accent: #72d6c9;
+  --accent-strong: #4eb5a7;
+  --danger: #f57f86;
+  --warning: #f6c15e;
+  --ok: #82d480;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top left, rgba(114, 214, 201, 0.18), transparent 28rem),
+    radial-gradient(circle at top right, rgba(246, 193, 94, 0.12), transparent 24rem),
+    linear-gradient(180deg, #0f1719 0%, #121f21 100%);
+  color: var(--text);
+  font-family: "Segoe UI", "Helvetica Neue", sans-serif;
+}
+
+.shell {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 32px;
+}
+
+.hero,
+.panel-head,
+.toggle-row,
+.card-actions,
+.session-row,
+.site-row,
+.request-row,
+.status-grid {
+  display: flex;
+}
+
+.hero,
+.panel-head,
+.toggle-row,
+.session-row,
+.site-row,
+.request-row {
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.hero {
+  align-items: flex-start;
+  margin-bottom: 24px;
+}
+
+.eyebrow {
+  margin: 0 0 8px;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+h1,
+h2,
+p {
+  margin: 0;
+}
+
+h1 {
+  font-size: 34px;
+}
+
+h2 {
+  font-size: 18px;
+}
+
+.hero-copy {
+  margin-top: 10px;
+  max-width: 680px;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.panel-grid {
+  display: grid;
+  gap: 18px;
+  margin-top: 18px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.panel {
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--panel);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.2);
+}
+
+.panel-wide {
+  margin-bottom: 18px;
+}
+
+.stack {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.meta-count,
+.pill,
+.tag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.meta-count,
+.pill {
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  color: var(--muted);
+}
+
+.pill-ok {
+  color: #0f1d12;
+  background: var(--ok);
+  border-color: transparent;
+}
+
+.pill-warn {
+  color: #30220a;
+  background: var(--warning);
+  border-color: transparent;
+}
+
+.pill-danger {
+  color: #351116;
+  background: var(--danger);
+  border-color: transparent;
+}
+
+.pill-muted {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.status-grid {
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.status-tile,
+.session-row,
+.site-row,
+.request-row {
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--panel-strong);
+}
+
+.status-tile {
+  min-width: 160px;
+}
+
+.status-tile strong,
+.session-copy strong,
+.site-copy strong,
+.request-copy strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.status-tile small,
+.session-copy small,
+.site-copy small,
+.request-copy small,
+.toggle-row small {
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.tag {
+  padding: 5px 9px;
+  background: rgba(114, 214, 201, 0.14);
+  color: var(--accent);
+}
+
+.tag-target {
+  background: rgba(130, 212, 128, 0.18);
+  color: var(--ok);
+}
+
+.card-actions {
+  align-items: center;
+  gap: 10px;
+}
+
+.toggle-row {
+  align-items: flex-start;
+  margin-top: 16px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+button,
+input[type="checkbox"] {
+  cursor: pointer;
+}
+
+button {
+  border: 0;
+  border-radius: 12px;
+  padding: 10px 14px;
+  font: inherit;
+}
+
+.ghost-button {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.action-button {
+  color: #07211c;
+  background: var(--accent);
+}
+
+.danger-button {
+  color: white;
+  background: rgba(245, 127, 134, 0.18);
+  border: 1px solid rgba(245, 127, 134, 0.35);
+}
+
+.empty-state {
+  color: var(--muted);
+}
+
+@media (max-width: 900px) {
+  .shell {
+    padding: 20px;
+  }
+
+  .panel-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .hero {
+    flex-direction: column;
+  }
+}

@@ -1,0 +1,38 @@
+node_modules/
+frontend/public/vendor/
+dist/
+dist-release-notes/
+dist-update-feed/
+.env
+.env.local
+*.log
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+.local/
+# Internal planning-tool state
+# Internal planning-tool state
+.kilo/
+.claude/
+.agents/
+
+# Local-only AI agent memory and private contributor notes
+.local/ai-agent-memory/
+AGENTS.local.md
+CLAUDE.local.md
+docs/*.local.md
+docs/workboards-local/
+
+# Tauri desktop build artifacts
+desktop/src-tauri/target/
+desktop/src-tauri/gen/
+
+desktop-ptt-helper/src-tauri/target/
+desktop-ptt-helper/src-tauri/gen/
+
+# Electron desktop build artifacts
+desktop-electron/dist/
+desktop-electron/native/windows-ptt-helper/target/

@@ -1,0 +1,27 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Nebulynk PTT Helper",
+  "version": "0.1.0",
+  "identifier": "net.nebulynk.desktop-ptt-helper",
+  "build": {
+    "frontendDist": "../ui"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "icon": [
+      "../../desktop/src-tauri/icons/icon.png",
+      "../../desktop/src-tauri/icons/icon.ico"
+    ],
+    "targets": [
+      "app",
+      "msi"
+    ]
+  }
+}

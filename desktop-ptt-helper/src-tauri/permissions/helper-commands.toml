@@ -1,0 +1,12 @@
+[[permission]]
+identifier = "allow-helper-commands"
+description = "Enables the Nebulynk PTT Helper commands for the local settings UI."
+commands.allow = [
+  "helper_get_state_snapshot",
+  "helper_approve_pairing",
+  "helper_reject_pairing",
+  "helper_revoke_origin",
+  "helper_set_paused",
+  "helper_set_autostart",
+  "helper_show_settings"
+]

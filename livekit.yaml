@@ -1,0 +1,9 @@
+port: 7880
+rtc:
+  udp_port: 7882
+  tcp_port: 7881
+  use_external_ip: true
+redis:
+  address: redis:6379 # Nutzt den Redis Service aus dem Docker Compose Stack
+keys:
+  # Keys werden über ENV Variablen überschrieben, aber Sektion muss existieren

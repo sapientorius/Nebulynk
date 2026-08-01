@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Nebulynk PTT Helper</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="hero">
+        <div>
+          <p class="eyebrow">Nebulynk Local Helper</p>
+          <h1>Windows Push-to-Talk</h1>
+          <p class="hero-copy">
+            Pair Nebulynk browser and PWA sessions once, keep one active target window, and forward
+            global push-to-talk through the local helper.
+          </p>
+        </div>
+        <button id="refresh-button" class="ghost-button" type="button">Refresh</button>
+      </header>
+
+      <section class="panel panel-wide">
+        <div class="panel-head">
+          <h2>Status</h2>
+          <span id="status-pill" class="pill pill-muted">Loading</span>
+        </div>
+        <div id="status-grid" class="status-grid"></div>
+      </section>
+
+      <section class="panel-grid">
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Pending Pairing</h2>
+            <span id="pending-count" class="meta-count">0</span>
+          </div>
+          <div id="pending-requests" class="stack empty-state">
+            No pairing requests waiting.
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Trusted Sites</h2>
+            <span id="trusted-count" class="meta-count">0</span>
+          </div>
+          <div id="trusted-origins" class="stack empty-state">
+            No trusted Nebulynk sites yet.
+          </div>
+        </section>
+      </section>
+
+      <section class="panel-grid">
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Live Sessions</h2>
+            <span id="session-count" class="meta-count">0</span>
+          </div>
+          <div id="active-sessions" class="stack empty-state">
+            No browser or PWA sessions connected.
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Helper Settings</h2>
+          </div>
+          <label class="toggle-row">
+            <input id="pause-toggle" type="checkbox" />
+            <span>
+              <strong>Pause global PTT</strong>
+              <small>Keep the helper running, but do not forward push-to-talk events.</small>
+            </span>
+          </label>
+          <label class="toggle-row">
+            <input id="autostart-toggle" type="checkbox" />
+            <span>
+              <strong>Start on Windows login</strong>
+              <small>Register the helper in the current user Run key.</small>
+            </span>
+          </label>
+        </section>
+      </section>
+    </main>
+
+    <script src="./settings.js"></script>
+  </body>
+</html>
