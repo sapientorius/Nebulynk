@@ -86,6 +86,19 @@ npm run dev:desktop:ptt-helper
 - [Security Policy](SECURITY.md)
 - [Trademark Policy](TRADEMARKS.md)
 
+## Built with
+
+<p>
+  <a href="https://feathersjs.com/"><img src="https://img.shields.io/badge/FeathersJS-404D59?style=for-the-badge&logo=feathers&logoColor=white" alt="FeathersJS"></a>
+  <a href="https://vuejs.org/"><img src="https://img.shields.io/badge/Vue.js-4FC08D?style=for-the-badge&logo=vuedotjs&logoColor=white" alt="Vue.js"></a>
+  <a href="https://www.naiveui.com/"><img src="https://img.shields.io/badge/Naive%20UI-18A058?style=for-the-badge&logo=naiveui&logoColor=white" alt="Naive UI"></a>
+  <a href="https://livekit.io/"><img src="https://img.shields.io/badge/LiveKit-00A2E8?style=for-the-badge&logo=livekit&logoColor=white" alt="LiveKit"></a>
+  <a href="https://www.postgresql.org/"><img src="https://img.shields.io/badge/PostgreSQL-4169E1?style=for-the-badge&logo=postgresql&logoColor=white" alt="PostgreSQL"></a>
+  <a href="https://redis.io/"><img src="https://img.shields.io/badge/Redis-DC382D?style=for-the-badge&logo=redis&logoColor=white" alt="Redis"></a>
+</p>
+
+The logos belong to their respective projects and trademark owners and do not imply endorsement or partnership.
+
 ## Quality Checks
 
 ```bash
