@@ -1,10 +1,10 @@
-# Self-Hosting with Docker and Coolify
+# Self-Hosting with Docker
 
 This guide explains how to run your own Nebulynk instance. It is intended for
 administrators who can manage domains, TLS certificates, and server backups.
-Coolify is the recommended option for a fully managed deployment of this
-repository. The Docker instructions use the existing Compose and Docker files
-on a self-managed host.
+For a fully managed deployment, follow the dedicated
+[Coolify step-by-step guide](COOLIFY.md). The instructions below use the
+existing Compose and Docker files on a self-managed host.
 
 Read [Secure Self-Hosting](security-hardening.md) as well. Its guidance on
 secrets, TLS, backups, and access control applies in addition to this guide.
@@ -76,7 +76,7 @@ For example, generate strong values with:
 
 ```bash
 openssl rand -base64 48    # JWT_SECRET, AI_SECRET_KEY, passwords
-openssl rand -hex 32       # GARAGE_RPC_SECRET
+openssl rand -hex 32       # GARAGE_RPC_SECRET: 32 bytes = 64 hex characters
 ```
 
 Use different values for `JWT_SECRET`, `AI_SECRET_KEY`, `POSTGRES_PASSWORD`,
@@ -107,7 +107,6 @@ Use different values for `JWT_SECRET`, `AI_SECRET_KEY`, `POSTGRES_PASSWORD`,
 | `LIVEKIT_PUBLIC_URL` | `wss://livekit.example.com` | Client-facing LiveKit URL emitted by the backend. |
 | `STORAGE_S3_PUBLIC_ENDPOINT` | `https://files.example.com` | Public S3 API used for signed file URLs; never use an admin or console port. |
 | `VITE_API_URL` | `https://api.example.com` | API URL embedded during the frontend build. |
-| `VITE_LIVEKIT_URL` | `wss://livekit.example.com` | LiveKit URL embedded during the frontend build. |
 
 `VITE_*` values are build arguments, not runtime secrets. Rebuild and deploy
 the frontend after changing one. Never expose secrets to the browser with a
@@ -149,13 +148,16 @@ included `livekit-egress.yaml` uses `nebulynk-files`.
 | Email | `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_IGNORE_TLS`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`, `SMTP_FROM_NAME` | Required for invitations and security-update digests. Sending remains disabled without `SMTP_HOST`; feed checks and the update center continue to work. |
 | Build provenance | `NEBULYNK_BUILD_SHA`, `NEBULYNK_BUILD_TIME` | Optional immutable commit and build timestamp shown to administrators. Only the package SemVer determines update availability. |
 | Update trust override | `NEBULYNK_UPDATE_PUBLIC_KEYS_JSON` | Official release tags embed their public verification keys. Use this additive public keyring only for controlled development or an overlapping emergency rotation; never place private key material here. |
-| Web Push | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `VITE_VAPID_PUBLIC_KEY` | Both server-side VAPID keys and the public build value are required for push. |
+| Web Push | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | Both server-side VAPID keys are required for push; the supplied Compose files reuse the public key for the frontend build. |
 | GIF search | `KLIPY_API_KEY` | Only set when using the Klipy integration. |
 
-The backend reads the legacy names `MINIO_ENDPOINT`, `MINIO_PUBLIC_ENDPOINT`,
-`MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY`, `MINIO_BUCKET`, `MINIO_ROOT_USER`, and
-`MINIO_ROOT_PASSWORD` as fallbacks. Use the consistent `STORAGE_S3_*` names
-for new deployments.
+The backend can still read legacy `MINIO_*` names during migration, but the
+Compose files and environment examples use only `STORAGE_S3_*`. Before
+updating an older installation, copy its public endpoint, access key, secret
+key, and bucket values to the corresponding `STORAGE_S3_*` variables. The
+supplied stack keeps its internal Garage endpoint at `http://garage:3900`.
+Reuse the existing values; do not rotate storage credentials as part of the
+rename.
 
 ## Docker on a self-managed host
 
@@ -180,8 +182,9 @@ build contexts. Do not start the base file alone for a production instance.
 
 2. Edit `.env.production`. Replace every `CHANGE_ME` value, set the four public
    domains, and leave `NODE_ENV=production`, `TRUST_PROXY=true`, and
-   `FRONTEND_PORT=8080`. `VITE_API_URL` and `VITE_LIVEKIT_URL` are required
-   build values, not secrets.
+   `FRONTEND_PORT=8080`. `VITE_API_URL` is a required build value, while the
+   supplied Compose file reuses `LIVEKIT_PUBLIC_URL` and `VAPID_PUBLIC_KEY` for
+   their corresponding frontend values.
 
 3. Render the Compose configuration before changing server state. This catches
    missing required variables and shows the final service definitions:
@@ -240,55 +243,10 @@ and Garage volumes.
 
 ## Deploying with Coolify
 
-Coolify manages builds, containers, domains, and TLS. The repository includes
-[`docker-compose.coolify.yml`](../docker-compose.coolify.yml) for this purpose;
-it contains every Nebulynk service.
-
-1. Create a project and a Docker Compose resource from
-   `https://github.com/sapientorius/Nebulynk`. Select
-   `docker-compose.coolify.yml` as the Compose file. Set the source reference
-   to `stable` for the recommended production channel, or to an immutable
-   `vX.Y.Z` tag for a change-controlled installation. Never use `main`.
-   Enable automatic deploys only for the `stable` policy; a tag-pinned resource
-   should move only after an administrator deliberately selects a newer tag.
-2. Add the values from the tables above as Coolify environment variables. Set
-   at least `POSTGRES_PASSWORD`, `GARAGE_RPC_SECRET`, `JWT_SECRET`,
-   `AI_SECRET_KEY`, `STORAGE_S3_ACCESS_KEY`, `STORAGE_S3_SECRET_KEY`,
-   `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`, `STORAGE_S3_PUBLIC_ENDPOINT`, and
-   `PASSKEY_RP_ID` before the first deployment.
-3. Configure these domains for the services at the specified internal port.
-   Then add the corresponding build/runtime variables:
-
-   | Coolify service | Port | Variable |
-   | --- | --- | --- |
-   | `frontend` | `8080` | `COOLIFY_URL_FRONTEND=https://app.example.com` |
-   | `backend` | `3030` | `COOLIFY_URL_BACKEND=https://api.example.com` |
-   | `livekit` | `7880` | `COOLIFY_URL_LIVEKIT_WSS=wss://livekit.example.com` |
-   | `garage` | `3900` | `STORAGE_S3_PUBLIC_ENDPOINT=https://files.example.com` |
-
-   The Compose stack sets `FRONTEND_URL` from `COOLIFY_URL_FRONTEND`. Frontend
-   build arguments come from `COOLIFY_URL_BACKEND`,
-   `COOLIFY_URL_LIVEKIT_WSS`, `VITE_VAPID_PUBLIC_KEY`, and
-   `AUTH_CSRF_COOKIE_NAME`. Set `LIVEKIT_PUBLIC_URL` to the same WSS URL.
-4. Open direct LiveKit media ports in Coolify and the server firewall as well:
-   TCP `7881` and UDP `7882` must be reachable by clients. An HTTP proxy alone
-   is not sufficient.
-5. Deploy and check every service log. Changing `VITE_*`,
-   `COOLIFY_URL_BACKEND`, or `COOLIFY_URL_LIVEKIT_WSS` requires a full frontend
-   rebuild. A normal backend or configuration change only requires a resource
-   redeploy. Optionally set `NEBULYNK_BUILD_SHA` and
-   `NEBULYNK_BUILD_TIME` from the selected source revision so administrators
-   can correlate the running build with the deployment.
-
-Coolify creates persistent volumes for the Compose volumes. Back up
-`nebulynk_postgres_data`, `nebulynk_garage_meta`, and
-`nebulynk_garage_data` together. Redis can be rebuilt from its data store if
-needed.
-
-Before Garage starts, the one-shot `garage-volume-init` service assigns only
-the two Garage volumes to the unprivileged Garage UID (`65532`). Wait for it to
-complete successfully in the Coolify logs; do not remove the service or change
-the volume ownership to root during maintenance.
+Coolify uses a separate workflow with generated secrets and domain-derived
+configuration. Follow [Deploying Nebulynk with Coolify](COOLIFY.md) for the
+complete supported step-by-step procedure. Do not apply the manual Docker
+environment checklist above unchanged to a Coolify resource.
 
 ## Acceptance checks, troubleshooting, and updates
 

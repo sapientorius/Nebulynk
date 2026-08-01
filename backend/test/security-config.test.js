@@ -1,6 +1,8 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { spawnSync } from 'node:child_process'
 import { readFile } from 'node:fs/promises'
+import { fileURLToPath } from 'node:url'
 import {
   resolveClientOrigins,
   resolveAuthenticationSecret,
@@ -191,23 +193,189 @@ test('validateRuntimeSecurity rejects public S3 endpoint values that target the 
   assert.ok(report.errors.some((entry) => entry.code === 'storage-s3-public-endpoint-console-port'))
 })
 
-test('Coolify compose passes required production security environment to backend', async () => {
-  const composePath = new URL('../../docker-compose.coolify.yml', import.meta.url)
-  const contents = await readFile(composePath, 'utf8')
+const repositoryRoot = fileURLToPath(new URL('../..', import.meta.url))
+const coolifyComposePath = fileURLToPath(new URL('../../docker-compose.coolify.yml', import.meta.url))
+const explicitCoolifyOverrideKeys = [
+  'POSTGRES_PASSWORD',
+  'GARAGE_RPC_SECRET',
+  'STORAGE_S3_ACCESS_KEY',
+  'STORAGE_S3_SECRET_KEY',
+  'JWT_SECRET',
+  'AI_SECRET_KEY',
+  'LIVEKIT_API_KEY',
+  'LIVEKIT_API_SECRET',
+  'FRONTEND_URL',
+  'PASSKEY_RP_ID',
+  'STORAGE_S3_PUBLIC_ENDPOINT',
+  'LIVEKIT_PUBLIC_URL'
+]
+const generatedCoolifyEnvironment = {
+  SERVICE_PASSWORD_64_POSTGRES: 'generated-postgres-secret',
+  SERVICE_HEX_64_GARAGERPC: 'a'.repeat(64),
+  SERVICE_USER_S3: 'generated-s3-user',
+  SERVICE_PASSWORD_64_S3: 'generated-s3-secret',
+  SERVICE_PASSWORD_64_JWT: 'generated-jwt-secret',
+  SERVICE_PASSWORD_64_AI: 'generated-ai-secret',
+  SERVICE_USER_LIVEKIT: 'generated-livekit-key',
+  SERVICE_PASSWORD_64_LIVEKIT: 'generated-livekit-secret',
+  SERVICE_URL_FRONTEND: 'https://app.example.com',
+  SERVICE_FQDN_FRONTEND: 'app.example.com',
+  SERVICE_URL_BACKEND: 'https://api.example.com',
+  SERVICE_URL_LIVEKIT: 'https://livekit.example.com',
+  SERVICE_URL_GARAGE: 'https://files.example.com',
+  SOURCE_COMMIT: '0123456789abcdef',
+  VAPID_PUBLIC_KEY: 'generated-vapid-public-key'
+}
 
-  assert.match(contents, /JWT_SECRET:\s*\$\{JWT_SECRET:\?JWT_SECRET must be set for production\}/)
-  assert.match(contents, /AI_SECRET_KEY:\s*\$\{AI_SECRET_KEY:-\}/)
+function resolveDockerComposeCommand() {
+  const plugin = spawnSync('docker', ['compose', 'version'], { encoding: 'utf8' })
+  if (plugin.status === 0) {
+    return { command: 'docker', prefix: ['compose'] }
+  }
+
+  const standalone = spawnSync('docker-compose', ['version'], { encoding: 'utf8' })
+  if (standalone.status === 0) {
+    return { command: 'docker-compose', prefix: [] }
+  }
+
+  return null
+}
+
+const dockerComposeCommand = resolveDockerComposeCommand()
+
+function renderCoolifyCompose(overrides = {}) {
+  const env = {
+    ...process.env,
+    ...generatedCoolifyEnvironment,
+    ...overrides
+  }
+
+  for (const key of explicitCoolifyOverrideKeys) {
+    if (!Object.hasOwn(overrides, key)) {
+      // An explicit empty value prevents a developer's local .env file from
+      // shadowing the generated-secret fallback during this contract test.
+      env[key] = ''
+    }
+  }
+
+  const result = spawnSync(
+    dockerComposeCommand.command,
+    [
+      ...dockerComposeCommand.prefix,
+      '--file',
+      coolifyComposePath,
+      'config',
+      '--format',
+      'json'
+    ],
+    {
+      cwd: repositoryRoot,
+      env,
+      encoding: 'utf8'
+    }
+  )
+
+  assert.equal(result.status, 0, result.stderr || result.error?.message)
+  return JSON.parse(result.stdout)
+}
+
+test('Coolify compose passes generated production configuration to every consumer', {
+  skip: !dockerComposeCommand
+}, () => {
+  const rendered = renderCoolifyCompose()
+  const { services } = rendered
+
+  assert.equal(services.postgres.environment.POSTGRES_PASSWORD, 'generated-postgres-secret')
+  assert.equal(services.backend.environment.POSTGRES_PASSWORD, 'generated-postgres-secret')
+
+  assert.equal(services.garage.environment.GARAGE_RPC_SECRET, 'a'.repeat(64))
+  assert.equal(services.garage.environment.GARAGE_RPC_SECRET.length, 64)
+  assert.equal(services.garage.environment.GARAGE_DEFAULT_ACCESS_KEY, 'generated-s3-user')
+  assert.equal(services.garage.environment.GARAGE_DEFAULT_SECRET_KEY, 'generated-s3-secret')
+  assert.equal(services['livekit-egress'].environment.AWS_ACCESS_KEY_ID, 'generated-s3-user')
+  assert.equal(services['livekit-egress'].environment.AWS_SECRET_ACCESS_KEY, 'generated-s3-secret')
+  assert.equal(services.backend.environment.STORAGE_S3_ACCESS_KEY, 'generated-s3-user')
+  assert.equal(services.backend.environment.STORAGE_S3_SECRET_KEY, 'generated-s3-secret')
+
+  assert.equal(services.livekit.environment.LIVEKIT_KEYS, 'generated-livekit-key: generated-livekit-secret')
+  assert.equal(services['livekit-egress'].environment.LIVEKIT_API_KEY, 'generated-livekit-key')
+  assert.equal(services.backend.environment.LIVEKIT_API_SECRET, 'generated-livekit-secret')
+
+  assert.equal(services.backend.environment.FRONTEND_URL, 'https://app.example.com')
+  assert.equal(services.backend.environment.PASSKEY_RP_ID, 'app.example.com')
+  assert.equal(services.backend.environment.STORAGE_S3_PUBLIC_ENDPOINT, 'https://files.example.com')
+  assert.equal(services.backend.environment.LIVEKIT_PUBLIC_URL, 'https://livekit.example.com')
+  assert.equal(services.backend.environment.NEBULYNK_BUILD_SHA, '0123456789abcdef')
+  assert.equal(services.frontend.build.args.VITE_API_URL, 'https://api.example.com')
+  assert.equal(services.frontend.build.args.VITE_LIVEKIT_URL, 'https://livekit.example.com')
+  assert.equal(services.frontend.build.args.VITE_VAPID_PUBLIC_KEY, 'generated-vapid-public-key')
+})
+
+test('Coolify compose preserves explicit secrets for existing installations', {
+  skip: !dockerComposeCommand
+}, () => {
+  const rendered = renderCoolifyCompose({
+    POSTGRES_PASSWORD: 'existing-postgres-secret',
+    GARAGE_RPC_SECRET: 'b'.repeat(64),
+    STORAGE_S3_ACCESS_KEY: 'existing-s3-user',
+    STORAGE_S3_SECRET_KEY: 'existing-s3-secret',
+    JWT_SECRET: 'existing-jwt-secret',
+    AI_SECRET_KEY: 'existing-ai-secret',
+    LIVEKIT_API_KEY: 'existing-livekit-key',
+    LIVEKIT_API_SECRET: 'existing-livekit-secret'
+  })
+  const { services } = rendered
+
+  assert.equal(services.postgres.environment.POSTGRES_PASSWORD, 'existing-postgres-secret')
+  assert.equal(services.garage.environment.GARAGE_RPC_SECRET, 'b'.repeat(64))
+  assert.equal(services.garage.environment.GARAGE_DEFAULT_ACCESS_KEY, 'existing-s3-user')
+  assert.equal(services['livekit-egress'].environment.AWS_SECRET_ACCESS_KEY, 'existing-s3-secret')
+  assert.equal(services.backend.environment.JWT_SECRET, 'existing-jwt-secret')
+  assert.equal(services.backend.environment.AI_SECRET_KEY, 'existing-ai-secret')
+  assert.equal(services.livekit.environment.LIVEKIT_KEYS, 'existing-livekit-key: existing-livekit-secret')
+})
+
+test('Coolify compose exposes only the supported deployment variable contract', async () => {
+  const composePath = new URL('../../docker-compose.coolify.yml', import.meta.url)
+  const baseComposePath = new URL('../../docker-compose.yml', import.meta.url)
+  const selfHostedComposePath = new URL('../../docker-compose.self-hosted.yml', import.meta.url)
+  const [contents, baseContents, selfHostedContents] = await Promise.all([
+    readFile(composePath, 'utf8'),
+    readFile(baseComposePath, 'utf8'),
+    readFile(selfHostedComposePath, 'utf8')
+  ])
+
+  assert.match(contents, /JWT_SECRET:\s*\$\{JWT_SECRET:-\$\{SERVICE_PASSWORD_64_JWT\}\}/)
+  assert.match(contents, /AI_SECRET_KEY:\s*\$\{AI_SECRET_KEY:-\$\{SERVICE_PASSWORD_64_AI\}\}/)
   assert.doesNotMatch(contents, /AI_CONFIG_MASTER_KEY/)
   assert.match(contents, /RATE_LIMIT_DRIVER:\s*\$\{RATE_LIMIT_DRIVER:-redis\}/)
-  assert.match(contents, /PASSKEY_RP_ID:\s*\$\{PASSKEY_RP_ID:-\}/)
+  assert.match(contents, /PASSKEY_RP_ID:\s*\$\{PASSKEY_RP_ID:-\$\{SERVICE_FQDN_FRONTEND\}\}/)
   assert.match(contents, /garage:/)
   assert.doesNotMatch(contents, /minio:/)
+  assert.doesNotMatch(contents, /MINIO_/)
+  assert.doesNotMatch(baseContents, /MINIO_/)
+  assert.doesNotMatch(selfHostedContents, /MINIO_/)
+  assert.doesNotMatch(contents, /S3_ROOT_/)
+  assert.doesNotMatch(contents, /COOLIFY_URL_/)
   assert.match(contents, /dockerfile:\s*garage\.Dockerfile/)
   assert.match(contents, /dockerfile:\s*livekit-egress\.Dockerfile/)
   assert.doesNotMatch(contents, /\.\/garage\.toml:\/etc\/garage\.toml/)
   assert.doesNotMatch(contents, /\.\/livekit-egress\.yaml:\/livekit-egress\.yaml/)
   assert.match(contents, /STORAGE_S3_ENDPOINT:\s*"http:\/\/garage:3900"/)
-  assert.match(contents, /STORAGE_S3_PUBLIC_ENDPOINT:\s*\$\{STORAGE_S3_PUBLIC_ENDPOINT:-\$\{MINIO_PUBLIC_ENDPOINT\}\}/)
+  assert.match(contents, /STORAGE_S3_PUBLIC_ENDPOINT:\s*\$\{STORAGE_S3_PUBLIC_ENDPOINT:-\$\{SERVICE_URL_GARAGE\}\}/)
+  assert.match(contents, /LIVEKIT_PUBLIC_URL:\s*\$\{LIVEKIT_PUBLIC_URL:-\$\{SERVICE_URL_LIVEKIT\}\}/)
+  assert.match(contents, /VITE_API_URL:\s*\$\{SERVICE_URL_BACKEND\}/)
+  assert.match(contents, /VITE_LIVEKIT_URL:\s*\$\{SERVICE_URL_LIVEKIT\}/)
+  assert.match(contents, /VITE_VAPID_PUBLIC_KEY:\s*\$\{VAPID_PUBLIC_KEY:-\}/)
+  assert.doesNotMatch(contents, /NEBULYNK_UPDATE_PUBLIC_KEYS_JSON/)
+  assert.doesNotMatch(contents, /NEBULYNK_BUILD_TIME/)
+  assert.match(contents, /NEBULYNK_BUILD_SHA:\s*\$\{SOURCE_COMMIT:-\}/)
+  assert.doesNotMatch(contents, /"3900:3900"/)
+  assert.doesNotMatch(contents, /"7880:7880"/)
+  assert.match(contents, /- "7881:7881"/)
+  assert.match(contents, /- "7882:7882\/udp"/)
+  assert.match(selfHostedContents, /VITE_LIVEKIT_URL:\s*\$\{LIVEKIT_PUBLIC_URL:\?LIVEKIT_PUBLIC_URL must be set\}/)
+  assert.match(selfHostedContents, /VITE_VAPID_PUBLIC_KEY:\s*\$\{VAPID_PUBLIC_KEY:-\}/)
   assert.match(contents, /AUTH_CSRF_COOKIE_NAME:\s*\$\{AUTH_CSRF_COOKIE_NAME:-nebulynk_csrf_token\}/)
   assert.match(contents, /VITE_AUTH_CSRF_COOKIE_NAME:\s*\$\{AUTH_CSRF_COOKIE_NAME:-nebulynk_csrf_token\}/)
 })
