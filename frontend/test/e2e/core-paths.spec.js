@@ -848,7 +848,10 @@ test.describe('P2-02 core e2e paths', () => {
     }])
 
     const uploadResponse = await uploadResponsePromise
-    expect(uploadResponse.ok()).toBe(true)
+    if (!uploadResponse.ok()) {
+      const responseText = await uploadResponse.text()
+      throw new Error(`File upload failed (${uploadResponse.status()}): ${responseText}`)
+    }
     await expect(page.locator('.pending-file-name', { hasText: forwardedFileName })).toBeVisible({ timeout: 30_000 })
 
     await input.fill(`Forward file ${runId}`)
