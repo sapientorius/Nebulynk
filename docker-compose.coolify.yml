@@ -1,5 +1,22 @@
 services:
-  # 1. Database (reachable internally as 'postgres')
+  # 1. Frontend (declared first for Coolify's Compose parser)
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      args:
+        NODE_IMAGE: ${NEBULYNK_NODE_IMAGE:-node:22.23.1-alpine3.24}
+        NGINX_IMAGE: ${NEBULYNK_NGINX_IMAGE:-nginxinc/nginx-unprivileged:1.31-alpine3.23@sha256:6320020c7da8714feab524e02c08c5a1958675c4e68700e93a2fd8970b065786}
+        # These URLs are baked into frontend build output
+        VITE_API_URL: ${SERVICE_URL_BACKEND}
+        VITE_LIVEKIT_URL: ${SERVICE_URL_LIVEKIT}
+        VITE_VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+        VITE_AUTH_CSRF_COOKIE_NAME: ${AUTH_CSRF_COOKIE_NAME:-nebulynk_csrf_token}
+    depends_on:
+      - backend
+    restart: always
+
+  # 2. Database (reachable internally as 'postgres')
   postgres:
     image: ${NEBULYNK_POSTGRES_IMAGE:-postgres:17-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193}
     environment:
@@ -12,14 +29,14 @@ services:
       - nebulynk_postgres_data:/var/lib/postgresql/data
     restart: always
 
-  # 2. Cache (reachable internally as 'redis')
+  # 3. Cache (reachable internally as 'redis')
   redis:
     image: ${NEBULYNK_REDIS_IMAGE:-redis:7.4.7-alpine3.21}
     volumes:
       - nebulynk_redis_data:/data
     restart: always
 
-  # 3. Prepare persistent Garage volumes for the unprivileged Garage process.
+  # 4. Prepare persistent Garage volumes for the unprivileged Garage process.
   garage-volume-init:
     image: alpine:3.21.5
     user: "0:0"
@@ -29,7 +46,7 @@ services:
       - nebulynk_garage_data:/var/lib/garage/data
     restart: "no"
 
-  # 4. Object storage (S3, Garage default)
+  # 5. Object storage (S3, Garage default)
   garage:
     build:
       context: .
@@ -52,7 +69,7 @@ services:
       - "3900" # S3 endpoint, published only through the Coolify proxy
     restart: always
 
-  # 5. LiveKit server (voice/video)
+  # 6. LiveKit server (voice/video)
   livekit:
     build:
       context: .
@@ -92,7 +109,7 @@ services:
       - garage
     restart: always
 
-  # 6. Backend API
+  # 7. Backend API
   backend:
     build:
       context: .
@@ -173,23 +190,6 @@ services:
       - garage
       - livekit
       - livekit-egress
-    restart: always
-
-  # 7. Frontend
-  frontend:
-    build:
-      context: .
-      dockerfile: frontend/Dockerfile
-      args:
-        NODE_IMAGE: ${NEBULYNK_NODE_IMAGE:-node:22.23.1-alpine3.24}
-        NGINX_IMAGE: ${NEBULYNK_NGINX_IMAGE:-nginxinc/nginx-unprivileged:1.31-alpine3.23@sha256:6320020c7da8714feab524e02c08c5a1958675c4e68700e93a2fd8970b065786}
-        # These URLs are baked into frontend build output
-        VITE_API_URL: ${SERVICE_URL_BACKEND}
-        VITE_LIVEKIT_URL: ${SERVICE_URL_LIVEKIT}
-        VITE_VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
-        VITE_AUTH_CSRF_COOKIE_NAME: ${AUTH_CSRF_COOKIE_NAME:-nebulynk_csrf_token}
-    depends_on:
-      - backend
     restart: always
 
 volumes:
