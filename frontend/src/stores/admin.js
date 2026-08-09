@@ -5,7 +5,11 @@ import {
   beginPrimaryAdminTransferPasskeyOptions as beginPrimaryAdminTransferPasskeyOptionsRequest,
   createAiProviderInstance as createAiProviderInstanceRequest,
   deleteAiProviderInstance as deleteAiProviderInstanceRequest,
+  deletePendingRegistration as deletePendingRegistrationRequest,
+  confirmPendingRegistration as confirmPendingRegistrationRequest,
   getPlatformStatus,
+  getRegistrationSettings as getRegistrationSettingsRequest,
+  getSecuritySettings as getSecuritySettingsRequest,
   getSmtpSettings as getSmtpSettingsRequest,
   listAiFunctionConfigs as listAiFunctionConfigsRequest,
   listAiProviderInstances as listAiProviderInstancesRequest,
@@ -18,6 +22,9 @@ import {
   updateAiProviderInstance as updateAiProviderInstanceRequest,
   updatePlatformSettings as updatePlatformSettingsRequest,
   resetUserTwoFactor as resetUserTwoFactorRequest,
+  listPendingRegistrations as listPendingRegistrationsRequest,
+  updateRegistrationSettings as updateRegistrationSettingsRequest,
+  updateSecuritySettings as updateSecuritySettingsRequest,
   updateSmtpSettings as updateSmtpSettingsRequest
 } from '../lib/api.js'
 
@@ -35,6 +42,9 @@ export const useAdminStore = defineStore('admin', () => {
   const invites = ref([])
   const platformSettings = ref({})
   const smtpSettings = ref({})
+  const registrationSettings = ref({})
+  const pendingRegistrations = ref([])
+  const securitySettings = ref({})
   const aiProviderInstances = ref([])
   const aiFunctionConfigs = ref([])
   const aiProviderModelsByCacheKey = ref({})
@@ -44,6 +54,9 @@ export const useAdminStore = defineStore('admin', () => {
   const loadingInvites = ref(false)
   const loadingPlatformSettings = ref(false)
   const loadingSmtpSettings = ref(false)
+  const loadingRegistrationSettings = ref(false)
+  const loadingPendingRegistrations = ref(false)
+  const loadingSecuritySettings = ref(false)
   const loadingAiProviderInstances = ref(false)
   const loadingAiFunctionConfigs = ref(false)
 
@@ -140,6 +153,75 @@ export const useAdminStore = defineStore('admin', () => {
     } finally {
       loadingPlatformSettings.value = false
     }
+  }
+
+  async function loadRegistrationSettings() {
+    const data = await getRegistrationSettingsRequest()
+    registrationSettings.value = data || {}
+    return registrationSettings.value
+  }
+
+  async function refreshRegistrationSettings() {
+    loadingRegistrationSettings.value = true
+    try {
+      return await loadRegistrationSettings()
+    } finally {
+      loadingRegistrationSettings.value = false
+    }
+  }
+
+  async function updateRegistrationSettings(payload) {
+    const data = await updateRegistrationSettingsRequest(payload)
+    registrationSettings.value = data || {}
+    return registrationSettings.value
+  }
+
+  async function loadPendingRegistrations() {
+    const data = await listPendingRegistrationsRequest()
+    pendingRegistrations.value = asList(data)
+    return pendingRegistrations.value
+  }
+
+  async function refreshPendingRegistrations() {
+    loadingPendingRegistrations.value = true
+    try {
+      return await loadPendingRegistrations()
+    } finally {
+      loadingPendingRegistrations.value = false
+    }
+  }
+
+  async function confirmPendingRegistration(id) {
+    const result = await confirmPendingRegistrationRequest(id)
+    pendingRegistrations.value = pendingRegistrations.value.filter((entry) => entry.id !== id)
+    return result
+  }
+
+  async function deletePendingRegistration(id) {
+    const result = await deletePendingRegistrationRequest(id)
+    pendingRegistrations.value = pendingRegistrations.value.filter((entry) => entry.id !== id)
+    return result
+  }
+
+  async function loadSecuritySettings() {
+    const data = await getSecuritySettingsRequest()
+    securitySettings.value = data || {}
+    return securitySettings.value
+  }
+
+  async function refreshSecuritySettings() {
+    loadingSecuritySettings.value = true
+    try {
+      return await loadSecuritySettings()
+    } finally {
+      loadingSecuritySettings.value = false
+    }
+  }
+
+  async function updateSecuritySettings(payload) {
+    const data = await updateSecuritySettingsRequest(payload)
+    securitySettings.value = data || {}
+    return securitySettings.value
   }
 
   async function loadSmtpSettings() {
@@ -380,6 +462,9 @@ export const useAdminStore = defineStore('admin', () => {
     invites,
     platformSettings,
     smtpSettings,
+    registrationSettings,
+    pendingRegistrations,
+    securitySettings,
     aiProviderInstances,
     aiFunctionConfigs,
     aiProviderModelsByCacheKey,
@@ -389,6 +474,9 @@ export const useAdminStore = defineStore('admin', () => {
     loadingInvites,
     loadingPlatformSettings,
     loadingSmtpSettings,
+    loadingRegistrationSettings,
+    loadingPendingRegistrations,
+    loadingSecuritySettings,
     loadingAiProviderInstances,
     loadingAiFunctionConfigs,
     loadUsers,
@@ -399,11 +487,17 @@ export const useAdminStore = defineStore('admin', () => {
     loadInvites,
     loadPlatformSettings,
     loadSmtpSettings,
+    loadRegistrationSettings,
+    loadPendingRegistrations,
+    loadSecuritySettings,
     refreshRoleData,
     refreshUserRoleData,
     refreshInviteData,
     refreshPlatformSettings,
     refreshSmtpSettings,
+    refreshRegistrationSettings,
+    refreshPendingRegistrations,
+    refreshSecuritySettings,
     loadAiProviderInstances,
     refreshAiProviderInstances,
     createAiProviderInstance,
@@ -424,6 +518,10 @@ export const useAdminStore = defineStore('admin', () => {
     createInvite,
     revokeInvite,
     updatePlatformSettings,
+    updateRegistrationSettings,
+    confirmPendingRegistration,
+    deletePendingRegistration,
+    updateSecuritySettings,
     updateSmtpSettings,
     testSmtpConnection,
     sendSmtpTestEmail

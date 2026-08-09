@@ -133,6 +133,92 @@ test('password-reset.create stays generic and does not store resets for unknown,
   assert.equal(calls.sentEmails.length, 0)
 })
 
+test('password-reset does not expose or consume a token for a pending registration', async () => {
+  const { app, calls } = createHarness({
+    seed: {
+      users: [{
+        id: 'pending-user',
+        email: 'pending@example.com',
+        preferred_locale: 'en',
+        account_type: 'member',
+        disabled_at: null,
+        registration_status: 'pending_admin_approval'
+      }],
+      password_resets: [{
+        id: 'reset-pending',
+        user_id: 'pending-user',
+        token_hash: hashPasswordResetToken('pending-reset-token'),
+        expires_at: '2026-05-11T13:00:00.000Z',
+        used_at: null,
+        created_at: '2026-05-11T12:00:00.000Z',
+        updated_at: '2026-05-11T12:00:00.000Z'
+      }]
+    }
+  })
+
+  await assert.rejects(
+    app.service('password-reset').find({
+      provider: 'rest',
+      query: { token: 'pending-reset-token' }
+    }),
+    (error) => {
+      assert.equal(error.error_code, 'api.password_reset.invalid_token')
+      return true
+    }
+  )
+
+  await assert.rejects(
+    app.service('password-reset').patch('pending-reset-token', {
+      password: 'NewPassw0rd!'
+    }, {
+      provider: 'rest'
+    }),
+    (error) => {
+      assert.equal(error.error_code, 'api.password_reset.invalid_token')
+      return true
+    }
+  )
+  assert.deepEqual(calls.userPatches, [])
+})
+
+test('password-reset validates the password policy before consuming a usable token', async () => {
+  const { app, calls, db } = createHarness({
+    seed: {
+      users: [{
+        id: 'user-1',
+        email: 'member@example.com',
+        preferred_locale: 'en',
+        account_type: 'member',
+        disabled_at: null
+      }],
+      password_resets: [{
+        id: 'reset-1',
+        user_id: 'user-1',
+        token_hash: hashPasswordResetToken('reset-token-1'),
+        expires_at: '2026-05-11T13:00:00.000Z',
+        used_at: null,
+        created_at: '2026-05-11T12:00:00.000Z',
+        updated_at: '2026-05-11T12:00:00.000Z'
+      }]
+    }
+  })
+
+  await assert.rejects(
+    app.service('password-reset').patch('reset-token-1', {
+      password: 'abcdefgh'
+    }, {
+      provider: 'rest'
+    }),
+    (error) => {
+      assert.equal(error.error_code, 'api.password_policy.requirements_not_met')
+      return true
+    }
+  )
+
+  assert.equal(db.tables.password_resets[0].used_at, null)
+  assert.deepEqual(calls.userPatches, [])
+})
+
 test('password-reset.create removes a fresh token again when email delivery is unavailable', async () => {
   const { app, db } = createHarness({
     seed: {

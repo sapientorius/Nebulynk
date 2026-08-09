@@ -38,6 +38,8 @@
         <UserRoleManager v-if="activeTab === 'users'" />
         <InviteManager v-if="activeTab === 'invites'" />
         <PlatformSettings v-if="activeTab === 'settings'" />
+        <RegistrationSettings v-if="activeTab === 'registration'" />
+        <SecuritySettings v-if="activeTab === 'security'" />
         <DesignSettings v-if="activeTab === 'design'" />
         <SmtpSettings v-if="activeTab === 'smtp'" />
         <AiSettings v-if="activeTab === 'ai'" />
@@ -73,6 +75,8 @@ const RoleManager = defineAsyncComponent(() => import('../components/admin/RoleM
 const UserRoleManager = defineAsyncComponent(() => import('../components/admin/UserRoleManager.vue'))
 const InviteManager = defineAsyncComponent(() => import('../components/admin/InviteManager.vue'))
 const PlatformSettings = defineAsyncComponent(() => import('../components/admin/PlatformSettings.vue'))
+const RegistrationSettings = defineAsyncComponent(() => import('../components/admin/RegistrationSettings.vue'))
+const SecuritySettings = defineAsyncComponent(() => import('../components/admin/SecuritySettings.vue'))
 const DesignSettings = defineAsyncComponent(() => import('../components/admin/DesignSettings.vue'))
 const SmtpSettings = defineAsyncComponent(() => import('../components/admin/SmtpSettings.vue'))
 const AiSettings = defineAsyncComponent(() => import('../components/admin/AiSettings.vue'))
@@ -82,7 +86,7 @@ const SPONSORSHIP_MENU_KEY = 'sponsorship'
 
 export default {
   name: 'AdminView',
-  components: { RoleManager, UserRoleManager, InviteManager, PlatformSettings, DesignSettings, SmtpSettings, AiSettings, UpdateCenter, MenuIcon },
+  components: { RoleManager, UserRoleManager, InviteManager, PlatformSettings, RegistrationSettings, SecuritySettings, DesignSettings, SmtpSettings, AiSettings, UpdateCenter, MenuIcon },
   data() {
     return {
       activeTab: 'roles',
@@ -123,6 +127,10 @@ export default {
       const options = []
       if (this.canManageSettings) {
         options.push({ label: this.$t('ui.views.settings'), key: 'settings' })
+        if (this.canManageUsers) {
+          options.push({ label: this.$t('selfRegistrationAdmin.title'), key: 'registration' })
+          options.push({ label: this.$t('securitySettings.title'), key: 'security' })
+        }
         options.push({ label: this.$t('ui.components.admin.design_settings'), key: 'design' })
         options.push({ label: this.$t('ui.components.admin.smtp_settings'), key: 'smtp' })
         options.push({ label: this.$t('ui.components.admin.ai_settings'), key: 'ai' })

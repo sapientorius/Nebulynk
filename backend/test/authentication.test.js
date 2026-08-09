@@ -188,6 +188,23 @@ test('local authentication results for disabled or expired accounts are rejected
       return true
     }
   )
+
+  await assert.rejects(
+    assertActiveLocalAuthenticationResult({
+      data: { strategy: 'local' },
+      result: {
+        user: {
+          id: 'pending-registration',
+          account_type: 'member',
+          registration_status: 'pending_email_verification'
+        }
+      }
+    }),
+    (error) => {
+      assert.equal(error.error_code, 'api.authentication.account_pending')
+      return true
+    }
+  )
 })
 
 test('non-production auth uses a higher IP rate-limit ceiling by default', async () => {

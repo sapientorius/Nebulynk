@@ -1,5 +1,6 @@
 import crypto from 'node:crypto'
 import { forbidden } from './errors.js'
+import { isRegistrationStatusActive } from './self-registration.js'
 
 export function isGuestAccount(user) {
   return user?.account_type === 'guest'
@@ -7,6 +8,7 @@ export function isGuestAccount(user) {
 
 export function isUserDisabled(user, now = new Date()) {
   if (!user || typeof user !== 'object') return true
+  if (!isRegistrationStatusActive(user.registration_status)) return true
   if (user.disabled_at) return true
 
   if (!isGuestAccount(user) || !user.guest_expires_at) {
@@ -19,6 +21,14 @@ export function isUserDisabled(user, now = new Date()) {
 }
 
 export function assertUserAccountActive(user, now = new Date()) {
+  if (user && !isRegistrationStatusActive(user.registration_status)) {
+    throw forbidden(
+      'api.authentication.account_pending',
+      { registration_status: user.registration_status },
+      'Dieses Konto ist noch nicht aktiv'
+    )
+  }
+
   if (!isUserDisabled(user, now)) return
 
   throw forbidden(

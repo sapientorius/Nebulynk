@@ -3,6 +3,7 @@ export const apiErrorMessages = {
     api: {
       authentication: {
         account_disabled: 'This account is disabled',
+        account_pending: 'This account is not active yet',
         authentication_required: 'Authentication required',
         invalid_credentials: 'Email or password is incorrect',
         invalid_token: 'Invalid token',
@@ -124,6 +125,24 @@ export const apiErrorMessages = {
         authentication_required: 'Authentication required',
         guest_accounts_forbidden: 'Guest accounts cannot change passwords',
         invalid_current_password: 'Your current password is incorrect'
+      },
+      password_policy: {
+        requirements_not_met: 'Your password does not meet the configured password requirements.'
+      },
+      self_registration: {
+        disabled: 'Self-registration is disabled.',
+        domain_not_allowed: 'This email domain is not allowed to register.',
+        email_already_registered: 'This email address is already registered.',
+        invalid_allowed_domain: 'One or more allowed email domains are invalid.',
+        invalid_token: 'This confirmation link is invalid.',
+        rate_limited: 'Too many registration attempts. Please wait {retry_after_seconds} seconds and try again.',
+        token_already_used: 'This confirmation link has already been used.',
+        token_expired: 'This confirmation link has expired.',
+        token_required: 'A confirmation token is required.'
+      },
+      pending_registrations: {
+        not_found: 'Pending registration not found.',
+        unknown_action: 'Unknown registration action.'
       },
       primary_admin: {
         cannot_delete_primary_admin: 'The primary admin account cannot be deleted',
@@ -427,6 +446,7 @@ export const apiErrorMessages = {
     api: {
       authentication: {
         account_disabled: 'Dieses Konto ist deaktiviert',
+        account_pending: 'Dieses Konto ist noch nicht aktiv',
         authentication_required: 'Authentifizierung erforderlich',
         invalid_credentials: 'E-Mail oder Passwort ist falsch',
         invalid_token: 'Ungueltiges Token',
@@ -548,6 +568,24 @@ export const apiErrorMessages = {
         authentication_required: 'Authentifizierung erforderlich',
         guest_accounts_forbidden: 'Gast-Konten koennen ihr Passwort nicht aendern',
         invalid_current_password: 'Dein aktuelles Passwort ist falsch'
+      },
+      password_policy: {
+        requirements_not_met: 'Dein Passwort erfuellt die konfigurierten Anforderungen nicht.'
+      },
+      self_registration: {
+        disabled: 'Die Selbstregistrierung ist deaktiviert.',
+        domain_not_allowed: 'Diese E-Mail-Domain ist nicht fuer die Registrierung zugelassen.',
+        email_already_registered: 'Diese E-Mail-Adresse ist bereits registriert.',
+        invalid_allowed_domain: 'Eine oder mehrere erlaubte E-Mail-Domains sind ungueltig.',
+        invalid_token: 'Dieser Bestaetigungslink ist ungueltig.',
+        rate_limited: 'Zu viele Registrierungsversuche. Bitte warte {retry_after_seconds} Sekunden und versuche es erneut.',
+        token_already_used: 'Dieser Bestaetigungslink wurde bereits verwendet.',
+        token_expired: 'Dieser Bestaetigungslink ist abgelaufen.',
+        token_required: 'Ein Bestaetigungstoken ist erforderlich.'
+      },
+      pending_registrations: {
+        not_found: 'Ausstehende Anmeldung nicht gefunden.',
+        unknown_action: 'Unbekannte Registrierungsaktion.'
       },
       primary_admin: {
         cannot_delete_primary_admin: 'Das Haupt-Admin-Konto kann nicht geloescht werden',

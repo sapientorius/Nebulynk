@@ -91,6 +91,46 @@ export async function updatePlatformSettings(payload) {
   return activeApiClient.updatePlatformSettings(payload)
 }
 
+export async function getSelfRegistrationConfig() {
+  return activeApiClient.getSelfRegistrationConfig()
+}
+
+export async function createSelfRegistration(payload) {
+  return activeApiClient.createSelfRegistration(payload)
+}
+
+export async function confirmSelfRegistration(token) {
+  return activeApiClient.confirmSelfRegistration(token)
+}
+
+export async function getRegistrationSettings() {
+  return activeApiClient.getRegistrationSettings()
+}
+
+export async function updateRegistrationSettings(payload) {
+  return activeApiClient.updateRegistrationSettings(payload)
+}
+
+export async function listPendingRegistrations() {
+  return activeApiClient.listPendingRegistrations()
+}
+
+export async function confirmPendingRegistration(id) {
+  return activeApiClient.confirmPendingRegistration(id)
+}
+
+export async function deletePendingRegistration(id) {
+  return activeApiClient.deletePendingRegistration(id)
+}
+
+export async function getSecuritySettings() {
+  return activeApiClient.getSecuritySettings()
+}
+
+export async function updateSecuritySettings(payload) {
+  return activeApiClient.updateSecuritySettings(payload)
+}
+
 export async function getSponsorshipPromptPreference() {
   const { data } = await api.get('/platform-owner/sponsorship-prompt')
   return data

@@ -136,6 +136,7 @@
                     :input-props="{ 'data-testid': 'settings-new-password' }"
                   />
                 </n-form-item>
+                <p class="settings-password-policy">{{ passwordPolicyHint }}</p>
                 <n-form-item :label="$t('passwordChange.fields.newPasswordConfirm')">
                   <n-input
                     v-model:value="securityForm.newPasswordConfirm"
@@ -573,6 +574,8 @@ import {
   subscribeToPwaInstallState
 } from '../lib/pwa.js'
 import { translateApiError } from '../lib/api-error.js'
+import { getSelfRegistrationConfig } from '../lib/api.js'
+import { DEFAULT_PASSWORD_POLICY, isPasswordValidForPolicy, normalizePasswordPolicy } from '../lib/password-policy.js'
 import { saveGeneralPreferences, toggleNotifications } from '../lib/settings-actions.js'
 import { isAnyDesktopRuntime } from '../lib/runtime.js'
 import { useChannelsStore, useNotificationsStore, useSessionStore, useUiStore } from '../stores/index.js'
@@ -607,6 +610,7 @@ export default {
       savingPassword: false,
       pushLoading: false,
       securityError: '',
+      passwordPolicy: DEFAULT_PASSWORD_POLICY,
       twoFactorLoading: false,
       twoFactorActionLoading: false,
       twoFactorError: '',
@@ -739,6 +743,13 @@ export default {
         return this.$t('twoFactor.status.pending')
       }
       return this.$t('twoFactor.status.disabled')
+    },
+    passwordPolicyHint() {
+      const policy = normalizePasswordPolicy(this.passwordPolicy)
+      return this.$t('passwordPolicy.requirement', {
+        minLength: policy.min_length,
+        minTypes: policy.min_types
+      })
     }
   },
   async created() {
@@ -747,6 +758,7 @@ export default {
     this.generalForm.themePreference = this.sessionStore.user?.theme_preference || 'platform'
     await this.loadTwoFactorStatus()
     await this.loadPasskeys()
+    await this.loadPasswordPolicy()
     if (this.activeTab === 'archived-channels' && this.canManageChannels) {
       await this.channelsStore.refreshArchived()
     }
@@ -778,6 +790,14 @@ export default {
     }
   },
   methods: {
+    async loadPasswordPolicy() {
+      try {
+        const config = await getSelfRegistrationConfig()
+        this.passwordPolicy = normalizePasswordPolicy(config?.password_policy)
+      } catch {
+        this.passwordPolicy = DEFAULT_PASSWORD_POLICY
+      }
+    },
     resolveReturnToChatRoute() {
       const returnTo = this.$route?.query?.returnTo
       if (typeof returnTo !== 'string') return '/channels'
@@ -1126,8 +1146,8 @@ export default {
         return
       }
 
-      if (this.securityForm.newPassword.length < 8) {
-        this.securityError = this.$t('passwordChange.errors.passwordTooShort')
+      if (!isPasswordValidForPolicy(this.securityForm.newPassword, this.passwordPolicy)) {
+        this.securityError = this.passwordPolicyHint
         return
       }
 
@@ -1255,6 +1275,13 @@ export default {
   margin: 0;
   opacity: 0.7;
   line-height: 1.5;
+}
+
+.settings-password-policy {
+  margin: -8px 0 16px;
+  font-size: 12px;
+  line-height: 1.5;
+  opacity: 0.7;
 }
 
 .settings-toggle-copy {

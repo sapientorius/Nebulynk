@@ -14,6 +14,10 @@ import { hasUserPlatformPermission } from '../../lib/user-permissions.js'
 import { listEnabledTwoFactorUserIds } from '../../lib/two-factor-data.js'
 import { getPasskeyCountsByUserId } from '../../lib/passkey-data.js'
 import { createWebauthnUserId, encodeBytesForStorage } from '../../lib/passkeys.js'
+import {
+  assertPasswordStrength,
+  getConfiguredPasswordStrengthPolicy
+} from '../../lib/password-policy.js'
 
 const { hashPassword, protect } = authHooks
 
@@ -217,6 +221,17 @@ async function assertMeetingVideoBackgroundPreferenceAllowed(context) {
 
   return context
 }
+
+async function assertConfiguredPasswordPolicy(context) {
+  if (!Object.prototype.hasOwnProperty.call(context.data || {}, 'password')) {
+    return context
+  }
+
+  const policy = await getConfiguredPasswordStrengthPolicy(context.app.get('postgresqlClient'))
+  assertPasswordStrength(context.data.password, policy.level)
+  return context
+}
+
 export class UsersService extends KnexService {
   async find(params = {}) {
     const query = { ...(params.query || {}) }
@@ -243,6 +258,7 @@ export class UsersService extends KnexService {
           query: {
             ...(params.query || {}),
             account_type: 'member',
+            registration_status: 'active',
             $limit: limit,
             $sort: {
               display_name: 1
@@ -283,6 +299,7 @@ export class UsersService extends KnexService {
       }
     } else if (isExternal) {
       baseQuery.where('account_type', 'member')
+      baseQuery.where('registration_status', 'active')
     }
 
     if (requestedIds.length > 0) {
@@ -356,6 +373,7 @@ export const users = (app) => {
           return context
         },
         validate(createSchema),
+        assertConfiguredPasswordPolicy,
         hashPassword('password'),
         async (context) => {
           context.data.id = createId()
@@ -365,6 +383,7 @@ export const users = (app) => {
       ],
       patch: [
         validate(patchSchema),
+        assertConfiguredPasswordPolicy,
         hashPassword('password'),
         assertAvatarPatchAllowed,
         // Own profile: always allowed. Other users: needs manage_users

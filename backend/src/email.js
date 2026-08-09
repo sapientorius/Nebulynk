@@ -4,6 +4,7 @@ import { logger } from './logger.js'
 import { bt } from './lib/i18n.js'
 import { resolveFrontendUrl } from './lib/security-config.js'
 import { buildPasswordResetUrl } from './lib/password-reset.js'
+import { buildRegistrationConfirmationUrl } from './lib/self-registration.js'
 
 export const DEFAULT_SMTP_SETTINGS_ID = 'default'
 const DEFAULT_SMTP_PORT = 587
@@ -613,6 +614,134 @@ export async function sendPasswordResetEmail(app, {
     })
   } catch (error) {
     logger.error('Password reset email delivery failed', buildLogContext(config, {
+      to: email,
+      error: normalizeProviderErrorMessage(error),
+      smtp_error_code: error?.code || null,
+      smtp_response_code: error?.responseCode || null,
+      smtp_response: error?.response || null
+    }))
+    return buildFailureResult(
+      `api.smtp.${slugifyValue(error?.code, 'delivery_failed')}`,
+      normalizeProviderErrorMessage(error),
+      config
+    )
+  }
+}
+
+export async function sendRegistrationConfirmationEmail(app, {
+  email,
+  token,
+  locale = 'en'
+}) {
+  const config = await resolveEffectiveSmtpConfig(app)
+  if (!config) {
+    logger.warn('Registration confirmation email skipped because SMTP is not configured', { to: email })
+    return buildFailureResult('api.smtp.not_configured', 'SMTP ist nicht konfiguriert', null)
+  }
+
+  const { platformName, defaultLocale } = await getPlatformMailContext(app)
+  const effectiveLocale = normalizeString(locale) || defaultLocale || 'en'
+  const confirmationUrl = buildRegistrationConfirmationUrl({
+    frontendUrl: resolveFrontendUrl(process.env),
+    token
+  })
+  const safePlatformName = escapeHtml(platformName)
+  const safeConfirmationUrl = escapeHtml(confirmationUrl)
+  const html = `
+    <div style="font-family:sans-serif;max-width:560px;margin:0 auto;background:#1a1a1a;color:#e0e0e0;padding:32px;border-radius:8px;">
+      <h2 style="color:#fff;margin-top:0;">${bt(effectiveLocale, 'email.selfRegistration.confirmation.heading', { platformName: safePlatformName })}</h2>
+      <p>${bt(effectiveLocale, 'email.selfRegistration.confirmation.intro', { platformName: safePlatformName })}</p>
+      <p>${bt(effectiveLocale, 'email.selfRegistration.confirmation.expiry')}</p>
+      <a href="${safeConfirmationUrl}" style="display:inline-block;padding:12px 24px;background:#18a058;color:#fff;text-decoration:none;border-radius:6px;font-weight:600;margin:16px 0;">
+        ${bt(effectiveLocale, 'email.selfRegistration.confirmation.cta')}
+      </a>
+      <p style="font-size:13px;opacity:0.6;margin-top:24px;">
+        ${bt(effectiveLocale, 'email.selfRegistration.confirmation.copyLink')} <a href="${safeConfirmationUrl}" style="color:#63e2b7;">${safeConfirmationUrl}</a>
+      </p>
+    </div>
+  `
+
+  try {
+    const transport = await getTransporter(app, config)
+    const info = await transport.sendMail({
+      from: formatFromAddress(config, platformName),
+      to: email,
+      subject: bt(effectiveLocale, 'email.selfRegistration.confirmation.subject', { platformName }),
+      html
+    })
+
+    if (!hasAcceptedRecipients(info)) {
+      return buildFailureResult('api.smtp.no_accepted_recipients', 'SMTP hat keine Empfaenger akzeptiert', config)
+    }
+
+    logger.info('Registration confirmation email sent', buildLogContext(config, {
+      to: email,
+      accepted: info.accepted,
+      rejected: info?.rejected || []
+    }))
+    return buildSuccessResult(config, { accepted: info.accepted })
+  } catch (error) {
+    logger.error('Registration confirmation email delivery failed', buildLogContext(config, {
+      to: email,
+      error: normalizeProviderErrorMessage(error),
+      smtp_error_code: error?.code || null,
+      smtp_response_code: error?.responseCode || null,
+      smtp_response: error?.response || null
+    }))
+    return buildFailureResult(
+      `api.smtp.${slugifyValue(error?.code, 'delivery_failed')}`,
+      normalizeProviderErrorMessage(error),
+      config
+    )
+  }
+}
+
+export async function sendAccountActivatedEmail(app, {
+  email,
+  locale = 'en'
+}) {
+  const config = await resolveEffectiveSmtpConfig(app)
+  if (!config) {
+    logger.warn('Account activation email skipped because SMTP is not configured', { to: email })
+    return buildFailureResult('api.smtp.not_configured', 'SMTP ist nicht konfiguriert', null)
+  }
+
+  const { platformName, defaultLocale } = await getPlatformMailContext(app)
+  const effectiveLocale = normalizeString(locale) || defaultLocale || 'en'
+  const loginUrl = resolveFrontendUrl(process.env)
+  const safePlatformName = escapeHtml(platformName)
+  const safeLoginUrl = escapeHtml(loginUrl)
+  const html = `
+    <div style="font-family:sans-serif;max-width:560px;margin:0 auto;background:#1a1a1a;color:#e0e0e0;padding:32px;border-radius:8px;">
+      <h2 style="color:#fff;margin-top:0;">${bt(effectiveLocale, 'email.selfRegistration.activation.heading', { platformName: safePlatformName })}</h2>
+      <p>${bt(effectiveLocale, 'email.selfRegistration.activation.intro', { platformName: safePlatformName })}</p>
+      <a href="${safeLoginUrl}" style="display:inline-block;padding:12px 24px;background:#18a058;color:#fff;text-decoration:none;border-radius:6px;font-weight:600;margin:16px 0;">
+        ${bt(effectiveLocale, 'email.selfRegistration.activation.cta')}
+      </a>
+    </div>
+  `
+
+  try {
+    const transport = await getTransporter(app, config)
+    const info = await transport.sendMail({
+      from: formatFromAddress(config, platformName),
+      to: email,
+      subject: bt(effectiveLocale, 'email.selfRegistration.activation.subject', { platformName }),
+      html
+    })
+
+    if (!hasAcceptedRecipients(info)) {
+      return buildFailureResult('api.smtp.no_accepted_recipients', 'SMTP hat keine Empfaenger akzeptiert', config)
+    }
+
+    logger.info('Account activation email sent', buildLogContext(config, {
+      to: email,
+      accepted: info.accepted,
+      rejected: info?.rejected || []
+    }))
+    return buildSuccessResult(config, { accepted: info.accepted })
+  } catch (error) {
+    logger.error('Account activation email delivery failed', buildLogContext(config, {
       to: email,
       error: normalizeProviderErrorMessage(error),
       smtp_error_code: error?.code || null,

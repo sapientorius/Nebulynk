@@ -896,6 +896,64 @@ export function createApiClient(options = {}) {
     }
   }
 
+  async function getSelfRegistrationConfig() {
+    const { data } = await http.get('/self-registration', {
+      __skipAuthRefresh: true
+    })
+    return data
+  }
+
+  async function createSelfRegistration(payload) {
+    const { data } = await http.post('/self-registration', payload, {
+      __skipAuthRefresh: true
+    })
+    return data
+  }
+
+  async function confirmSelfRegistration(token) {
+    const { data } = await http.patch(`/self-registration/${encodeURIComponent(token)}`, {}, {
+      __skipAuthRefresh: true
+    })
+    return data
+  }
+
+  async function getRegistrationSettings() {
+    const { data } = await http.get('/registration-settings')
+    return data
+  }
+
+  async function updateRegistrationSettings(payload) {
+    const { data } = await http.patch('/registration-settings/default', payload)
+    return data
+  }
+
+  async function listPendingRegistrations() {
+    const { data } = await http.get('/pending-registrations')
+    return data
+  }
+
+  async function confirmPendingRegistration(id) {
+    const { data } = await http.patch(`/pending-registrations/${encodeURIComponent(id)}`, {
+      action: 'confirm'
+    })
+    return data
+  }
+
+  async function deletePendingRegistration(id) {
+    const { data } = await http.delete(`/pending-registrations/${encodeURIComponent(id)}`)
+    return data
+  }
+
+  async function getSecuritySettings() {
+    const { data } = await http.get('/security-settings')
+    return data
+  }
+
+  async function updateSecuritySettings(payload) {
+    const { data } = await http.patch('/security-settings/default', payload)
+    return data
+  }
+
   async function getSmtpSettings() {
     const { data } = await http.get('/smtp-settings')
     return data
@@ -1173,6 +1231,16 @@ export function createApiClient(options = {}) {
     getPlatformStatus,
     setupPlatform,
     updatePlatformSettings,
+    getSelfRegistrationConfig,
+    createSelfRegistration,
+    confirmSelfRegistration,
+    getRegistrationSettings,
+    updateRegistrationSettings,
+    listPendingRegistrations,
+    confirmPendingRegistration,
+    deletePendingRegistration,
+    getSecuritySettings,
+    updateSecuritySettings,
     getSmtpSettings,
     updateSmtpSettings,
     testSmtpConnection,

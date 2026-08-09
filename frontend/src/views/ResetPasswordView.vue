@@ -34,6 +34,7 @@
             @keyup.enter="submitReset"
           />
         </n-form-item>
+        <p class="password-policy-hint">{{ passwordPolicyHint }}</p>
         <n-form-item :label="$t('passwordReset.fields.passwordConfirm')">
           <n-input
             v-model:value="form.passwordConfirm"
@@ -60,6 +61,8 @@
 <script>
 import { usePasswordResetStore, useSessionStore } from '../stores/index.js'
 import { translateApiError } from '../lib/api-error.js'
+import { getSelfRegistrationConfig } from '../lib/api.js'
+import { DEFAULT_PASSWORD_POLICY, isPasswordValidForPolicy, normalizePasswordPolicy } from '../lib/password-policy.js'
 
 export default {
   name: 'ResetPasswordView',
@@ -69,6 +72,7 @@ export default {
       submitting: false,
       error: null,
       formError: null,
+      passwordPolicy: DEFAULT_PASSWORD_POLICY,
       form: {
         password: '',
         passwordConfirm: ''
@@ -81,10 +85,17 @@ export default {
     },
     sessionStore() {
       return useSessionStore()
+    },
+    passwordPolicyHint() {
+      const policy = normalizePasswordPolicy(this.passwordPolicy)
+      return this.$t('passwordPolicy.requirement', {
+        minLength: policy.min_length,
+        minTypes: policy.min_types
+      })
     }
   },
   async created() {
-    await this.loadToken()
+    await Promise.all([this.loadToken(), this.loadPasswordPolicy()])
   },
   methods: {
     async loadToken() {
@@ -96,11 +107,19 @@ export default {
         this.loadingInfo = false
       }
     },
+    async loadPasswordPolicy() {
+      try {
+        const config = await getSelfRegistrationConfig()
+        this.passwordPolicy = normalizePasswordPolicy(config?.password_policy)
+      } catch {
+        this.passwordPolicy = DEFAULT_PASSWORD_POLICY
+      }
+    },
     async submitReset() {
       this.formError = null
 
-      if (this.form.password.length < 8) {
-        this.formError = this.$t('passwordReset.errors.passwordTooShort')
+      if (!isPasswordValidForPolicy(this.form.password, this.passwordPolicy)) {
+        this.formError = this.passwordPolicyHint
         return
       }
 
@@ -132,5 +151,12 @@ export default {
   align-items: center;
   min-height: 100vh;
   padding: 24px;
+}
+
+.password-policy-hint {
+  margin: -8px 0 16px;
+  font-size: 12px;
+  line-height: 1.5;
+  opacity: 0.7;
 }
 </style>

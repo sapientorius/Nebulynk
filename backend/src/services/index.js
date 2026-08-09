@@ -37,6 +37,10 @@ import { smtpSettings } from './smtp-settings/smtp-settings.js'
 import { passwordReset } from './password-reset/password-reset.js'
 import { passwordChange } from './password-change/password-change.js'
 import { videoBackgrounds } from './video-backgrounds/video-backgrounds.js'
+import { selfRegistration } from './self-registration/self-registration.js'
+import { registrationSettings } from './registration-settings/registration-settings.js'
+import { pendingRegistrations } from './pending-registrations/pending-registrations.js'
+import { securitySettings } from './security-settings/security-settings.js'
 
 export const services = (app) => {
   app.configure(users)
@@ -78,4 +82,8 @@ export const services = (app) => {
   app.configure(smtpSettings)
   app.configure(passwordReset)
   app.configure(passwordChange)
+  app.configure(selfRegistration)
+  app.configure(registrationSettings)
+  app.configure(pendingRegistrations)
+  app.configure(securitySettings)
 }

@@ -15,6 +15,16 @@ const routes = [
     component: () => import('../views/LoginView.vue')
   },
   {
+    path: '/register',
+    name: 'Register',
+    component: () => import('../views/RegisterView.vue')
+  },
+  {
+    path: '/register/confirm/:token',
+    name: 'RegistrationConfirmation',
+    component: () => import('../views/RegistrationConfirmationView.vue')
+  },
+  {
     path: '/desktop/server-manager',
     name: 'DesktopServerManager',
     component: () => import('../views/DesktopServerManagerView.vue')

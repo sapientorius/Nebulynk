@@ -16,6 +16,22 @@ export const backendMessages = {
         intro: 'Du hast ein neues Passwort fuer <strong>{platformName}</strong> angefordert.',
         subject: 'Passwort fuer {platformName} zuruecksetzen'
       },
+      selfRegistration: {
+        confirmation: {
+          subject: 'Bestaetige dein Konto bei {platformName}',
+          heading: 'Bestaetige dein Konto bei {platformName}',
+          intro: 'Bitte bestaetige deine E-Mail-Adresse, um die Registrierung bei <strong>{platformName}</strong> fortzusetzen.',
+          expiry: 'Dieser Link ist 24 Stunden gueltig.',
+          cta: 'E-Mail-Adresse bestaetigen',
+          copyLink: 'Oder kopiere diesen Link:'
+        },
+        activation: {
+          subject: 'Dein Konto bei {platformName} ist aktiv',
+          heading: 'Dein Konto ist aktiv',
+          intro: 'Dein Konto bei <strong>{platformName}</strong> wurde freigeschaltet. Du kannst dich jetzt anmelden.',
+          cta: 'Jetzt anmelden'
+        }
+      },
       platformSecurityUpdate: {
         subject: '[Security:{severity}] Nebulynk-Update fuer {platformName}',
         heading: 'Security-Update fuer {platformName}',
@@ -55,6 +71,22 @@ export const backendMessages = {
         heading: 'Reset your {platformName} password',
         intro: 'You requested a new password for <strong>{platformName}</strong>.',
         subject: 'Reset your {platformName} password'
+      },
+      selfRegistration: {
+        confirmation: {
+          subject: 'Confirm your {platformName} account',
+          heading: 'Confirm your {platformName} account',
+          intro: 'Please confirm your email address to continue your registration with <strong>{platformName}</strong>.',
+          expiry: 'This link is valid for 24 hours.',
+          cta: 'Confirm email address',
+          copyLink: 'Or copy this link:'
+        },
+        activation: {
+          subject: 'Your {platformName} account is active',
+          heading: 'Your account is active',
+          intro: 'Your account for <strong>{platformName}</strong> has been activated. You can now sign in.',
+          cta: 'Sign in now'
+        }
       },
       platformSecurityUpdate: {
         subject: '[Security:{severity}] Nebulynk update for {platformName}',

@@ -119,6 +119,14 @@
             <router-link to="/forgot-password" class="login-forgot-link" data-testid="login-forgot-password">
               {{ $t('login.buttons.forgotPassword') }}
             </router-link>
+            <router-link
+              v-if="selfRegistrationEnabled && !isDesktopMode"
+              to="/register"
+              class="login-forgot-link"
+              data-testid="login-register"
+            >
+              {{ $t('selfRegistration.loginLink') }}
+            </router-link>
           </div>
           <n-button type="primary" block :loading="loading" data-testid="login-submit" @click="submit">{{ $t('login.buttons.submit') }}</n-button>
           <n-button secondary block style="margin-top: 12px" :loading="loading" data-testid="login-passkey-submit" @click="submitPasskey">
@@ -162,7 +170,7 @@
 
 <script>
 import { startAuthentication } from '@simplewebauthn/browser'
-import { useSessionStore } from '../stores/index.js'
+import { useSelfRegistrationStore, useSessionStore } from '../stores/index.js'
 import { translateApiError } from '../lib/api-error.js'
 import {
   addDesktopProfile,
@@ -182,6 +190,7 @@ export default {
       twoFactorChallenge: null,
       twoFactorMode: 'totp',
       twoFactorCode: '',
+      selfRegistrationEnabled: false,
       form: {
         email: '',
         password: '',
@@ -208,6 +217,9 @@ export default {
     },
     sessionStore() {
       return useSessionStore()
+    },
+    selfRegistrationStore() {
+      return useSelfRegistrationStore()
     },
     isDesktopMode() {
       return isDesktopManagerWindow()
@@ -247,6 +259,14 @@ export default {
         email: { required: true, message: this.$t('login.validation.emailRequired'), trigger: 'blur' },
         password: { required: true, message: this.$t('login.validation.passwordRequired'), trigger: 'blur' }
       }
+    }
+  },
+  async created() {
+    try {
+      const config = await this.selfRegistrationStore.loadConfig({ refresh: true })
+      this.selfRegistrationEnabled = config?.enabled === true
+    } catch {
+      this.selfRegistrationEnabled = false
     }
   },
   methods: {
@@ -551,7 +571,8 @@ export default {
 
 .login-links {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
+  gap: 12px;
   margin: -4px 0 18px;
 }
 

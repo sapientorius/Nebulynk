@@ -59,6 +59,7 @@
               :input-props="{ 'data-testid': 'setup-password' }"
             />
           </n-form-item>
+          <p class="setup-password-policy">{{ passwordPolicyHint }}</p>
         </n-form>
         <n-space>
           <n-button @click="step = 1">{{ $t('common.back') }}</n-button>
@@ -85,6 +86,8 @@
 import { useSessionStore } from '../stores/index.js'
 import { applyLocaleForUser, getLocaleOptions, setPlatformDefaultLocale } from '../lib/i18n.js'
 import { translateApiError } from '../lib/api-error.js'
+import { getSelfRegistrationConfig } from '../lib/api.js'
+import { DEFAULT_PASSWORD_POLICY, isPasswordValidForPolicy, normalizePasswordPolicy } from '../lib/password-policy.js'
 
 export default {
   name: 'SetupView',
@@ -93,6 +96,7 @@ export default {
       step: 1,
       loading: false,
       error: null,
+      passwordPolicy: DEFAULT_PASSWORD_POLICY,
       form: {
         platformName: 'Nebulynk',
         domain: '',
@@ -121,10 +125,30 @@ export default {
     },
     languageOptions() {
       return getLocaleOptions()
+    },
+    passwordPolicyHint() {
+      const policy = normalizePasswordPolicy(this.passwordPolicy)
+      return this.$t('passwordPolicy.requirement', {
+        minLength: policy.min_length,
+        minTypes: policy.min_types
+      })
+    }
+  },
+  async created() {
+    try {
+      const config = await getSelfRegistrationConfig()
+      this.passwordPolicy = normalizePasswordPolicy(config?.password_policy)
+    } catch {
+      this.passwordPolicy = DEFAULT_PASSWORD_POLICY
     }
   },
   methods: {
     async doSetup() {
+      if (!isPasswordValidForPolicy(this.form.password, this.passwordPolicy)) {
+        this.error = this.passwordPolicyHint
+        return
+      }
+
       this.loading = true
       this.error = null
       try {
@@ -152,5 +176,12 @@ export default {
   align-items: center;
   min-height: 100vh;
   padding: 24px;
+}
+
+.setup-password-policy {
+  margin: -8px 0 16px;
+  font-size: 12px;
+  line-height: 1.5;
+  opacity: 0.7;
 }
 </style>

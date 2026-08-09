@@ -178,6 +178,7 @@ export function createMemoryDb(seed = {}) {
     smtp_settings: [],
     smtp_secrets: [],
     password_resets: [],
+    registration_email_tokens: [],
     auth_sessions: [],
     auth_login_challenges: [],
     auth_passkey_challenges: [],
@@ -211,6 +212,12 @@ export function createMemoryDb(seed = {}) {
     message_reminders: [],
     ...clone(seed)
   }
+
+  tables.users = tables.users.map((user) => (
+    Object.prototype.hasOwnProperty.call(user, 'registration_status')
+      ? user
+      : { ...user, registration_status: 'active' }
+  ))
 
   const db = (tableName) => createBuilder(tables, tableName)
   db.tables = tables

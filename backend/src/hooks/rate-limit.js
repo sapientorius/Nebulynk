@@ -261,3 +261,39 @@ export function createPasswordResetTokenRateLimitHook() {
     ]
   })
 }
+
+export function createSelfRegistrationCreateRateLimitHook() {
+  return createRateLimitHook({
+    errorCode: 'api.self_registration.rate_limited',
+    buckets: [
+      {
+        name: 'self-registration:create:ip',
+        limit: 10,
+        deriveKey: (context) => getRequestIp(context.params)
+      },
+      {
+        name: 'self-registration:create:email',
+        limit: 5,
+        deriveKey: (context) => normalizeEmailRateLimitKey(context.data?.email)
+      }
+    ]
+  })
+}
+
+export function createSelfRegistrationTokenRateLimitHook() {
+  return createRateLimitHook({
+    errorCode: 'api.self_registration.rate_limited',
+    buckets: [
+      {
+        name: 'self-registration:token:ip',
+        limit: 20,
+        deriveKey: (context) => getRequestIp(context.params)
+      },
+      {
+        name: 'self-registration:token:value',
+        limit: 10,
+        deriveKey: (context) => normalizeTokenRateLimitKey(context.id)
+      }
+    ]
+  })
+}

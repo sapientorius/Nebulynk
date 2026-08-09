@@ -13,6 +13,11 @@ import {
   createPasswordResetTokenRateLimitHook
 } from '../../hooks/rate-limit.js'
 import { patchSchema, createSchema } from './password-reset.schema.js'
+import { isRegistrationStatusActive } from '../../lib/self-registration.js'
+import {
+  assertPasswordStrength,
+  getConfiguredPasswordStrengthPolicy
+} from '../../lib/password-policy.js'
 
 function normalizeEmail(value) {
   return typeof value === 'string' ? value.trim().toLowerCase() : ''
@@ -32,6 +37,7 @@ function isEligibleUser(user) {
     user
     && user.account_type === 'member'
     && !user.disabled_at
+    && isRegistrationStatusActive(user.registration_status)
   )
 }
 
@@ -130,6 +136,8 @@ export class PasswordResetService {
     }
 
     const record = await this._resolveUsableReset(token)
+    const passwordPolicy = await getConfiguredPasswordStrengthPolicy(this.db)
+    assertPasswordStrength(data.password, passwordPolicy.level)
     const nowIso = this.now().toISOString()
 
     await this.db.transaction(async (trx) => {
@@ -177,7 +185,8 @@ export class PasswordResetService {
       ...reset,
       email: user?.email || null,
       account_type: user?.account_type || null,
-      disabled_at: user?.disabled_at || null
+      disabled_at: user?.disabled_at || null,
+      registration_status: user?.registration_status || null
     }
   }
 

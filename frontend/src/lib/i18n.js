@@ -109,6 +109,95 @@ const baseMessages = {
         loginFailed: 'Login failed'
       }
     },
+    passwordPolicy: {
+      requirement: 'Use at least {minLength} characters and {minTypes} of these character types: lowercase letters, uppercase letters, numbers, and special characters.',
+      requirementsNotMet: 'Your password does not meet the configured password requirements.'
+    },
+    selfRegistration: {
+      loginLink: 'Create an account',
+      title: 'Create your account',
+      description: 'Register for this Nebulynk workspace.',
+      disabledTitle: 'Registration unavailable',
+      disabledDescription: 'Self-registration is currently disabled for this workspace.',
+      fields: {
+        displayName: 'Display Name',
+        email: 'Email',
+        password: 'Password',
+        passwordConfirm: 'Confirm Password'
+      },
+      placeholders: {
+        displayName: 'Your name',
+        email: 'you@example.com',
+        password: 'Choose a secure password',
+        passwordConfirm: 'Repeat password'
+      },
+      buttons: {
+        register: 'Create account',
+        goToLogin: 'Go to login'
+      },
+      success: {
+        emailTitle: 'Check your email',
+        emailDescription: 'We sent you a confirmation link. Open it to finish your registration.',
+        manualTitle: 'Registration received',
+        manualDescription: 'An administrator must confirm your account before you can sign in.'
+      },
+      confirmation: {
+        loading: 'Confirming your account...',
+        activeTitle: 'Your account is active',
+        activeDescription: 'Your email address was confirmed and you can now sign in.',
+        pendingTitle: 'Email address confirmed',
+        pendingDescription: 'Your account will now be reviewed by an administrator. You will receive an email when it is activated.',
+        invalidDescription: 'This confirmation link is invalid or no longer available.'
+      },
+      errors: {
+        displayNameRequired: 'Please enter a display name',
+        emailRequired: 'Please enter an email address',
+        passwordsMismatch: 'Passwords do not match',
+        registrationFailed: 'Registration could not be completed',
+        confirmationFailed: 'Account confirmation failed'
+      }
+    },
+    selfRegistrationAdmin: {
+      title: 'Registration',
+      settingsTitle: 'Self-registration settings',
+      enabled: 'Allow self-registration',
+      enabledHelp: 'People can create their own member accounts when this is enabled.',
+      domains: 'Allowed email domains',
+      domainsHelp: 'Enter one exact domain per line. Leave empty to allow every email domain.',
+      adminApproval: 'Require administrator approval',
+      adminApprovalHelp: 'Confirmed accounts remain pending until an administrator activates them.',
+      smtpWarning: 'SMTP is not configured. Registrants will not receive confirmation links and must be confirmed manually by an administrator.',
+      openSmtp: 'Open SMTP settings',
+      saved: 'Registration settings saved.',
+      saveFailed: 'Registration settings could not be saved.',
+      pendingTitle: 'Pending registrations',
+      empty: 'No pending registrations.',
+      email: 'Email',
+      name: 'Name',
+      status: 'Status',
+      pendingSince: 'Pending since',
+      pendingFor: 'Pending for',
+      awaitingEmail: 'Awaiting email confirmation',
+      awaitingApproval: 'Awaiting activation',
+      confirm: 'Confirm',
+      confirmAndActivate: 'Confirm and activate',
+      activate: 'Activate',
+      delete: 'Delete',
+      deleteConfirm: 'Delete this pending registration permanently?',
+      activated: 'Account activated.',
+      activationEmailFailed: 'The account was activated, but the activation email could not be sent.',
+      actionFailed: 'Registration action failed.'
+    },
+    securitySettings: {
+      title: 'Security',
+      passwordTitle: 'Password strength',
+      passwordHelp: 'This applies to every password set from now on, including invitations, password changes, and resets.',
+      basic: 'Basic - 8 characters and 2 character types',
+      strong: 'Strong - 8 characters and 3 character types',
+      veryStrong: 'Very strong - 10 characters and 3 character types',
+      saved: 'Security settings saved.',
+      saveFailed: 'Security settings could not be saved.'
+    },
     passwordReset: {
       fields: {
         email: 'Email',
@@ -816,6 +905,95 @@ const baseMessages = {
       errors: {
         loginFailed: 'Login fehlgeschlagen'
       }
+    },
+    passwordPolicy: {
+      requirement: 'Verwende mindestens {minLength} Zeichen und {minTypes} dieser Zeichentypen: Kleinbuchstaben, Grossbuchstaben, Ziffern und Sonderzeichen.',
+      requirementsNotMet: 'Dein Passwort erfuellt die konfigurierten Anforderungen nicht.'
+    },
+    selfRegistration: {
+      loginLink: 'Konto erstellen',
+      title: 'Konto erstellen',
+      description: 'Registriere dich fuer diesen Nebulynk-Arbeitsbereich.',
+      disabledTitle: 'Registrierung nicht verfuegbar',
+      disabledDescription: 'Die Selbstregistrierung ist fuer diesen Arbeitsbereich derzeit deaktiviert.',
+      fields: {
+        displayName: 'Anzeigename',
+        email: 'E-Mail',
+        password: 'Passwort',
+        passwordConfirm: 'Passwort bestaetigen'
+      },
+      placeholders: {
+        displayName: 'Dein Name',
+        email: 'du@beispiel.de',
+        password: 'Sicheres Passwort waehlen',
+        passwordConfirm: 'Passwort wiederholen'
+      },
+      buttons: {
+        register: 'Konto erstellen',
+        goToLogin: 'Zum Login'
+      },
+      success: {
+        emailTitle: 'Pruefe deine E-Mails',
+        emailDescription: 'Wir haben dir einen Bestaetigungslink gesendet. Oeffne ihn, um die Registrierung abzuschliessen.',
+        manualTitle: 'Anmeldung eingegangen',
+        manualDescription: 'Ein Administrator muss dein Konto bestaetigen, bevor du dich anmelden kannst.'
+      },
+      confirmation: {
+        loading: 'Dein Konto wird bestaetigt...',
+        activeTitle: 'Dein Konto ist aktiv',
+        activeDescription: 'Deine E-Mail-Adresse wurde bestaetigt. Du kannst dich jetzt anmelden.',
+        pendingTitle: 'E-Mail-Adresse bestaetigt',
+        pendingDescription: 'Dein Konto wird nun von einem Administrator ueberprueft. Du bekommst eine E-Mail, sobald es freigeschaltet ist.',
+        invalidDescription: 'Dieser Bestaetigungslink ist ungueltig oder nicht mehr verfuegbar.'
+      },
+      errors: {
+        displayNameRequired: 'Bitte gib einen Anzeigenamen ein',
+        emailRequired: 'Bitte gib eine E-Mail-Adresse ein',
+        passwordsMismatch: 'Passwoerter stimmen nicht ueberein',
+        registrationFailed: 'Die Registrierung konnte nicht abgeschlossen werden',
+        confirmationFailed: 'Die Kontobestaetigung ist fehlgeschlagen'
+      }
+    },
+    selfRegistrationAdmin: {
+      title: 'Registrierung',
+      settingsTitle: 'Einstellungen fuer die Selbstregistrierung',
+      enabled: 'Selbstregistrierung erlauben',
+      enabledHelp: 'Wenn diese Option aktiv ist, koennen Personen eigene Mitgliedskonten erstellen.',
+      domains: 'Erlaubte E-Mail-Domains',
+      domainsHelp: 'Gib pro Zeile eine exakte Domain ein. Eine leere Liste erlaubt jede E-Mail-Domain.',
+      adminApproval: 'Freigabe durch Administrator verlangen',
+      adminApprovalHelp: 'Bestaetigte Konten bleiben ausstehend, bis ein Administrator sie aktiviert.',
+      smtpWarning: 'SMTP ist nicht konfiguriert. Anmeldende erhalten keine Bestaetigungslinks und muessen manuell durch einen Administrator bestaetigt werden.',
+      openSmtp: 'SMTP-Einstellungen oeffnen',
+      saved: 'Registrierungseinstellungen gespeichert.',
+      saveFailed: 'Registrierungseinstellungen konnten nicht gespeichert werden.',
+      pendingTitle: 'Ausstehende Anmeldungen',
+      empty: 'Keine ausstehenden Anmeldungen.',
+      email: 'E-Mail',
+      name: 'Name',
+      status: 'Status',
+      pendingSince: 'Ausstehend seit',
+      pendingFor: 'Ausstehend seit',
+      awaitingEmail: 'Wartet auf E-Mail-Bestaetigung',
+      awaitingApproval: 'Wartet auf Freischaltung',
+      confirm: 'Bestaetigen',
+      confirmAndActivate: 'Bestaetigen und aktivieren',
+      activate: 'Aktivieren',
+      delete: 'Loeschen',
+      deleteConfirm: 'Diese ausstehende Anmeldung dauerhaft loeschen?',
+      activated: 'Konto aktiviert.',
+      activationEmailFailed: 'Das Konto wurde aktiviert, aber die Aktivierungs-E-Mail konnte nicht gesendet werden.',
+      actionFailed: 'Registrierungsaktion fehlgeschlagen.'
+    },
+    securitySettings: {
+      title: 'Sicherheit',
+      passwordTitle: 'Passwortstaerke',
+      passwordHelp: 'Diese Regel gilt ab jetzt fuer jedes gesetzte Passwort, einschliesslich Einladungen, Passwortaenderungen und Zuruecksetzungen.',
+      basic: 'Basis - 8 Zeichen und 2 Zeichentypen',
+      strong: 'Stark - 8 Zeichen und 3 Zeichentypen',
+      veryStrong: 'Sehr stark - 10 Zeichen und 3 Zeichentypen',
+      saved: 'Sicherheitseinstellungen gespeichert.',
+      saveFailed: 'Sicherheitseinstellungen konnten nicht gespeichert werden.'
     },
     passwordReset: {
       fields: {

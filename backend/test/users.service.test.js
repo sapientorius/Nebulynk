@@ -260,6 +260,7 @@ test('users.find scopes and sorts external admin directory reads to member accou
 
   assert.equal(superFindCalls.length, 1)
   assert.equal(superFindCalls[0].query.account_type, 'member')
+  assert.equal(superFindCalls[0].query.registration_status, 'active')
   assert.equal(superFindCalls[0].query.$limit, 50)
   assert.deepEqual(superFindCalls[0].query.$sort, {
     display_name: 1
@@ -297,6 +298,7 @@ test('users.find scopes external non-admin directory reads to member accounts', 
 
   assert.equal(superFindCalls.length, 1)
   assert.equal(superFindCalls[0].query.account_type, 'member')
+  assert.equal(superFindCalls[0].query.registration_status, 'active')
   assert.equal(superFindCalls[0].query.$limit, 50)
   assert.deepEqual(superFindCalls[0].query.$sort, {
     display_name: 1
