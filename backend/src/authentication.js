@@ -5,6 +5,7 @@ import {
   createAuthenticationRateLimitHook
 } from './hooks/rate-limit.js'
 import { assertUserAccountActive } from './lib/account-state.js'
+import { assertAccessTokenVersion, buildAuthTokenPayload } from './lib/auth-token-version.js'
 
 export function resolveRememberJwtOptions(data, configuration) {
   const rememberRequested = data?.strategy === 'local' && data?.remember === true
@@ -29,6 +30,19 @@ export function resolveBrowserJwtOptions(data, configuration) {
 }
 
 class NebulynkAuthenticationService extends AuthenticationService {
+  async getPayload(authResult, params) {
+    const payload = await super.getPayload(authResult, params)
+    const userId = authResult.user?.id
+    const db = this.app.get('postgresqlClient')
+    const currentUser = userId && db
+      ? await db('users').where('id', userId).first()
+      : authResult.user
+    return {
+      ...payload,
+      ...buildAuthTokenPayload(currentUser || authResult.user)
+    }
+  }
+
   async create(data, params = {}) {
     const browserJwtOptions = resolveBrowserJwtOptions(data, this.configuration)
     const rememberJwtOptions = Object.keys(browserJwtOptions).length > 0
@@ -51,6 +65,14 @@ class NebulynkAuthenticationService extends AuthenticationService {
   }
 }
 
+class NebulynkJwtStrategy extends JWTStrategy {
+  async authenticate(authentication, params) {
+    const result = await super.authenticate(authentication, params)
+    assertAccessTokenVersion(result.authentication?.payload, result.user)
+    return result
+  }
+}
+
 export async function assertActiveLocalAuthenticationResult(context) {
   if (context.data?.strategy === 'local' && context.result?.user) {
     assertUserAccountActive(context.result.user)
@@ -61,7 +83,7 @@ export async function assertActiveLocalAuthenticationResult(context) {
 export const authentication = (app) => {
   const authService = new NebulynkAuthenticationService(app)
 
-  authService.register('jwt', new JWTStrategy())
+  authService.register('jwt', new NebulynkJwtStrategy())
   authService.register('local', new LocalStrategy())
 
   app.use('authentication', authService)

@@ -1191,6 +1191,25 @@ export function createApiClient(options = {}) {
     return data
   }
 
+  async function disableUser(userId) {
+    const { data } = await http.patch(`/users/${encodeURIComponent(userId)}`, {
+      disabled_at: new Date().toISOString()
+    })
+    return data
+  }
+
+  async function enableUser(userId) {
+    const { data } = await http.patch(`/users/${encodeURIComponent(userId)}`, {
+      disabled_at: null
+    })
+    return data
+  }
+
+  async function deleteUser(userId) {
+    const { data } = await http.delete(`/users/${encodeURIComponent(userId)}`)
+    return data
+  }
+
   async function beginPrimaryAdminTransferPasskeyOptions() {
     const { data } = await http.post('/admin/primary-admin-transfer/passkey-options', {})
     return data
@@ -1271,6 +1290,9 @@ export function createApiClient(options = {}) {
     verifyPasskeyRegistration,
     deletePasskey,
     resetUserPasskeys,
+    disableUser,
+    enableUser,
+    deleteUser,
     beginPrimaryAdminTransferPasskeyOptions,
     transferPrimaryAdmin,
     isAuthenticated

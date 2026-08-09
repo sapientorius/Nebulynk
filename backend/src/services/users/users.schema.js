@@ -45,6 +45,7 @@ export const patchSchema = {
     status: { type: 'string', enum: ['online', 'away', 'dnd', 'offline'] },
     custom_status: { type: ['string', 'null'], maxLength: 200 },
     custom_status_emoji: { type: ['string', 'null'], maxLength: 50 },
-    status_expires_at: { type: ['string', 'null'], format: 'date-time' }
+    status_expires_at: { type: ['string', 'null'], format: 'date-time' },
+    disabled_at: { type: ['string', 'null'], format: 'date-time' }
   }
 }

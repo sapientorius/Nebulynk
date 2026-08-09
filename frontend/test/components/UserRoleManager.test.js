@@ -3,7 +3,7 @@ import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 describe('UserRoleManager source contract', () => {
-  it('shows 2FA, passkey, and primary-admin controls in the admin user table', () => {
+  it('groups administrative controls in a responsive actions dropdown', () => {
     const source = readFileSync(resolve('src/components/admin/UserRoleManager.vue'), 'utf8')
 
     expect(source).toContain("twoFactor.admin.column")
@@ -11,6 +11,10 @@ describe('UserRoleManager source contract', () => {
     expect(source).toContain("twoFactor.admin.disabled")
     expect(source).toContain("twoFactor.admin.resetAction")
     expect(source).toContain("window.confirm(this.$t('twoFactor.admin.resetConfirm'))")
+    expect(source).toContain('<n-dropdown')
+    expect(source).toContain('getUserActionOptions(user)')
+    expect(source).toContain('handleUserAction(user, action)')
+    expect(source).toContain('admin-user-actions-${user.id}')
     expect(source).toContain('admin-user-reset-2fa-${user.id}')
     expect(source).toContain('await this.adminStore.resetUserTwoFactor(user.id)')
     expect(source).toContain("passkeys.admin.column")
@@ -28,5 +32,27 @@ describe('UserRoleManager source contract', () => {
     expect(source).toContain('await startAuthentication({')
     expect(source).toContain('this.adminStore.beginPrimaryAdminTransferPasskeyOptions()')
     expect(source).toContain('this.adminStore.transferPrimaryAdmin({')
+    expect(source).toContain("userManagement.status")
+    expect(source).toContain("userManagement.deactivated")
+    expect(source).toContain('canManageAccount(user)')
+    expect(source).toContain('admin-user-disable-${user.id}')
+    expect(source).toContain('admin-user-enable-${user.id}')
+    expect(source).toContain('admin-user-delete-${user.id}')
+    expect(source).toContain("class: 'user-action-delete'")
+    expect(source).toContain(':global(.user-action-delete .n-dropdown-option-body__label)')
+    expect(source).toContain('confirmAccountAction({ dialogType, title, content, positiveText })')
+    expect(source).toContain("dialogType: isEnabling ? 'success' : 'warning'")
+    expect(source).toContain("dialogType: 'error'")
+    expect(source).toContain('window.$dialog[dialogType]({')
+    expect(source).not.toContain("window.confirm(this.$t(confirmationKey")
+    expect(source).not.toContain("window.confirm(this.$t('userManagement.deleteConfirm'")
+    expect(source).toContain('await this.adminStore.disableUser(user.id)')
+    expect(source).toContain('await this.adminStore.enableUser(user.id)')
+    expect(source).toContain('await this.adminStore.deleteUser(user.id)')
+    expect(source).toContain('overflow-x: auto')
+    expect(source).toContain('min-height: 44px')
+
+    const mainSource = readFileSync(resolve('src/main.js'), 'utf8')
+    expect(mainSource).toContain('NDropdown')
   })
 })

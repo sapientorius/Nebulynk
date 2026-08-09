@@ -2,14 +2,27 @@ function clone(value) {
   return JSON.parse(JSON.stringify(value))
 }
 
+function resolveColumnName(column) {
+  if (typeof column !== 'string') return column
+  const normalized = column.replace(/\s+as\s+.*/i, '')
+  return normalized.includes('.') ? normalized.split('.').at(-1) : normalized
+}
+
 function matchesWhere(row, whereClauses) {
   return whereClauses.every((clause) => {
     if (clause.type === 'where') {
       if (typeof clause.field === 'object' && clause.field !== null) {
-        return Object.entries(clause.field).every(([key, value]) => row[key] === value)
+        return Object.entries(clause.field).every(([key, value]) => {
+          const field = resolveColumnName(key)
+          if (value && typeof value === 'object' && Array.isArray(value.$in)) {
+            return value.$in.includes(row[field])
+          }
+          return row[field] === value
+        })
       }
+      const field = resolveColumnName(clause.field)
       if (clause.operator) {
-        const left = row[clause.field]
+        const left = row[field]
         const right = clause.value
         if (clause.operator === '>=') return left >= right
         if (clause.operator === '>') return left > right
@@ -17,19 +30,21 @@ function matchesWhere(row, whereClauses) {
         if (clause.operator === '<') return left < right
         if (clause.operator === '!=') return left !== right
       }
-      return row[clause.field] === clause.value
+      return row[field] === clause.value
     }
 
     if (clause.type === 'whereNotNull') {
-      return row[clause.field] !== null && row[clause.field] !== undefined
+      const field = resolveColumnName(clause.field)
+      return row[field] !== null && row[field] !== undefined
     }
 
     if (clause.type === 'whereNull') {
-      return row[clause.field] === null || row[clause.field] === undefined
+      const field = resolveColumnName(clause.field)
+      return row[field] === null || row[field] === undefined
     }
 
     if (clause.type === 'whereIn') {
-      return clause.values.includes(row[clause.field])
+      return clause.values.includes(row[resolveColumnName(clause.field)])
     }
 
     return true
@@ -37,13 +52,14 @@ function matchesWhere(row, whereClauses) {
 }
 
 function pickColumns(row, columns) {
-  if (!columns || columns.length === 0 || columns[0] === '*') {
+  if (!columns || columns.length === 0 || resolveColumnName(columns[0]) === '*') {
     return clone(row)
   }
 
   const next = {}
   for (const column of columns) {
-    next[column] = row[column]
+    const field = resolveColumnName(column)
+    next[field] = row[field]
   }
   return next
 }
@@ -55,6 +71,7 @@ function createBuilder(tables, tableName, whereClauses = [], options = {}) {
   }
 
   return {
+    client: { driverName: 'pg' },
     where(field, operatorOrValue, maybeValue) {
       if (arguments.length >= 3) {
         whereClauses.push({ type: 'where', field, operator: operatorOrValue, value: maybeValue })
@@ -62,6 +79,9 @@ function createBuilder(tables, tableName, whereClauses = [], options = {}) {
       }
       whereClauses.push({ type: 'where', field, value: operatorOrValue })
       return this
+    },
+    andWhere(field, operatorOrValue, maybeValue) {
+      return this.where(field, operatorOrValue, maybeValue)
     },
     whereNotNull(field) {
       whereClauses.push({ type: 'whereNotNull', field })
@@ -92,9 +112,25 @@ function createBuilder(tables, tableName, whereClauses = [], options = {}) {
       options.limit = Number(value)
       return this
     },
+    offset(value) {
+      options.offset = Number(value)
+      return this
+    },
     select(...columns) {
-      const list = this._resolve()
-      return Promise.resolve(list.map((row) => pickColumns(row, columns)))
+      options.select = columns
+      return this
+    },
+    clearSelect() {
+      delete options.select
+      return this
+    },
+    clearOrder() {
+      delete options.orderBy
+      return this
+    },
+    count(column) {
+      options.count = column
+      return this
     },
     first() {
       const list = this._resolve()
@@ -141,11 +177,20 @@ function createBuilder(tables, tableName, whereClauses = [], options = {}) {
     delete() {
       return this.del()
     },
+    clone() {
+      return createBuilder(tables, tableName, [...whereClauses], { ...options })
+    },
     then(resolve, reject) {
       return Promise.resolve(this._resolve().map((row) => clone(row))).then(resolve, reject)
     },
+    catch(reject) {
+      return Promise.resolve(this._resolve().map((row) => clone(row))).catch(reject)
+    },
     _resolve() {
       let filtered = tables[tableName].filter((row) => matchesWhere(row, whereClauses))
+      if (options.count) {
+        return [{ total: filtered.length }]
+      }
       if (options.orderBy?.length > 0) {
         filtered = [...filtered].sort((left, right) => {
           for (const order of options.orderBy) {
@@ -162,9 +207,12 @@ function createBuilder(tables, tableName, whereClauses = [], options = {}) {
       }
 
       if (Number.isFinite(options.limit)) {
-        return filtered.slice(0, options.limit)
+        filtered = filtered.slice(0, options.limit)
       }
-      return filtered
+      if (Number.isFinite(options.offset) && options.offset > 0) {
+        filtered = filtered.slice(options.offset)
+      }
+      return filtered.map((row) => pickColumns(row, options.select))
     }
   }
 }

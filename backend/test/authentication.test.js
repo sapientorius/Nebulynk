@@ -10,6 +10,7 @@ import {
   createAuthenticationRateLimitHook
 } from '../src/hooks/rate-limit.js'
 import { createRateLimiter, MemoryRateLimitStore } from '../src/lib/rate-limit.js'
+import { assertAccessTokenVersion, buildAuthTokenPayload } from '../src/lib/auth-token-version.js'
 
 test('remember-me auth requests receive the configured extended JWT options', () => {
   const options = resolveRememberJwtOptions(
@@ -54,6 +55,16 @@ test('jwt re-authentication does not inherit remember-me login overrides', () =>
   )
 
   assert.deepEqual(options, {})
+})
+
+test('access tokens are bound to the current user auth version', () => {
+  assert.deepEqual(buildAuthTokenPayload({ auth_version: 3 }), { auth_version: 3 })
+  assert.doesNotThrow(() => assertAccessTokenVersion({ auth_version: 3 }, { auth_version: 3 }))
+
+  assert.throws(
+    () => assertAccessTokenVersion({ auth_version: 2 }, { auth_version: 3 }),
+    (error) => error.name === 'NotAuthenticated'
+  )
 })
 
 function createRateLimitContext({

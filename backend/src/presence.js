@@ -129,6 +129,38 @@ export function clearAutoAwayState(userId) {
   autoAwayUsers.delete(userId)
 }
 
+export function disconnectUserConnections(userId) {
+  if (!userId) return 0
+
+  const connections = onlineUsers.get(userId)
+  if (!connections || connections.size === 0) return 0
+
+  if (disconnectTimers.has(userId)) {
+    clearTimeout(disconnectTimers.get(userId))
+    disconnectTimers.delete(userId)
+  }
+
+  let disconnected = 0
+  for (const connection of [...connections]) {
+    try {
+      if (typeof connection.disconnect === 'function') {
+        connection.disconnect(true)
+        disconnected += 1
+      } else if (typeof connection.close === 'function') {
+        connection.close()
+        disconnected += 1
+      }
+    } catch (error) {
+      logger.warn('Failed to disconnect user connection', {
+        userId,
+        error: error.message
+      })
+    }
+  }
+
+  return disconnected
+}
+
 export function isAutoAwayUser(userId) {
   return autoAwayUsers.has(userId)
 }

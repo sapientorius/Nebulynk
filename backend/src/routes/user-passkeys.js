@@ -3,6 +3,7 @@ import { authenticateRequest } from './authenticate-request.js'
 import { logger } from '../logger.js'
 import { buildErrorBody, attachErrorMetadata, badRequest, conflict, forbidden, notFound } from '../lib/errors.js'
 import { assertUserAccountActive, isGuestAccount } from '../lib/account-state.js'
+import { buildAuthTokenPayload } from '../lib/auth-token-version.js'
 import { hasUserPlatformPermission } from '../lib/user-permissions.js'
 import { revokeAllUserRefreshSessions, sanitizeUser } from '../lib/auth-sessions.js'
 import { consumeRateLimitBuckets, getRequestIp } from '../hooks/rate-limit.js'
@@ -97,7 +98,7 @@ async function ensureUserWebauthnId(db, user) {
 }
 
 async function issueBrowserLoginToken(app, user) {
-  return app.service('authentication').createAccessToken({}, {
+  return app.service('authentication').createAccessToken(buildAuthTokenPayload(user), {
     subject: `${user.id}`,
     ...issueBrowserAccessTokenJwtOptions(app)
   })

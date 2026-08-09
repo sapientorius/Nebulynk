@@ -377,6 +377,21 @@ const baseMessages = {
         resetFailed: 'Passkeys could not be reset.'
       }
     },
+    userManagement: {
+      status: 'Status',
+      active: 'Active',
+      deactivated: 'Deactivated',
+      disableAction: 'Deactivate',
+      enableAction: 'Activate',
+      deleteAction: 'Delete',
+      disableConfirm: 'Deactivate {name}? They will be signed out and must sign in again after reactivation.',
+      enableConfirm: 'Reactivate {name}? They will need to sign in again.',
+      deleteConfirm: 'Permanently delete {name}? Their account and dependent data cannot be recovered.',
+      disableSuccess: 'User deactivated.',
+      enableSuccess: 'User reactivated.',
+      deleteSuccess: 'User permanently deleted.',
+      actionFailed: 'User management action failed.'
+    },
     primaryAdmin: {
       badge: 'Primary admin',
       transferAction: 'Transfer primary admin',
@@ -1173,6 +1188,21 @@ const baseMessages = {
         resetSuccess: 'Die Passkeys wurden zurueckgesetzt.',
         resetFailed: 'Die Passkeys konnten nicht zurueckgesetzt werden.'
       }
+    },
+    userManagement: {
+      status: 'Status',
+      active: 'Aktiv',
+      deactivated: 'Deaktiviert',
+      disableAction: 'Deaktivieren',
+      enableAction: 'Aktivieren',
+      deleteAction: 'Loeschen',
+      disableConfirm: '{name} deaktivieren? Die Person wird abgemeldet und muss sich nach der Reaktivierung erneut anmelden.',
+      enableConfirm: '{name} wieder aktivieren? Die Person muss sich erneut anmelden.',
+      deleteConfirm: '{name} endgueltig loeschen? Konto und abhaengige Daten koennen nicht wiederhergestellt werden.',
+      disableSuccess: 'Nutzer deaktiviert.',
+      enableSuccess: 'Nutzer wieder aktiviert.',
+      deleteSuccess: 'Nutzer endgueltig geloescht.',
+      actionFailed: 'Nutzeraktion fehlgeschlagen.'
     },
     primaryAdmin: {
       badge: 'Haupt-Admin',

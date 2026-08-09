@@ -2,6 +2,7 @@ import { createHash, randomBytes } from 'node:crypto'
 import { createId } from '@paralleldrive/cuid2'
 import { logger } from '../logger.js'
 import { assertUserAccountActive } from './account-state.js'
+import { assertAccessTokenVersion, buildAuthTokenPayload } from './auth-token-version.js'
 import { normalizeMeetingVideoPreferences } from './meeting-video-preferences.js'
 import { isProductionEnvironment } from './security-config.js'
 
@@ -128,6 +129,7 @@ export function sanitizeUser(user) {
   delete sanitized.password
   delete sanitized.avatar_storage_key
   delete sanitized.webauthn_user_id
+  delete sanitized.auth_version
   sanitized.meeting_video_preferences = normalizeMeetingVideoPreferences(sanitized.meeting_video_preferences)
   return sanitized
 }
@@ -145,6 +147,7 @@ export async function resolveUserFromAccessToken(app, accessToken) {
     throw new Error('User not found')
   }
 
+  assertAccessTokenVersion(payload, user)
   assertUserAccountActive(user)
   return sanitizeUser(user)
 }
@@ -154,7 +157,7 @@ async function issueAccessTokenForUser(app, user, { transport = 'body' } = {}) {
   const jwtOptions = transport === 'cookie'
     ? issueBrowserAccessTokenJwtOptions(app)
     : {}
-  return authService.createAccessToken({}, {
+  return authService.createAccessToken(buildAuthTokenPayload(user), {
     subject: `${user.id}`,
     ...jwtOptions
   })

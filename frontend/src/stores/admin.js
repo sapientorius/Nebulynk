@@ -5,8 +5,10 @@ import {
   beginPrimaryAdminTransferPasskeyOptions as beginPrimaryAdminTransferPasskeyOptionsRequest,
   createAiProviderInstance as createAiProviderInstanceRequest,
   deleteAiProviderInstance as deleteAiProviderInstanceRequest,
+  deleteUser as deleteUserRequest,
   deletePendingRegistration as deletePendingRegistrationRequest,
   confirmPendingRegistration as confirmPendingRegistrationRequest,
+  disableUser as disableUserRequest,
   getPlatformStatus,
   getRegistrationSettings as getRegistrationSettingsRequest,
   getSecuritySettings as getSecuritySettingsRequest,
@@ -14,6 +16,7 @@ import {
   listAiFunctionConfigs as listAiFunctionConfigsRequest,
   listAiProviderInstances as listAiProviderInstancesRequest,
   listAiProviderModels as listAiProviderModelsRequest,
+  enableUser as enableUserRequest,
   resetUserPasskeys as resetUserPasskeysRequest,
   transferPrimaryAdmin as transferPrimaryAdminRequest,
   sendSmtpTestEmail as sendSmtpTestEmailRequest,
@@ -415,6 +418,31 @@ export const useAdminStore = defineStore('admin', () => {
     return result
   }
 
+  function mergeUser(userId, patch) {
+    users.value = users.value.map((user) =>
+      user.id === userId ? { ...user, ...patch } : user
+    )
+  }
+
+  async function disableUser(userId) {
+    const result = await disableUserRequest(userId)
+    mergeUser(userId, result)
+    return result
+  }
+
+  async function enableUser(userId) {
+    const result = await enableUserRequest(userId)
+    mergeUser(userId, result)
+    return result
+  }
+
+  async function deleteUser(userId) {
+    const result = await deleteUserRequest(userId)
+    users.value = users.value.filter((user) => user.id !== userId)
+    userRoles.value = userRoles.value.filter((userRole) => userRole.user_id !== userId)
+    return result
+  }
+
   async function beginPrimaryAdminTransferPasskeyOptions() {
     return beginPrimaryAdminTransferPasskeyOptionsRequest()
   }
@@ -515,6 +543,9 @@ export const useAdminStore = defineStore('admin', () => {
     updateUserRoles,
     resetUserTwoFactor,
     resetUserPasskeys,
+    disableUser,
+    enableUser,
+    deleteUser,
     createInvite,
     revokeInvite,
     updatePlatformSettings,

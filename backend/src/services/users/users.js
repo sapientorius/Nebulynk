@@ -4,7 +4,7 @@ import { authenticate } from '@feathersjs/authentication'
 import { createId } from '@paralleldrive/cuid2'
 import { checkPermission } from '../../hooks/check-permission.js'
 import { clearExpiredStatus } from '../../hooks/clear-expired-status.js'
-import { clearAutoAwayState } from '../../presence.js'
+import { clearAutoAwayState, disconnectUserConnections } from '../../presence.js'
 import { validate } from '../../schemas/validators.js'
 import { createSchema, patchSchema } from './users.schema.js'
 import { badRequest, forbidden } from '../../lib/errors.js'
@@ -14,6 +14,7 @@ import { hasUserPlatformPermission } from '../../lib/user-permissions.js'
 import { listEnabledTwoFactorUserIds } from '../../lib/two-factor-data.js'
 import { getPasskeyCountsByUserId } from '../../lib/passkey-data.js'
 import { createWebauthnUserId, encodeBytesForStorage } from '../../lib/passkeys.js'
+import { revokeAllUserRefreshSessions } from '../../lib/auth-sessions.js'
 import {
   assertPasswordStrength,
   getConfiguredPasswordStrengthPolicy
@@ -176,12 +177,76 @@ async function resolveGuestScopedRequestedIds({
   return requestedIds.filter((id) => allowedIds.has(id))
 }
 
-async function assertPrimaryAdminRemoveAllowed(context) {
+function hasOwn(object, property) {
+  return Object.prototype.hasOwnProperty.call(object || {}, property)
+}
+
+async function getTargetUser(context) {
   const app = context.app || context.service?.options?.app
   const db = app?.get('postgresqlClient')
-  if (!db || !context.id) return context
+  if (!db || !context.id) return null
 
-  const targetUser = await db('users').where('id', context.id).first()
+  return db('users').where('id', context.id).first()
+}
+
+async function assertAccountStatePatchAllowed(context) {
+  if (!hasOwn(context.data, 'disabled_at')) return context
+
+  if (!context.id) {
+    throw badRequest(
+      'api.users.account_state_requires_user_id',
+      {},
+      'Account state can only be changed for an individual user'
+    )
+  }
+
+  await checkPermission('manage_users')(context)
+
+  const targetUser = await getTargetUser(context)
+  if (!targetUser) return context
+
+  if (targetUser.id === context.params.user?.id) {
+    throw forbidden(
+      'api.users.cannot_manage_own_account',
+      {},
+      'Your own account cannot be deactivated or deleted'
+    )
+  }
+
+  if (targetUser.is_primary_admin) {
+    throw forbidden(
+      'api.primary_admin.cannot_manage_primary_admin',
+      {},
+      'The primary admin account cannot be deactivated or reactivated'
+    )
+  }
+
+  context.params.accountStateTarget = targetUser
+  if (context.data.disabled_at === null) {
+    context.data.auth_version = Number(targetUser.auth_version || 1) + 1
+    context.params.accountStateChange = 'enabled'
+    return context
+  }
+
+  context.data.disabled_at = new Date().toISOString()
+  context.data.status = 'offline'
+  context.data.auth_version = Number(targetUser.auth_version || 1) + 1
+  context.params.accountStateChange = 'disabled'
+  return context
+}
+
+async function assertAccountRemoveAllowed(context) {
+  const targetUser = await getTargetUser(context)
+  if (!targetUser) return context
+
+  if (targetUser.id === context.params.user?.id) {
+    throw forbidden(
+      'api.users.cannot_manage_own_account',
+      {},
+      'Your own account cannot be deactivated or deleted'
+    )
+  }
+
   if (targetUser?.is_primary_admin) {
     throw forbidden(
       'api.primary_admin.cannot_delete_primary_admin',
@@ -190,6 +255,7 @@ async function assertPrimaryAdminRemoveAllowed(context) {
     )
   }
 
+  context.params.removedUser = targetUser
   return context
 }
 
@@ -241,6 +307,9 @@ export class UsersService extends KnexService {
     const currentUser = params.user || null
     const isExternal = !!params.provider
     const isGuestUser = currentUser?.account_type === 'guest'
+    const canManageUsers = isExternal && currentUser?.id
+      ? currentUser.is_admin === true || await hasUserPlatformPermission(this.app || this.options?.app, currentUser.id, 'manage_users')
+      : false
 
     if (requestedIds.length === 0 && !rawSearchTerm) {
       const limit = normalizeSearchLimit(query.$limit)
@@ -259,6 +328,7 @@ export class UsersService extends KnexService {
             ...(params.query || {}),
             account_type: 'member',
             registration_status: 'active',
+            ...(canManageUsers ? {} : { disabled_at: null }),
             $limit: limit,
             $sort: {
               display_name: 1
@@ -300,6 +370,9 @@ export class UsersService extends KnexService {
     } else if (isExternal) {
       baseQuery.where('account_type', 'member')
       baseQuery.where('registration_status', 'active')
+      if (!canManageUsers) {
+        baseQuery.whereNull('disabled_at')
+      }
     }
 
     if (requestedIds.length > 0) {
@@ -386,6 +459,7 @@ export const users = (app) => {
         assertConfiguredPasswordPolicy,
         hashPassword('password'),
         assertAvatarPatchAllowed,
+        assertAccountStatePatchAllowed,
         // Own profile: always allowed. Other users: needs manage_users
         async (context) => {
           if (Object.prototype.hasOwnProperty.call(context.data, 'meeting_video_preferences')) {
@@ -407,12 +481,12 @@ export const users = (app) => {
       ],
       remove: [
         checkPermission('manage_users'),
-        assertPrimaryAdminRemoveAllowed
+        assertAccountRemoveAllowed
       ]
     },
     after: {
       all: [
-        protect('password', 'avatar_storage_key'),
+        protect('password', 'avatar_storage_key', 'auth_version'),
         async (context) => {
           if (!context.params.provider) return context
           context.result = sanitizeExternalUsersResult(context.result, context.params.user?.id || null)
@@ -428,6 +502,35 @@ export const users = (app) => {
           if (!canManageUsers) return context
           context.result = await attachTwoFactorStatus(app, context.result)
           context.result = await attachPasskeyStatus(app, context.result)
+          return context
+        }
+      ],
+      patch: [
+        async (context) => {
+          if (context.params.accountStateChange !== 'disabled') return context
+
+          const app = context.app || context.service?.options?.app
+          const targetUser = context.params.accountStateTarget
+          if (!app || !targetUser?.id) return context
+
+          await revokeAllUserRefreshSessions(app, targetUser.id)
+          disconnectUserConnections(targetUser.id)
+          app.channel?.('authenticated')?.send({
+            type: 'presence',
+            userId: targetUser.id,
+            status: 'offline'
+          })
+          return context
+        }
+      ],
+      remove: [
+        async (context) => {
+          const app = context.app || context.service?.options?.app
+          const targetUser = context.params.removedUser
+          if (!app || !targetUser?.id) return context
+
+          await revokeAllUserRefreshSessions(app, targetUser.id)
+          disconnectUserConnections(targetUser.id)
           return context
         }
       ],

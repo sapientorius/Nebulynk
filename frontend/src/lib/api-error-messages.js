@@ -146,6 +146,7 @@ export const apiErrorMessages = {
       },
       primary_admin: {
         cannot_delete_primary_admin: 'The primary admin account cannot be deleted',
+        cannot_manage_primary_admin: 'The primary admin account cannot be deactivated or reactivated',
         confirmation_required: 'Type TRANSFER_PRIMARY_ADMIN to confirm this irreversible transfer',
         current_password_required: 'Current password is required',
         current_primary_admin_required: 'Only the current primary admin can transfer this role',
@@ -415,6 +416,8 @@ export const apiErrorMessages = {
       },
       users: {
         avatar_updates_use_avatar_endpoint: 'Avatar updates must use the avatar endpoint',
+        account_state_requires_user_id: 'Account state can only be changed for an individual user',
+        cannot_manage_own_account: 'You cannot deactivate or delete your own account',
         direct_creation_not_allowed: 'Direct user creation is not allowed',
         not_found: 'User not found',
         video_background_image_required: 'Choose a background image',
@@ -589,6 +592,7 @@ export const apiErrorMessages = {
       },
       primary_admin: {
         cannot_delete_primary_admin: 'Das Haupt-Admin-Konto kann nicht geloescht werden',
+        cannot_manage_primary_admin: 'Das Haupt-Admin-Konto kann nicht deaktiviert oder reaktiviert werden',
         confirmation_required: 'Gib TRANSFER_PRIMARY_ADMIN ein, um diese unumkehrbare Uebertragung zu bestaetigen',
         current_password_required: 'Aktuelles Passwort ist erforderlich',
         current_primary_admin_required: 'Nur der aktuelle Haupt-Admin kann diese Rolle uebertragen',
@@ -858,6 +862,8 @@ export const apiErrorMessages = {
       },
       users: {
         avatar_updates_use_avatar_endpoint: 'Avatar-Aenderungen muessen ueber den Avatar-Endpunkt erfolgen',
+        account_state_requires_user_id: 'Der Kontostatus kann nur fuer einen einzelnen Nutzer geaendert werden',
+        cannot_manage_own_account: 'Du kannst dein eigenes Konto nicht deaktivieren oder loeschen',
         direct_creation_not_allowed: 'Direkte Benutzererstellung ist nicht erlaubt',
         not_found: 'Nutzer nicht gefunden',
         video_background_image_required: 'Waehle ein Hintergrundbild aus',

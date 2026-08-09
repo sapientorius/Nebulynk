@@ -87,7 +87,8 @@ function createSeed() {
     ],
     user_roles: [
       { id: 'user-role-primary', user_id: 'primary-1', role_id: 'role-admin' },
-      { id: 'user-role-manager', user_id: 'manager-1', role_id: 'role-manager' }
+      { id: 'user-role-manager', user_id: 'manager-1', role_id: 'role-manager' },
+      { id: 'user-role-member', user_id: 'member-1', role_id: 'role-manager' }
     ],
     auth_sessions: [
       {
@@ -352,6 +353,9 @@ test('users.remove blocks deleting the primary admin account', async () => {
   app.defaultAuthentication = () => ({
     async authenticate() {
       return { user: db.tables.users.find((entry) => entry.id === 'manager-1') }
+    },
+    getStrategies() {
+      return [{ async hashPassword(value) { return value } }]
     }
   })
   app.use('authentication', createAuthService(db))
@@ -366,6 +370,95 @@ test('users.remove blocks deleting the primary admin account', async () => {
     }),
     (error) => {
       assert.equal(error.error_code, 'api.primary_admin.cannot_delete_primary_admin')
+      return true
+    }
+  )
+})
+
+test('manage_users can deactivate and reactivate another account without removing its roles', async () => {
+  const db = createMemoryDb(createSeed())
+  const app = feathers()
+  app.set('postgresqlClient', db)
+  app.set('paginate', false)
+  app.defaultAuthentication = () => ({
+    async authenticate() {
+      return { user: db.tables.users.find((entry) => entry.id === 'manager-1') }
+    },
+    getStrategies() {
+      return [{ async hashPassword(value) { return value } }]
+    }
+  })
+  app.use('authentication', createAuthService(db))
+  users(app)
+
+  const params = {
+    provider: 'rest',
+    authenticated: true,
+    user: db.tables.users.find((entry) => entry.id === 'manager-1'),
+    resolvedPermissions: new Set(['manage_users'])
+  }
+
+  const deactivated = await app.service('users').patch('member-1', {
+    disabled_at: '2026-08-09T10:00:00.000Z'
+  }, params)
+  const storedAfterDisable = db.tables.users.find((entry) => entry.id === 'member-1')
+
+  assert.ok(deactivated.disabled_at)
+  assert.equal(storedAfterDisable.status, 'offline')
+  assert.equal(storedAfterDisable.auth_version, 2)
+  assert.ok(db.tables.auth_sessions.find((entry) => entry.id === 'session-member').revoked_at)
+  assert.ok(db.tables.user_roles.find((entry) => entry.id === 'user-role-member'))
+
+  const reactivated = await app.service('users').patch('member-1', {
+    disabled_at: null
+  }, params)
+  const storedAfterEnable = db.tables.users.find((entry) => entry.id === 'member-1')
+
+  assert.equal(reactivated.disabled_at, null)
+  assert.equal(storedAfterEnable.auth_version, 3)
+  assert.equal(storedAfterEnable.status, 'offline')
+})
+
+test('users account management rejects self and primary-admin changes', async () => {
+  const db = createMemoryDb(createSeed())
+  const app = feathers()
+  app.set('postgresqlClient', db)
+  app.set('paginate', false)
+  app.defaultAuthentication = () => ({
+    async authenticate() {
+      return { user: db.tables.users.find((entry) => entry.id === 'manager-1') }
+    },
+    getStrategies() {
+      return [{ async hashPassword(value) { return value } }]
+    }
+  })
+  app.use('authentication', createAuthService(db))
+  users(app)
+
+  const params = {
+    provider: 'rest',
+    authenticated: true,
+    user: db.tables.users.find((entry) => entry.id === 'manager-1'),
+    resolvedPermissions: new Set(['manage_users'])
+  }
+
+  for (const [userId, expectedCode] of [
+    ['manager-1', 'api.users.cannot_manage_own_account'],
+    ['primary-1', 'api.primary_admin.cannot_manage_primary_admin']
+  ]) {
+    await assert.rejects(
+      app.service('users').patch(userId, { disabled_at: '2026-08-09T10:00:00.000Z' }, params),
+      (error) => {
+        assert.equal(error.error_code, expectedCode)
+        return true
+      }
+    )
+  }
+
+  await assert.rejects(
+    app.service('users').remove('manager-1', params),
+    (error) => {
+      assert.equal(error.error_code, 'api.users.cannot_manage_own_account')
       return true
     }
   )

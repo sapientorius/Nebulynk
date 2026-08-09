@@ -300,6 +300,18 @@ export async function resetUserPasskeys(userId) {
   return activeApiClient.resetUserPasskeys(userId)
 }
 
+export async function disableUser(userId) {
+  return activeApiClient.disableUser(userId)
+}
+
+export async function enableUser(userId) {
+  return activeApiClient.enableUser(userId)
+}
+
+export async function deleteUser(userId) {
+  return activeApiClient.deleteUser(userId)
+}
+
 export async function beginPrimaryAdminTransferPasskeyOptions() {
   return activeApiClient.beginPrimaryAdminTransferPasskeyOptions()
 }

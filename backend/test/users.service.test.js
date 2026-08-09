@@ -33,6 +33,9 @@ function createBuilder(rows = []) {
     limit(...args) {
       state.limitCalls.push(args)
       return Promise.resolve(rows)
+    },
+    async first() {
+      return undefined
     }
   }
 
@@ -299,11 +302,30 @@ test('users.find scopes external non-admin directory reads to member accounts', 
   assert.equal(superFindCalls.length, 1)
   assert.equal(superFindCalls[0].query.account_type, 'member')
   assert.equal(superFindCalls[0].query.registration_status, 'active')
+  assert.equal(superFindCalls[0].query.disabled_at, null)
   assert.equal(superFindCalls[0].query.$limit, 50)
   assert.deepEqual(superFindCalls[0].query.$sort, {
     display_name: 1
   })
   assert.deepEqual(result.data, rows)
+})
+
+test('users.find keeps deactivated accounts visible to manage_users administrators', async () => {
+  const { service, superFindCalls } = createService([], {
+    superFindResult: { total: 0, limit: 50, skip: 0, data: [] }
+  })
+
+  await service.find({
+    provider: 'rest',
+    user: {
+      id: 'admin-1',
+      account_type: 'member',
+      is_admin: true
+    },
+    query: { $limit: 50 }
+  })
+
+  assert.equal(Object.hasOwn(superFindCalls[0].query, 'disabled_at'), false)
 })
 
 test('users patch validation accepts theme preference values', async () => {
@@ -321,6 +343,20 @@ test('users patch validation accepts theme preference values', async () => {
 
   assert.deepEqual(context.data, {
     theme_preference: 'light'
+  })
+})
+
+test('users patch validation accepts an account deactivation timestamp', async () => {
+  const hook = validate(patchSchema)
+  const context = {
+    params: { provider: 'rest' },
+    data: { disabled_at: '2026-08-09T10:00:00.000Z' }
+  }
+
+  await hook(context)
+
+  assert.deepEqual(context.data, {
+    disabled_at: '2026-08-09T10:00:00.000Z'
   })
 })
 

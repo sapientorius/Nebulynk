@@ -2,6 +2,7 @@ import { createId } from '@paralleldrive/cuid2'
 import { buildErrorBody, attachErrorMetadata } from '../lib/errors.js'
 import { logger } from '../logger.js'
 import { assertUserAccountActive } from '../lib/account-state.js'
+import { buildAuthTokenPayload } from '../lib/auth-token-version.js'
 import { issueBrowserAccessTokenJwtOptions, sanitizeUser } from '../lib/auth-sessions.js'
 import { consumeRateLimitBuckets, getRequestIp } from '../hooks/rate-limit.js'
 import {
@@ -76,7 +77,7 @@ function isChallengeUsable(challenge) {
 }
 
 async function issueBrowserLoginToken(app, user) {
-  return app.service('authentication').createAccessToken({}, {
+  return app.service('authentication').createAccessToken(buildAuthTokenPayload(user), {
     subject: `${user.id}`,
     ...issueBrowserAccessTokenJwtOptions(app)
   })

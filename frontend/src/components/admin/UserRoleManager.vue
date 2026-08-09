@@ -3,22 +3,29 @@
     <h3 style="margin: 0 0 16px 0">{{ $t('ui.components.admin.users_roles') }}</h3>
 
     <n-spin :show="loading">
-      <n-table :bordered="false" :single-line="false">
-        <thead>
+      <div class="user-role-table-scroll">
+        <n-table class="user-role-table" :bordered="false" :single-line="false">
+          <thead>
           <tr>
             <th>{{ $t('ui.components.admin.user') }}</th>
             <th>{{ $t('ui.components.admin.email') }}</th>
+            <th>{{ $t('userManagement.status') }}</th>
             <th>Admin</th>
             <th>{{ $t('twoFactor.admin.column') }}</th>
             <th>{{ $t('passkeys.admin.column') }}</th>
             <th>{{ $t('ui.components.admin.platform_roles') }}</th>
             <th>{{ $t('ui.components.admin.actions') }}</th>
           </tr>
-        </thead>
-        <tbody>
+          </thead>
+          <tbody>
           <tr v-for="user in users" :key="user.id">
             <td>{{ user.display_name }}</td>
             <td>{{ user.email }}</td>
+            <td>
+              <n-tag :type="user.disabled_at ? 'warning' : 'success'" size="small">
+                {{ user.disabled_at ? $t('userManagement.deactivated') : $t('userManagement.active') }}
+              </n-tag>
+            </td>
             <td>
               <n-space size="small">
                 <n-tag v-if="user.is_admin" type="error" size="small">Admin</n-tag>
@@ -50,38 +57,30 @@
                 style="min-width: 250px"
               />
             </td>
-            <td>
-              <n-space size="small">
+            <td class="user-actions-cell">
+              <n-dropdown
+                v-if="getUserActionOptions(user).length"
+                trigger="click"
+                placement="bottom-end"
+                to="body"
+                :options="getUserActionOptions(user)"
+                @select="(action) => handleUserAction(user, action)"
+              >
                 <n-button
-                  size="small"
-                  :disabled="!user.two_factor_enabled"
-                  :data-testid="`admin-user-reset-2fa-${user.id}`"
-                  @click="resetTwoFactor(user)"
+                  class="user-actions-trigger"
+                  :disabled="accountActionUserId === user.id"
+                  :aria-label="$t('ui.components.admin.actions')"
+                  :title="$t('ui.components.admin.actions')"
+                  :data-testid="`admin-user-actions-${user.id}`"
                 >
-                  {{ $t('twoFactor.admin.resetAction') }}
+                  {{ $t('ui.components.admin.actions') }}
                 </n-button>
-                <n-button
-                  size="small"
-                  :disabled="!(user.passkey_count > 0)"
-                  :data-testid="`admin-user-reset-passkeys-${user.id}`"
-                  @click="resetPasskeys(user)"
-                >
-                  {{ $t('passkeys.admin.resetAction') }}
-                </n-button>
-                <n-button
-                  v-if="canTransferPrimaryAdminTo(user)"
-                  size="small"
-                  type="warning"
-                  :data-testid="`admin-user-transfer-primary-admin-${user.id}`"
-                  @click="openPrimaryAdminTransfer(user)"
-                >
-                  {{ $t('primaryAdmin.transferAction') }}
-                </n-button>
-              </n-space>
+              </n-dropdown>
             </td>
           </tr>
-        </tbody>
-      </n-table>
+          </tbody>
+        </n-table>
+      </div>
     </n-spin>
 
     <n-modal
@@ -160,6 +159,7 @@ export default {
       transferModalVisible: false,
       transferTarget: null,
       transferLoading: false,
+      accountActionUserId: null,
       transferError: '',
       transferForm: {
         confirmation: '',
@@ -219,6 +219,69 @@ export default {
         && !user.disabled_at
     },
 
+    canManageAccount(user) {
+      return !!user?.id
+        && user.id !== this.currentUser.id
+        && user.is_primary_admin !== true
+    },
+
+    getUserActionOptions(user) {
+      const options = []
+      const addOption = (key, label, testId, props = {}) => {
+        options.push({
+          key,
+          label,
+          props: {
+            'data-testid': testId,
+            ...props
+          }
+        })
+      }
+
+      if (user.two_factor_enabled) {
+        addOption('reset-two-factor', this.$t('twoFactor.admin.resetAction'), `admin-user-reset-2fa-${user.id}`)
+      }
+      if (user.passkey_count > 0) {
+        addOption('reset-passkeys', this.$t('passkeys.admin.resetAction'), `admin-user-reset-passkeys-${user.id}`)
+      }
+      if (this.canTransferPrimaryAdminTo(user)) {
+        addOption('transfer-primary-admin', this.$t('primaryAdmin.transferAction'), `admin-user-transfer-primary-admin-${user.id}`)
+      }
+      if (this.canManageAccount(user)) {
+        if (options.length) options.push({ type: 'divider', key: 'account-actions-divider' })
+        addOption(
+          'toggle-account-state',
+          user.disabled_at ? this.$t('userManagement.enableAction') : this.$t('userManagement.disableAction'),
+          user.disabled_at ? `admin-user-enable-${user.id}` : `admin-user-disable-${user.id}`
+        )
+        addOption(
+          'delete-user',
+          this.$t('userManagement.deleteAction'),
+          `admin-user-delete-${user.id}`,
+          { class: 'user-action-delete' }
+        )
+      }
+
+      return options
+    },
+
+    handleUserAction(user, action) {
+      switch (action) {
+        case 'reset-two-factor':
+          return this.resetTwoFactor(user)
+        case 'reset-passkeys':
+          return this.resetPasskeys(user)
+        case 'transfer-primary-admin':
+          return this.openPrimaryAdminTransfer(user)
+        case 'toggle-account-state':
+          return this.toggleAccountState(user)
+        case 'delete-user':
+          return this.deleteUser(user)
+        default:
+          return undefined
+      }
+    },
+
     async updateUserRoles(userId, newRoleIds) {
       try {
         await this.adminStore.updateUserRoles(userId, newRoleIds)
@@ -254,6 +317,87 @@ export default {
       } catch (error) {
         console.error('Failed to reset user passkeys:', error)
         window.$message?.error(this.$t('passkeys.admin.resetFailed'))
+      }
+    },
+
+    confirmAccountAction({ dialogType, title, content, positiveText }) {
+      if (!window.$dialog?.[dialogType]) return Promise.resolve(false)
+
+      return new Promise((resolve) => {
+        let settled = false
+        const settle = (confirmed) => {
+          if (settled) return
+          settled = true
+          resolve(confirmed)
+        }
+
+        window.$dialog[dialogType]({
+          title,
+          content,
+          positiveText,
+          negativeText: this.$t('common.cancel'),
+          onPositiveClick: () => settle(true),
+          onNegativeClick: () => settle(false),
+          onClose: () => settle(false)
+        })
+      })
+    },
+
+    async toggleAccountState(user) {
+      if (!this.canManageAccount(user)) return
+
+      const isEnabling = !!user.disabled_at
+      const confirmationKey = isEnabling
+        ? 'userManagement.enableConfirm'
+        : 'userManagement.disableConfirm'
+      const confirmed = await this.confirmAccountAction({
+        dialogType: isEnabling ? 'success' : 'warning',
+        title: this.$t(isEnabling ? 'userManagement.enableAction' : 'userManagement.disableAction'),
+        content: this.$t(confirmationKey, { name: user.display_name }),
+        positiveText: this.$t(isEnabling ? 'userManagement.enableAction' : 'userManagement.disableAction')
+      })
+      if (!confirmed) {
+        return
+      }
+
+      this.accountActionUserId = user.id
+      try {
+        if (isEnabling) {
+          await this.adminStore.enableUser(user.id)
+          window.$message?.success(this.$t('userManagement.enableSuccess'))
+        } else {
+          await this.adminStore.disableUser(user.id)
+          window.$message?.success(this.$t('userManagement.disableSuccess'))
+        }
+      } catch (error) {
+        console.error('Failed to update user account state:', error)
+        window.$message?.error(translateApiError(error, 'userManagement.actionFailed'))
+      } finally {
+        this.accountActionUserId = null
+      }
+    },
+
+    async deleteUser(user) {
+      if (!this.canManageAccount(user)) return
+      const confirmed = await this.confirmAccountAction({
+        dialogType: 'error',
+        title: this.$t('userManagement.deleteAction'),
+        content: this.$t('userManagement.deleteConfirm', { name: user.display_name }),
+        positiveText: this.$t('userManagement.deleteAction')
+      })
+      if (!confirmed) {
+        return
+      }
+
+      this.accountActionUserId = user.id
+      try {
+        await this.adminStore.deleteUser(user.id)
+        window.$message?.success(this.$t('userManagement.deleteSuccess'))
+      } catch (error) {
+        console.error('Failed to delete user:', error)
+        window.$message?.error(translateApiError(error, 'userManagement.actionFailed'))
+      } finally {
+        this.accountActionUserId = null
       }
     },
 
@@ -333,7 +477,39 @@ export default {
 </script>
 
 <style scoped>
+.user-role-table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.user-role-table {
+  min-width: 960px;
+}
+
+.user-actions-cell {
+  white-space: nowrap;
+}
+
+.user-actions-trigger {
+  min-height: 40px;
+}
+
+:global(.user-action-delete .n-dropdown-option-body__label) {
+  color: rgb(208, 48, 80);
+}
+
 .primary-admin-target {
   margin: 0;
+}
+
+@media (max-width: 640px) {
+  .user-role-table {
+    min-width: 880px;
+  }
+
+  .user-actions-trigger {
+    min-height: 44px;
+    padding-inline: 14px;
+  }
 }
 </style>

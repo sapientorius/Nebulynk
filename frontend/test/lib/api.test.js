@@ -1063,7 +1063,10 @@ describe('auth api helpers', () => {
       changePassword,
       confirmTwoFactorSetup,
       deletePasskey,
+      deleteUser,
       disableTwoFactor,
+      disableUser,
+      enableUser,
       getPasskeys,
       getTwoFactorStatus,
       regenerateTwoFactorRecoveryCodes,
@@ -1103,7 +1106,22 @@ describe('auth api helpers', () => {
         return { data: { ok: true } }
       }
 
+      if (url === '/users/member-1') {
+        if (payload.disabled_at === null) {
+          return { data: { id: 'member-1', disabled_at: null } }
+        }
+        expect(typeof payload.disabled_at).toBe('string')
+        return { data: { id: 'member-1', disabled_at: payload.disabled_at } }
+      }
+
       throw new Error(`Unexpected PATCH ${url}`)
+    })
+
+    deleteMock.mockImplementation(async (url) => {
+      if (url === '/users/member-1') {
+        return { data: { id: 'member-1' } }
+      }
+      throw new Error(`Unexpected DELETE ${url}`)
     })
 
     postMock.mockImplementation(async (url, payload, config) => {
@@ -1247,6 +1265,12 @@ describe('auth api helpers', () => {
     })).resolves.toEqual({ ok: true })
     await expect(resetUserTwoFactor('member-1')).resolves.toEqual({ ok: true })
     await expect(resetUserPasskeys('member-1')).resolves.toEqual({ ok: true, user_id: 'member-1', passkey_count: 0 })
+    await expect(disableUser('member-1')).resolves.toEqual(expect.objectContaining({
+      id: 'member-1',
+      disabled_at: expect.any(String)
+    }))
+    await expect(enableUser('member-1')).resolves.toEqual({ id: 'member-1', disabled_at: null })
+    await expect(deleteUser('member-1')).resolves.toEqual({ id: 'member-1' })
     await expect(beginPrimaryAdminTransferPasskeyOptions()).resolves.toEqual({
       challengeId: 'primary-passkey-challenge',
       options: { challenge: 'passkey-options' }
