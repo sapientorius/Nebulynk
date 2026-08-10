@@ -1,0 +1,102 @@
+import { expect, test } from '@playwright/test'
+import { ensureAdmin } from './bootstrap.js'
+
+const runId = Date.now().toString(36)
+const adminCredentials = {
+  platformName: `Nebulynk auth card ${runId}`,
+  adminDisplayName: 'Auth Card Admin',
+  adminEmail: `auth-card-admin.${runId}@example.com`,
+  adminPassword: 'AuthCardPassw0rd!'
+}
+
+const enabledRegistrationConfig = {
+  enabled: true,
+  password_policy: {
+    level: 'basic',
+    min_length: 8,
+    min_types: 2
+  }
+}
+
+const disabledRegistrationConfig = {
+  ...enabledRegistrationConfig,
+  enabled: false
+}
+
+async function mockRegistrationConfig(page, config) {
+  await page.route('**/self-registration**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(config)
+    })
+  })
+}
+
+async function expectRegistrationFace(page) {
+  const inner = page.getByTestId('auth-flip-card').locator('.auth-flip-card__inner')
+  await expect(inner).toHaveClass(/is-flipped/)
+  await expect(page.getByTestId('auth-login-face')).toHaveAttribute('aria-hidden', 'true')
+  await expect(page.getByTestId('auth-register-face')).toHaveAttribute('aria-hidden', 'false')
+  return inner
+}
+
+test.describe('login and registration flip card', () => {
+  test('flips through the URL, supports direct registration, history, and reduced motion', async ({ page }) => {
+    await ensureAdmin(page, adminCredentials)
+    await mockRegistrationConfig(page, enabledRegistrationConfig)
+    await page.goto('/login')
+
+    await expect(page.getByTestId('login-view')).toBeVisible()
+    await expect(page.getByTestId('login-register')).toBeVisible()
+
+    const card = page.getByTestId('auth-flip-card')
+    const cardBox = await card.boundingBox()
+    const viewport = page.viewportSize()
+    expect(cardBox).not.toBeNull()
+    expect(viewport).not.toBeNull()
+    expect(Math.abs(cardBox.x - (viewport.width - cardBox.width) / 2)).toBeLessThan(2)
+
+    await page.getByTestId('login-register').click()
+    await expect(page).toHaveURL(/\/register$/)
+    const inner = await expectRegistrationFace(page)
+    await expect.poll(() => inner.evaluate((element) => getComputedStyle(element).transitionDuration)).toBe('1.05s')
+    await expect(page.getByTestId('self-registration-display-name')).toBeVisible()
+    const registrationContent = page.getByTestId('self-registration-view').locator('.n-card__content').last()
+    await expect.poll(() => registrationContent.evaluate((element) => getComputedStyle(element).paddingLeft)).toBe('24px')
+
+    await page.goBack()
+    await expect(page).toHaveURL(/\/login$/)
+    await expect(page.getByTestId('auth-login-face')).toHaveAttribute('aria-hidden', 'false')
+    await expect(page.getByTestId('auth-register-face')).toHaveAttribute('aria-hidden', 'true')
+
+    await page.goForward()
+    await expect(page).toHaveURL(/\/register$/)
+    await expectRegistrationFace(page)
+
+    await page.goto('/register')
+    await expectRegistrationFace(page)
+
+    await page.emulateMedia({ reducedMotion: 'reduce' })
+    await page.goto('/login')
+    await page.getByTestId('login-register').click()
+    await expectRegistrationFace(page)
+    await expect.poll(() => inner.evaluate((element) => getComputedStyle(element).transitionDuration)).toBe('0s')
+  })
+
+  test('keeps the account link hidden but direct registration available when disabled', async ({ browser }) => {
+    const page = await browser.newPage()
+    await ensureAdmin(page, adminCredentials)
+    await mockRegistrationConfig(page, disabledRegistrationConfig)
+
+    await page.goto('/login')
+    await expect(page.getByTestId('login-view')).toBeVisible()
+    await expect(page.getByTestId('login-register')).toHaveCount(0)
+
+    await page.goto('/register')
+    await expectRegistrationFace(page)
+    await expect(page.getByTestId('self-registration-disabled-login')).toBeVisible()
+
+    await page.close()
+  })
+})

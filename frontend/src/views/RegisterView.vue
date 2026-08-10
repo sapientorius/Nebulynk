@@ -1,5 +1,9 @@
 <template>
-  <div class="registration-container" data-testid="self-registration-view">
+  <div
+    class="registration-container"
+    :class="{ 'registration-container--embedded': embedded }"
+    data-testid="self-registration-view"
+  >
     <n-card v-if="loading" style="max-width: 460px; width: 100%; text-align: center">
       <n-spin size="large" />
     </n-card>
@@ -109,13 +113,31 @@ import { isPasswordValidForPolicy, normalizePasswordPolicy } from '../lib/passwo
 
 export default {
   name: 'RegisterView',
+  props: {
+    embedded: {
+      type: Boolean,
+      default: false
+    },
+    config: {
+      type: Object,
+      default: null
+    },
+    configLoading: {
+      type: Boolean,
+      default: true
+    },
+    configError: {
+      type: String,
+      default: null
+    }
+  },
   data() {
     return {
-      loading: true,
+      localLoading: true,
       submitting: false,
-      error: null,
+      localError: null,
       formError: null,
-      config: null,
+      localConfig: null,
       success: null,
       form: {
         displayName: '',
@@ -129,11 +151,20 @@ export default {
     selfRegistrationStore() {
       return useSelfRegistrationStore()
     },
+    loading() {
+      return this.embedded ? this.configLoading : this.localLoading
+    },
+    error() {
+      return this.embedded ? this.configError : this.localError
+    },
+    registrationConfig() {
+      return this.embedded ? this.config : this.localConfig
+    },
     enabled() {
-      return this.config?.enabled === true
+      return this.registrationConfig?.enabled === true
     },
     passwordPolicy() {
-      return normalizePasswordPolicy(this.config?.password_policy)
+      return normalizePasswordPolicy(this.registrationConfig?.password_policy)
     },
     passwordPolicyHint() {
       return this.$t('passwordPolicy.requirement', {
@@ -143,12 +174,14 @@ export default {
     }
   },
   async created() {
+    if (this.embedded) return
+
     try {
-      this.config = await this.selfRegistrationStore.loadConfig({ refresh: true })
+      this.localConfig = await this.selfRegistrationStore.loadConfig({ refresh: true })
     } catch (error) {
-      this.error = translateApiError(error, 'selfRegistration.errors.registrationFailed')
+      this.localError = translateApiError(error, 'selfRegistration.errors.registrationFailed')
     } finally {
-      this.loading = false
+      this.localLoading = false
     }
   },
   methods: {
@@ -195,6 +228,20 @@ export default {
   align-items: center;
   min-height: 100vh;
   padding: 24px;
+}
+
+.registration-container--embedded {
+  display: block;
+  min-height: 0;
+  padding: 0;
+}
+
+.registration-container--embedded :deep(.n-card) {
+  width: 100% !important;
+  max-width: none !important;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .password-policy-hint {

@@ -7,6 +7,23 @@ function source(path) {
 }
 
 describe('self-registration views', () => {
+  it('shares the animated auth card between login and registration routes', () => {
+    const auth = source('src/views/AuthView.vue')
+    const login = source('src/views/LoginView.vue')
+    const flipCard = source('src/components/AuthFlipCard.vue')
+    const router = source('src/router/index.js')
+
+    expect(auth).toContain('<LoginView />')
+    expect(login).toContain('<AuthFlipCard :flipped="isRegistrationRoute" :animate="animationReady">')
+    expect(login).toContain('<RegisterView')
+    expect(login).toContain('embedded')
+    expect(flipCard).toContain('data-testid="auth-flip-card"')
+    expect(flipCard).toContain(':inert="flipped"')
+    expect(flipCard).toContain(':inert="!flipped"')
+    expect(flipCard).toContain('rotateY(180deg)')
+    expect(router.match(/component: \(\) => import\('\.\.\/views\/AuthView\.vue'\)/g)).toHaveLength(2)
+  })
+
   it('only renders the registration entry point when the public setting enables it', () => {
     const login = source('src/views/LoginView.vue')
 

@@ -29,7 +29,9 @@
       <span class="mist-band"></span>
     </div>
 
-    <n-card class="login-card" style="max-width: 430px; width: 100%">
+    <AuthFlipCard :flipped="isRegistrationRoute" :animate="animationReady">
+      <template #front>
+        <n-card class="login-card" style="max-width: 430px; width: 100%">
       <h1 class="login-brand">
         <span class="wordmark">{{ brandName }}</span>
       </h1>
@@ -164,12 +166,26 @@
       <n-alert v-if="error" type="error" style="margin-top: 16px">
         {{ error }}
       </n-alert>
-    </n-card>
+        </n-card>
+      </template>
+
+      <template #back>
+        <div class="login-card registration-card" style="max-width: 430px; width: 100%">
+          <RegisterView
+            embedded
+            :config="registrationConfig"
+            :config-loading="registrationConfigLoading"
+            :config-error="registrationConfigError"
+          />
+        </div>
+      </template>
+    </AuthFlipCard>
   </div>
 </template>
 
 <script>
 import { startAuthentication } from '@simplewebauthn/browser'
+import AuthFlipCard from '../components/AuthFlipCard.vue'
 import { useSelfRegistrationStore, useSessionStore } from '../stores/index.js'
 import { translateApiError } from '../lib/api-error.js'
 import {
@@ -180,9 +196,11 @@ import {
   setActiveDesktopProfile
 } from '../lib/desktop-runtime.js'
 import { isDesktopManagerWindow } from '../lib/runtime.js'
+import RegisterView from './RegisterView.vue'
 
 export default {
   name: 'LoginView',
+  components: { AuthFlipCard, RegisterView },
   data() {
     return {
       loading: false,
@@ -191,6 +209,11 @@ export default {
       twoFactorMode: 'totp',
       twoFactorCode: '',
       selfRegistrationEnabled: false,
+      registrationConfig: null,
+      registrationConfigLoading: true,
+      registrationConfigError: null,
+      animationReady: false,
+      animationFrame: null,
       form: {
         email: '',
         password: '',
@@ -223,6 +246,9 @@ export default {
     },
     isDesktopMode() {
       return isDesktopManagerWindow()
+    },
+    isRegistrationRoute() {
+      return this.$route.name === 'Register'
     },
     activeDesktopProfile() {
       return getActiveDesktopProfile()
@@ -264,9 +290,23 @@ export default {
   async created() {
     try {
       const config = await this.selfRegistrationStore.loadConfig({ refresh: true })
+      this.registrationConfig = config
       this.selfRegistrationEnabled = config?.enabled === true
-    } catch {
+    } catch (error) {
+      this.registrationConfigError = translateApiError(error, 'selfRegistration.errors.registrationFailed')
       this.selfRegistrationEnabled = false
+    } finally {
+      this.registrationConfigLoading = false
+    }
+  },
+  mounted() {
+    this.animationFrame = window.requestAnimationFrame(() => {
+      this.animationReady = true
+    })
+  },
+  beforeUnmount() {
+    if (this.animationFrame) {
+      window.cancelAnimationFrame(this.animationFrame)
     }
   },
   methods: {
@@ -398,7 +438,7 @@ export default {
   align-items: center;
   min-height: 100dvh;
   padding: 24px;
-  overflow: hidden;
+  overflow: auto;
   background:
     radial-gradient(circle at top, rgba(92, 117, 255, 0.16), transparent 32%),
     radial-gradient(circle at 80% 10%, rgba(63, 224, 214, 0.14), transparent 24%),
@@ -514,6 +554,21 @@ export default {
     radial-gradient(circle at top, rgba(121, 215, 255, 0.14), transparent 34%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.08), transparent 28%);
   pointer-events: none;
+}
+
+.registration-card :deep(.n-card) {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.registration-card :deep(.n-card-header) {
+  display: block;
+  padding: 24px 24px 20px;
+}
+
+.registration-card :deep(.n-card__content) {
+  padding: 0 24px 24px;
 }
 
 .login-kicker,
