@@ -18,7 +18,8 @@ const channelsStoreMock = vi.hoisted(() => ({
   hasChannel: vi.fn(() => false),
   addChannel: vi.fn(),
   patchChannel: vi.fn(),
-  select: vi.fn().mockResolvedValue(undefined)
+  select: vi.fn().mockResolvedValue(undefined),
+  clearActiveContext: vi.fn()
 }))
 
 const voiceStoreMock = vi.hoisted(() => ({
@@ -107,6 +108,7 @@ describe('meetings store', () => {
     channelsStoreMock.patchChannel.mockReset()
     channelsStoreMock.select.mockReset()
     channelsStoreMock.select.mockResolvedValue(undefined)
+    channelsStoreMock.clearActiveContext.mockReset()
     voiceStoreMock.connectWithPayload.mockReset()
     voiceStoreMock.connectWithPayload.mockResolvedValue(undefined)
     voiceStoreMock.leave.mockReset()
@@ -390,6 +392,42 @@ describe('meetings store', () => {
         reason: 'processing'
       }
     }))
+  })
+
+  it('invalidates ended meeting details and immediately reloads an open restricted meeting', async () => {
+    apiMock.get
+      .mockResolvedValueOnce({
+        data: {
+          id: 'meeting-history-1',
+          status: 'ended',
+          source_channel_id: 'source-history-1',
+          chat_channel_id: 'meeting-channel-history-1',
+          description: 'Previously readable',
+          content_access: { allowed: true, denial_reason: null }
+        }
+      })
+      .mockResolvedValueOnce({
+        data: {
+          id: 'meeting-history-1',
+          status: 'ended',
+          source_channel_id: 'source-history-1',
+          detail_level: 'card',
+          content_access: {
+            allowed: false,
+            denial_reason: 'channel_meeting_history_policy'
+          }
+        }
+      })
+
+    const store = useMeetingsStore()
+    await store.setActive('meeting-history-1')
+    await store.handleSourceHistoryAccessChanged('source-history-1')
+
+    expect(apiMock.get).toHaveBeenNthCalledWith(2, '/meetings/meeting-history-1')
+    expect(store.activeMeeting.content_access.allowed).toBe(false)
+    expect(store.activeMeeting.description).toBeUndefined()
+    expect(store.historyAccessRevision).toBe(1)
+    expect(channelsStoreMock.clearActiveContext).toHaveBeenCalledTimes(1)
   })
 
   it('generateSummary forwards an optional reason for admin regeneration flows', async () => {

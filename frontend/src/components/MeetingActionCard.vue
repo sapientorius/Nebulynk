@@ -4,7 +4,8 @@
     class="meeting-card"
     :class="{
       'meeting-card-notification': variant === 'notification',
-      'meeting-card-overview': variant === 'overview'
+      'meeting-card-overview': variant === 'overview',
+      'meeting-card-restricted': isAccessDenied
     }"
     data-testid="meeting-card"
     :data-meeting-id="meetingId"
@@ -50,6 +51,7 @@
 
       <n-space :size="8">
         <n-button
+          v-if="!isAccessDenied"
           size="small"
           tertiary
           data-testid="meeting-card-open"
@@ -120,6 +122,10 @@ export default {
       type: Boolean,
       default: false
     },
+    isAccessDenied: {
+      type: Boolean,
+      default: false
+    },
     showLabel: {
       type: Boolean,
       default: true
@@ -155,6 +161,11 @@ export default {
 .meeting-card-overview {
   max-width: none;
   height: 100%;
+}
+
+.meeting-card-restricted {
+  border-color: rgba(240, 160, 32, 0.45);
+  background: rgba(240, 160, 32, 0.06);
 }
 
 .meeting-card-heading {

@@ -12,6 +12,17 @@ function createService({
   let rawCallIndex = 0
 
   const db = (table) => {
+    if (table === 'channels') {
+      const channelBuilder = {
+        where() {
+          return channelBuilder
+        },
+        async first() {
+          return { id: 'channel-1', type: 'private', purpose: 'default' }
+        }
+      }
+      return channelBuilder
+    }
     assert.equal(table, 'channel_members')
     const builder = {
       where(filters) {
@@ -159,9 +170,7 @@ test('search returns message results with keyword fallback metadata and cursor',
     'message',
     'channel-1',
     'user-2',
-    'user-1',
-    'user-1',
-    'user-1',
+    ...Array(8).fill('user-1'),
     '2026-03-16T10:00:00.000Z',
     '2026-03-16T10:00:00.000Z',
     'message:message-9',
@@ -226,9 +235,7 @@ test('search falls back to trigram and supports file filters', async () => {
   assert.deepEqual(rawCalls[1].bindings, [
     'file',
     'pdf',
-    'user-1',
-    'user-1',
-    'user-1',
+    ...Array(8).fill('user-1'),
     '%spe%',
     20
   ])
@@ -257,9 +264,7 @@ test('search keeps date bindings aligned when query text contains natural langua
     'message',
     'channel-1',
     '2026-03-18T00:00:00.000Z',
-    'user-1',
-    'user-1',
-    'user-1',
+    ...Array(8).fill('user-1'),
     'noch nicht',
     20
   ])
@@ -305,9 +310,7 @@ test('search supports filter-only queries without ranking bindings', async () =>
     'message',
     'channel-1',
     '2026-03-18T00:00:00.000Z',
-    'user-1',
-    'user-1',
-    'user-1',
+    ...Array(8).fill('user-1'),
     20
   ])
   assert.equal(result.data[0].id, 'message:message-5')
@@ -349,7 +352,8 @@ test('search scope includes meeting participant membership for meeting artifacts
     }
   })
 
-  assert.match(rawCalls[0].sql, /meeting_participants mp/)
+  assert.match(rawCalls[0].sql, /meeting_participants access_joined/)
+  assert.match(rawCalls[0].sql, /meeting_start_members access_snapshot/)
   assert.equal(result.data[0].document_type, 'meeting_summary')
   assert.equal(result.data[0].navigation_target, '/meetings/meeting-1')
 })
@@ -409,9 +413,7 @@ test('search meetings tab defaults to transcript and summary documents and match
     'meeting_summary',
     'meeting-chat-2',
     '2026-03-27T00:00:00.000Z',
-    'user-1',
-    'user-1',
-    'user-1',
+    ...Array(8).fill('user-1'),
     'rollout',
     20
   ])
@@ -511,9 +513,7 @@ test('search meetings tab uses author or speaker filter for meeting chat message
     'meeting-chat-2',
     'user-2',
     'user-2',
-    'user-1',
-    'user-1',
-    'user-1',
+    ...Array(8).fill('user-1'),
     'alex',
     20
   ])
@@ -550,9 +550,7 @@ test('search ignores guest author filters for external workspace queries', async
     'guest-1',
     'guest-1',
     'guest-1',
-    'user-1',
-    'user-1',
-    'user-1',
+    ...Array(8).fill('user-1'),
     'alex',
     20
   ])

@@ -597,10 +597,16 @@
               :autosize="{ minRows: 2, maxRows: 5 }"
             />
           </n-form-item>
+          <n-form-item :label="$t('meetingHistoryAccess.channel_label')">
+            <MeetingHistoryAccessSelect
+              v-model="settingsForm.meetingHistoryAccess"
+              data-testid="channel-meeting-history-access"
+            />
+          </n-form-item>
         </n-form>
 
-        <n-divider />
-        <div class="danger-zone">
+        <n-divider v-if="!isDm" />
+        <div v-if="!isDm" class="danger-zone">
           <div class="danger-title">{{ $t('ui.components.danger_zone') }}</div>
           <n-button
             :type="channel?.is_archived ? 'warning' : 'error'"
@@ -730,11 +736,14 @@ import {
 import { observeMobileLayout, readIsMobileLayout } from '../lib/mobile-layout.js'
 import { getPresenceStatusColor } from '../lib/user-presence.js'
 import UserAvatar from './UserAvatar.vue'
+import MeetingHistoryAccessSelect from './MeetingHistoryAccessSelect.vue'
+import { DEFAULT_MEETING_HISTORY_ACCESS } from '../lib/meeting-history-access.js'
 
 export default {
   name: 'ChannelHeader',
   components: {
     UserAvatar,
+    MeetingHistoryAccessSelect,
     PinIcon,
     CreateIcon,
     CallIcon,
@@ -806,7 +815,8 @@ export default {
       },
       settingsForm: {
         name: '',
-        topic: ''
+        topic: '',
+        meetingHistoryAccess: DEFAULT_MEETING_HISTORY_ACCESS
       }
     }
   },
@@ -850,6 +860,11 @@ export default {
       return this.channel?.type === 'group'
     },
     canManageChannelSettings() {
+      if (this.isGroupDm) {
+        const selfId = this.sessionStore.user?.id
+        const membership = (this.channel?.participants || []).find((entry) => entry.user_id === selfId)
+        return this.sessionStore.user?.is_admin === true || membership?.role === 'owner'
+      }
       return !this.isDm && this.channelsStore.can('manage_channels')
     },
     canLeaveChannel() {
@@ -1118,6 +1133,7 @@ export default {
       if (!this.canManageChannelSettings || !this.channel) return
       this.settingsForm.name = this.channel.name || ''
       this.settingsForm.topic = this.channel.topic || ''
+      this.settingsForm.meetingHistoryAccess = this.channel.meeting_history_access || DEFAULT_MEETING_HISTORY_ACCESS
       this.showSettingsModal = true
     },
     async saveRename() {
@@ -1156,10 +1172,20 @@ export default {
 
       this.savingSettings = true
       try {
-        await this.channelsStore.update(this.channel.id, {
+        const historyAccessChanged = this.channel.meeting_history_access !== this.settingsForm.meetingHistoryAccess
+        const payload = {
           name,
-          topic: this.settingsForm.topic || null
-        })
+          topic: this.settingsForm.topic || null,
+          meeting_history_access: this.settingsForm.meetingHistoryAccess
+        }
+        if (this.isGroupDm) {
+          await this.dmsStore.update(this.channel.id, payload)
+        } else {
+          await this.channelsStore.update(this.channel.id, payload)
+        }
+        if (historyAccessChanged) {
+          await this.meetingsStore.handleSourceHistoryAccessChanged(this.channel.id)
+        }
         this.showSettingsModal = false
         window.$message.success(this.$t('ui.components.channel_updated'))
       } catch {

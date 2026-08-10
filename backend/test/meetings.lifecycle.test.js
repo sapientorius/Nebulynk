@@ -553,10 +553,24 @@ test('meetings behavior: create does not precreate summary placeholder artifacts
         }
         return builder
       }
-      if (table === 'channel_members' || table === 'meeting_participants') {
-        return {
+      if (table === 'channel_members') {
+        const builder = {
+          where() { return builder },
+          async select() { return [{ user_id: 'user-1' }] },
           async insert() { return undefined }
         }
+        return builder
+      }
+      if (table === 'meeting_participants') {
+        return { async insert() { return undefined } }
+      }
+      if (table === 'meeting_start_members') {
+        const builder = {
+          insert() { return builder },
+          onConflict() { return builder },
+          async ignore() { return undefined }
+        }
+        return builder
       }
       if (table === 'meeting_artifacts') {
         throw new Error('create should not precreate meeting artifacts')

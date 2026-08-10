@@ -93,4 +93,14 @@ describe('ChannelHeader call action visibility', () => {
     expect(source).toContain('data-testid="channel-header-mobile-leave"')
     expect(source).not.toContain('showAiSummaryMenu: false')
   })
+
+  it('loads and saves meeting history access for channels and owner-managed groups', () => {
+    const source = readFileSync(resolve('src/components/ChannelHeader.vue'), 'utf8')
+
+    expect(source).toContain('data-testid="channel-meeting-history-access"')
+    expect(source).toContain('membership?.role === \'owner\'')
+    expect(source).toContain('this.channel.meeting_history_access || DEFAULT_MEETING_HISTORY_ACCESS')
+    expect(source).toContain('meeting_history_access: this.settingsForm.meetingHistoryAccess')
+    expect(source).toContain('this.meetingsStore.handleSourceHistoryAccessChanged(this.channel.id)')
+  })
 })

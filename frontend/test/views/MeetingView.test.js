@@ -355,4 +355,14 @@ describe('MeetingView', () => {
     expect(source).toContain('if (!this.summaryShareText || !this.canShareSummaryInApp) return')
     expect(source).toContain('if (!this.canShareSummaryInApp || !this.shareSummaryTargetChannelId || !this.summaryShareText) return')
   })
+
+  it('renders the policy denial state for restricted direct meeting URLs', () => {
+    const source = readFileSync(resolve('src/views/MeetingView.vue'), 'utf8')
+
+    expect(source).toContain('v-if="isMeetingContentRestricted"')
+    expect(source).toContain('data-testid="meeting-access-restricted"')
+    expect(source).toContain("meetingHistoryAccess.restricted_title")
+    expect(source).toContain("meetingHistoryAccess.denied")
+    expect(source).toContain('this.meeting?.content_access?.allowed === false')
+  })
 })

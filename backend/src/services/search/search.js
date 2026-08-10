@@ -1,5 +1,9 @@
 import { authenticate } from '@feathersjs/authentication'
-import { badRequest, forbidden } from '../../lib/errors.js'
+import { badRequest } from '../../lib/errors.js'
+import {
+  assertCanReadChannel,
+  buildMeetingContentAccessSql
+} from '../../domains/meetings/content-access.js'
 
 const DEFAULT_LIMIT = 20
 const MAX_LIMIT = 50
@@ -224,22 +228,18 @@ function buildScopeClauses(searchQuery, user, { enforceMemberAuthorFilter = fals
   }
 
   if (!user?.is_admin) {
+    const meetingAccess = buildMeetingContentAccessSql('sd.source_meeting_id', user?.id || null)
     clauses.push(`(
-      (sd.source_channel_id IS NOT NULL AND EXISTS (
+      (sd.source_meeting_id IS NULL AND sd.source_channel_id IS NOT NULL AND EXISTS (
         SELECT 1
         FROM channel_members cm
         WHERE cm.channel_id = sd.source_channel_id
           AND cm.user_id = ?
       ))
-      OR (sd.source_meeting_id IS NOT NULL AND EXISTS (
-        SELECT 1
-        FROM meeting_participants mp
-        WHERE mp.meeting_id = sd.source_meeting_id
-          AND mp.user_id = ?
-      ))
-      OR (sd.owner_user_id = ?)
+      OR (sd.source_meeting_id IS NOT NULL AND ${meetingAccess.sql})
+      OR (sd.source_meeting_id IS NULL AND sd.owner_user_id = ?)
     )`)
-    bindings.push(user?.id || null, user?.id || null, user?.id || null)
+    bindings.push(user?.id || null, ...meetingAccess.bindings, user?.id || null)
   }
 
   if (searchQuery.beforeCreatedAt && searchQuery.beforeId) {
@@ -402,20 +402,10 @@ export class SearchService {
     const enforceMemberAuthorFilter = !!params.provider
 
     if (searchQuery.channelId && !user?.is_admin) {
-      const membership = await db('channel_members')
-        .where({
-          channel_id: searchQuery.channelId,
-          user_id: user?.id || null
-        })
-        .first()
-
-      if (!membership) {
-        throw forbidden(
-          'api.channels.membership_required',
-          { channel_id: searchQuery.channelId },
-          'You are not a member of this channel'
-        )
-      }
+      await assertCanReadChannel(db, {
+        channelId: searchQuery.channelId,
+        user
+      })
     }
 
     const { sql: whereSql, bindings: whereBindings } = buildScopeClauses(searchQuery, user, {

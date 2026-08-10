@@ -872,6 +872,8 @@ export default {
     },
     async openMeeting(meetingId) {
       if (!meetingId) return
+      const meeting = this.meetingsStore.getMeetingById(meetingId)
+      if (meeting?.content_access?.allowed === false) return
       await this.$router.push(`/meetings/${meetingId}`).catch(() => {})
     },
     async joinMeetingCall(meetingId) {

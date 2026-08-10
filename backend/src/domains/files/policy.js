@@ -34,11 +34,9 @@ export function assertChannelMembership(membership) {
 }
 
 export function requiresMessageReadAccess({ file, currentUserId }) {
+  if (file.message_id) return true
   if (file.user_id === currentUserId) return false
-  if (!file.message_id) {
-    throw forbidden('api.files.file_access_denied', {}, 'Kein Zugriff auf diese Datei')
-  }
-  return true
+  throw forbidden('api.files.file_access_denied', {}, 'Kein Zugriff auf diese Datei')
 }
 
 export function resolveRemovePermission({ file, currentUserId }) {

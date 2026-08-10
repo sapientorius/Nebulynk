@@ -33,18 +33,18 @@ test('channel-read-state is authenticated and membership scoped', async () => {
   assert.match(src, /membership_required/)
 })
 
-test('message-search is authenticated and membership scoped', async () => {
+test('message-search is authenticated and meeting-content-policy scoped', async () => {
   const src = await read('src/services/message-search/message-search.js')
   assert.match(src, /authenticate\('jwt'\)/)
-  assert.match(src, /channel_id: searchQuery\.channelId,\s*user_id: user\?\.id \|\| null/)
-  assert.match(src, /membership_required/)
+  assert.match(src, /assertCanReadChannel/)
+  assert.match(src, /buildChannelReadAccessSql/)
 })
 
-test('search service is authenticated and membership scoped', async () => {
+test('search service is authenticated and meeting-content-policy scoped', async () => {
   const src = await read('src/services/search/search.js')
   assert.match(src, /authenticate\('jwt'\)/)
-  assert.match(src, /channel_id: searchQuery\.channelId,\s*user_id: user\?\.id \|\| null/)
-  assert.match(src, /membership_required/)
+  assert.match(src, /assertCanReadChannel/)
+  assert.match(src, /buildMeetingContentAccessSql/)
 })
 
 test('messages.find enforces channel_id', async () => {

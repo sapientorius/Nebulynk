@@ -1,3 +1,8 @@
+import {
+  assertCanReadChannel,
+  buildChannelReadAccessSql
+} from '../meetings/content-access.js'
+
 export class FilesRepository {
   constructor(db) {
     this.db = db
@@ -17,6 +22,10 @@ export class FilesRepository {
       .first()
   }
 
+  async assertCanReadChannel(channelId, user) {
+    return assertCanReadChannel(this.db, { channelId, user })
+  }
+
   async findFiles({ messageId, userId, limit, currentUserId, restrictToAccessibleScope }) {
     const query = this.db('files')
 
@@ -30,14 +39,17 @@ export class FilesRepository {
 
     if (restrictToAccessibleScope) {
       const db = this.db
+      const channelAccess = buildChannelReadAccessSql('messages.channel_id', currentUserId)
       query.andWhere(function () {
-        this.where('files.user_id', currentUserId)
+        this.where(function () {
+          this.where('files.user_id', currentUserId)
+            .whereNull('files.message_id')
+        })
           .orWhereExists(function () {
             this.select(db.raw('1'))
               .from('messages')
-              .join('channel_members', 'messages.channel_id', '=', 'channel_members.channel_id')
               .whereRaw('messages.id = files.message_id')
-              .andWhere('channel_members.user_id', currentUserId)
+              .andWhereRaw(channelAccess.sql, channelAccess.bindings)
           })
       })
     }

@@ -22,6 +22,7 @@ function createDbStub({
     domain: '',
     default_locale: 'en',
     default_meeting_language: 'en',
+    default_meeting_history_access: 'all_channel_members',
     auto_away_minutes: '15',
     meeting_video_enabled: 'true',
     upload_max_file_size_mb: '20',
@@ -137,6 +138,7 @@ test('platform.find hook-chain: returns current platform settings map', async ()
     domain: 'chat.example.test',
     default_locale: 'en',
     default_meeting_language: 'en',
+    default_meeting_history_access: 'all_channel_members',
     auto_away_minutes: '15',
     meeting_video_enabled: 'true',
     upload_max_file_size_mb: '20',
@@ -241,6 +243,7 @@ test('platform.create hook-chain: successful setup updates baseline settings', a
   assert.equal(settingsMap.get('domain'), 'chat.example.test')
   assert.equal(settingsMap.get('default_locale'), 'de')
   assert.equal(settingsMap.get('default_meeting_language'), 'de')
+  assert.equal(settingsMap.get('default_meeting_history_access'), 'all_channel_members')
 })
 
 test('platform.patch hook-chain: rejects invalid language payload', async () => {
@@ -365,6 +368,7 @@ test('platform.patch hook-chain: updates default locale and auto-away timeout fo
     {
       defaultLanguage: 'de',
       defaultMeetingLanguage: 'fr',
+      defaultMeetingHistoryAccess: 'active_participants',
       autoAwayMinutes: 25,
       meetingVideoEnabled: false,
       uploadMaxFileSizeMb: 64,
@@ -396,6 +400,7 @@ test('platform.patch hook-chain: updates default locale and auto-away timeout fo
 
   assert.equal(settingsMap.get('default_locale'), 'de')
   assert.equal(settingsMap.get('default_meeting_language'), 'fr')
+  assert.equal(settingsMap.get('default_meeting_history_access'), 'active_participants')
   assert.equal(settingsMap.get('auto_away_minutes'), '25')
   assert.equal(settingsMap.get('meeting_video_enabled'), 'false')
   assert.equal(settingsMap.get('upload_max_file_size_mb'), '64')
@@ -418,6 +423,7 @@ test('platform.patch hook-chain: updates default locale and auto-away timeout fo
   assert.equal(settingsMap.get('theme_light_custom_css'), 'body { color: black; }')
   assert.equal(result.default_locale, 'de')
   assert.equal(result.default_meeting_language, 'fr')
+  assert.equal(result.default_meeting_history_access, 'active_participants')
   assert.equal(result.auto_away_minutes, '25')
   assert.equal(result.meeting_video_enabled, 'false')
   assert.equal(result.upload_max_file_size_mb, '64')

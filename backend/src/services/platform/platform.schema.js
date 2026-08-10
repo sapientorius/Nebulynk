@@ -1,5 +1,6 @@
 import { SUPPORTED_LOCALES } from '../../lib/locales.js'
 import { SUPPORTED_MEETING_LANGUAGES } from '../../lib/meeting-languages.js'
+import { MEETING_HISTORY_ACCESS_VALUES } from '../../lib/meeting-history-access.js'
 import {
   THEME_CUSTOM_CSS_MAX_LENGTH,
   THEME_FONT_FAMILY_VALUES,
@@ -39,6 +40,7 @@ export const patchSchema = {
     defaultMeetingLanguage: { type: 'string', enum: SUPPORTED_MEETING_LANGUAGES },
     autoAwayMinutes: { type: 'integer', minimum: 1 },
     meetingVideoEnabled: { type: 'boolean' },
+    defaultMeetingHistoryAccess: { type: 'string', enum: MEETING_HISTORY_ACCESS_VALUES },
     uploadMaxFileSizeMb: { type: 'integer', minimum: 1, maximum: 1024 },
     imageUploadMaxDimensionPx: { type: 'integer', minimum: 256, maximum: 8192 },
     imageUploadQuality: { type: 'integer', minimum: 1, maximum: 100 },

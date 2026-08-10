@@ -6,6 +6,7 @@ import { checkPermission } from '../../hooks/check-permission.js'
 import { validate } from '../../schemas/validators.js'
 import { createSchema } from './reactions.schema.js'
 import { notFound } from '../../lib/errors.js'
+import { assertCanReadChannel } from '../../domains/meetings/content-access.js'
 
 export class ReactionsService extends KnexService {
   async find(params) {
@@ -66,6 +67,21 @@ export const reactions = (app) => {
       all: [authenticate('jwt')]
     },
     before: {
+      find: [
+        async (context) => {
+          if (!context.params.user) return context
+          const messageId = context.params.query?.message_id
+          if (!messageId) return context
+          const db = context.app.get('postgresqlClient')
+          const message = await db('messages').where('id', messageId).first()
+          if (!message) throw notFound('api.messages.message_not_found', {}, 'Nachricht nicht gefunden')
+          await assertCanReadChannel(db, {
+            channelId: message.channel_id,
+            user: context.params.user
+          })
+          return context
+        }
+      ],
       create: [
         validate(createSchema),
         setUserId(),

@@ -36,6 +36,7 @@ function createDomainService({
         { key: 'domain', value: '' },
         { key: 'default_locale', value: 'en' },
         { key: 'default_meeting_language', value: 'en' },
+        { key: 'default_meeting_history_access', value: 'all_channel_members' },
         { key: 'auto_away_minutes', value: '15' },
         { key: 'meeting_video_enabled', value: 'true' },
         { key: 'upload_max_file_size_mb', value: '20' },
@@ -92,6 +93,7 @@ test('platform domain: find maps settings table rows to key-value payload', asyn
     domain: '',
     default_locale: 'en',
     default_meeting_language: 'en',
+    default_meeting_history_access: 'all_channel_members',
     auto_away_minutes: '15',
     meeting_video_enabled: 'true',
     upload_max_file_size_mb: '20',
@@ -161,6 +163,7 @@ test('platform domain behavior: setup uses defaults and creates baseline records
     purpose: 'default',
     is_voice: false,
     is_archived: false,
+    meeting_history_access: 'all_channel_members',
     created_by: 'admin-1'
   })
   assert.deepEqual(calls.createdMembers, [
@@ -176,7 +179,8 @@ test('platform domain behavior: setup uses defaults and creates baseline records
     { key: 'platform_name', value: 'Nebulynk' },
     { key: 'domain', value: '' },
     { key: 'default_locale', value: 'en' },
-    { key: 'default_meeting_language', value: 'en' }
+    { key: 'default_meeting_language', value: 'en' },
+    { key: 'default_meeting_history_access', value: 'all_channel_members' }
   ])
   assert.deepEqual(result, {
     initialized: true,
@@ -219,9 +223,10 @@ test('platform domain behavior: setup persists selected default language', async
   })
 
   assert.equal(calls.usersCreate[0].preferred_locale, 'de')
-  assert.deepEqual(calls.updatedSettings.slice(-2), [
+  assert.deepEqual(calls.updatedSettings.slice(-3), [
     { key: 'default_locale', value: 'de' },
-    { key: 'default_meeting_language', value: 'de' }
+    { key: 'default_meeting_language', value: 'de' },
+    { key: 'default_meeting_history_access', value: 'all_channel_members' }
   ])
 })
 
@@ -244,6 +249,16 @@ test('platform domain behavior: update settings patches meeting video flag', asy
 
   assert.deepEqual(calls.updatedSettings, [
     { key: 'meeting_video_enabled', value: 'false' }
+  ])
+})
+
+test('platform domain behavior: update settings patches default meeting history access', async () => {
+  const { service, calls } = createDomainService()
+
+  await service.updateSettings({ defaultMeetingHistoryAccess: 'active_participants' })
+
+  assert.deepEqual(calls.updatedSettings, [
+    { key: 'default_meeting_history_access', value: 'active_participants' }
   ])
 })
 

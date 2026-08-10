@@ -21,5 +21,8 @@ describe('ChannelPastMeetingsPanel', () => {
     expect(source).toContain('...buildMeetingCardState({')
     expect(source).toContain('miniSummary: resolveMeetingMiniSummary(meeting)')
     expect(source).toContain('data-testid="channel-past-meetings-load-more"')
+    expect(source).toContain(':tabindex="isMeetingRestricted(meeting) ? -1 : 0"')
+    expect(source).toContain("meeting?.content_access?.allowed === false")
+    expect(source).toContain("'meetingsStore.historyAccessRevision'")
   })
 })

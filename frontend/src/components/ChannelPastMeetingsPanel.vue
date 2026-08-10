@@ -14,8 +14,10 @@
           v-for="meeting in pastMeetings"
           :key="meeting.id"
           class="channel-past-meeting-card"
-          role="button"
-          tabindex="0"
+          :class="{ 'channel-past-meeting-card-restricted': isMeetingRestricted(meeting) }"
+          :role="isMeetingRestricted(meeting) ? undefined : 'button'"
+          :tabindex="isMeetingRestricted(meeting) ? -1 : 0"
+          :aria-disabled="isMeetingRestricted(meeting) ? 'true' : undefined"
           @click="openMeeting(meeting.id)"
           @keydown.enter.prevent="openMeeting(meeting.id)"
           @keydown.space.prevent="openMeeting(meeting.id)"
@@ -82,6 +84,11 @@ export default {
     }
   },
   watch: {
+    'meetingsStore.historyAccessRevision': {
+      async handler() {
+        await this.loadPastMeetings()
+      }
+    },
     channelId: {
       immediate: true,
       async handler() {
@@ -159,7 +166,13 @@ export default {
     },
     async openMeeting(meetingId) {
       if (!meetingId) return
+      const meeting = this.pastMeetings.find((entry) => entry.id === meetingId)
+        || this.meetingsStore.getMeetingById(meetingId)
+      if (this.isMeetingRestricted(meeting)) return
       await this.$router.push(`/meetings/${meetingId}`).catch(() => {})
+    },
+    isMeetingRestricted(meeting) {
+      return meeting?.content_access?.allowed === false
     }
   }
 }
@@ -199,6 +212,10 @@ export default {
 .channel-past-meeting-card {
   min-width: 0;
   cursor: pointer;
+}
+
+.channel-past-meeting-card-restricted {
+  cursor: default;
 }
 
 .channel-past-meeting-card:focus-visible {

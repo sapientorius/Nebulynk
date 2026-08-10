@@ -12,8 +12,9 @@
           v-for="meeting in upcomingMeetings"
           :key="meeting.id"
           class="meeting-overview-card"
-          role="button"
-          tabindex="0"
+          :role="isMeetingRestricted(meeting) ? undefined : 'button'"
+          :tabindex="isMeetingRestricted(meeting) ? -1 : 0"
+          :aria-disabled="isMeetingRestricted(meeting) ? 'true' : undefined"
           @click="openMeeting(meeting.id)"
           @keydown.enter.prevent="openMeeting(meeting.id)"
           @keydown.space.prevent="openMeeting(meeting.id)"
@@ -63,8 +64,9 @@
             v-for="meeting in pastMeetings"
             :key="meeting.id"
             class="meeting-overview-card"
-            role="button"
-            tabindex="0"
+            :role="isMeetingRestricted(meeting) ? undefined : 'button'"
+            :tabindex="isMeetingRestricted(meeting) ? -1 : 0"
+            :aria-disabled="isMeetingRestricted(meeting) ? 'true' : undefined"
             @click="openMeeting(meeting.id)"
             @keydown.enter.prevent="openMeeting(meeting.id)"
             @keydown.space.prevent="openMeeting(meeting.id)"
@@ -140,6 +142,13 @@ export default {
   async created() {
     await this.loadOverview()
   },
+  watch: {
+    'meetingsStore.historyAccessRevision': {
+      async handler() {
+        await this.loadOverview()
+      }
+    }
+  },
   methods: {
     async loadOverview(options = {}) {
       const requestedPastVisibleCount = Number(options.pastVisibleCount)
@@ -168,7 +177,12 @@ export default {
       }
     },
     async openMeeting(meetingId) {
+      const meeting = this.meetingsStore.getMeetingById(meetingId)
+      if (this.isMeetingRestricted(meeting)) return
       await this.$router.push(`/meetings/${meetingId}`).catch(() => {})
+    },
+    isMeetingRestricted(meeting) {
+      return meeting?.content_access?.allowed === false
     },
     buildUpcomingCard(meeting) {
       return {

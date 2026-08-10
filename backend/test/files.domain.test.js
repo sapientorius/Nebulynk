@@ -29,6 +29,11 @@ function createDomainService({ repositoryOverrides = {} } = {}) {
       }
       return null
     },
+    async assertCanReadChannel(channelId, user) {
+      const membership = await this.findChannelMembership(channelId, user?.id)
+      if (!membership) throw new Forbidden('Membership required')
+      return { allowed: true, membership }
+    },
     async findFiles() {
       return []
     },
@@ -75,7 +80,7 @@ test('files behavior: find access normalizes limit and scope flags', async () =>
   })
 
   assert.equal(access.limit, 100)
-  assert.equal(access.restrictToAccessibleScope, true)
+  assert.equal(access.restrictToAccessibleScope, false)
   assert.equal(access.currentUserId, 'user-1')
 })
 

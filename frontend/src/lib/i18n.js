@@ -7,6 +7,28 @@ export const DEFAULT_LOCALE = 'en'
 
 const baseMessages = {
   en: {
+    meetingHistoryAccess: {
+      global_label: 'Default access to past meeting content',
+      channel_label: 'Access to past meeting content',
+      global_copy_help: 'This value is copied to newly created channels and group chats. Existing settings are not changed later.',
+      active_participant_retention: 'People who actually joined a meeting retain access after leaving the channel or group.',
+      denied: 'You do not have permission to view this meeting content under the channel meeting access settings.',
+      restricted_title: 'Meeting content unavailable',
+      options: {
+        all_channel_members: {
+          label: 'All channel members',
+          description: 'All current members can view past meetings, including people added after the meeting.'
+        },
+        meeting_start_members: {
+          label: 'Members at meeting start',
+          description: 'Only current members who were already members when the meeting actually started can view it.'
+        },
+        active_participants: {
+          label: 'Active participants only',
+          description: 'Only people who actually joined the meeting can view it. An invitation or channel membership alone is not enough.'
+        }
+      }
+    },
     languages: {
       en: 'English',
       de: 'German',
@@ -819,6 +841,28 @@ const baseMessages = {
     }
   },
   de: {
+    meetingHistoryAccess: {
+      global_label: 'Standardzugriff auf vergangene Meeting-Inhalte',
+      channel_label: 'Zugriff auf vergangene Meeting-Inhalte',
+      global_copy_help: 'Dieser Wert wird in neu erstellte Channels und Gruppen-Chats kopiert. Bestehende Einstellungen werden später nicht verändert.',
+      active_participant_retention: 'Personen, die einem Meeting tatsächlich beigetreten sind, behalten ihren Zugriff nach dem Verlassen des Channels oder der Gruppe.',
+      denied: 'Du hast gemäß den Meeting-Zugriffseinstellungen dieses Channels keinen Zugriff auf die Inhalte dieses Meetings.',
+      restricted_title: 'Meeting-Inhalte nicht verfügbar',
+      options: {
+        all_channel_members: {
+          label: 'Alle Channel-Mitglieder',
+          description: 'Alle aktuellen Mitglieder sehen vergangene Meetings, auch wenn sie erst nach dem Meeting hinzugefügt wurden.'
+        },
+        meeting_start_members: {
+          label: 'Mitglieder beim Meeting-Start',
+          description: 'Nur aktuelle Mitglieder, die beim tatsächlichen Start des Meetings bereits Mitglied waren, können darauf zugreifen.'
+        },
+        active_participants: {
+          label: 'Nur aktive Teilnehmer',
+          description: 'Nur Personen, die dem Meeting tatsächlich beigetreten sind, können darauf zugreifen. Eine Einladung oder Channel-Mitgliedschaft allein reicht nicht.'
+        }
+      }
+    },
     languages: {
       en: 'Englisch',
       de: 'Deutsch',

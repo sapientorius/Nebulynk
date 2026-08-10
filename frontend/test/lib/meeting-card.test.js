@@ -15,7 +15,8 @@ function t(key, params = {}) {
     'ui.components.meeting_card_status_loading': 'Lade...',
     'ui.views.scheduled': 'Geplant',
     'ui.views.cancelled': 'Abgesagt',
-    'ui.views.starts_at': 'Start'
+    'ui.views.starts_at': 'Start',
+    'meetingHistoryAccess.denied': 'Kein Zugriff gemäß Channel-Einstellungen'
   }
 
   const template = translations[key] || key
@@ -146,5 +147,31 @@ describe('meeting card helpers', () => {
       label: 'Abgesagt',
       type: 'error'
     })
+  })
+
+  it('builds a non-navigable card without summary or participant count when access is denied', () => {
+    const state = buildMeetingCardState({
+      meetingId: 'meeting-restricted-1',
+      meeting: {
+        status: 'ended',
+        content_access: {
+          allowed: false,
+          denial_reason: 'channel_meeting_history_policy'
+        },
+        engaged_participant_count: 12,
+        artifacts: [{
+          artifact_type: 'summary',
+          status: 'ready',
+          payload: { mini_summary: 'Should stay hidden' }
+        }]
+      },
+      tFn: t
+    })
+
+    expect(state.summaryText).toBe('Kein Zugriff gemäß Channel-Einstellungen')
+    expect(state.miniSummary).toBeNull()
+    expect(state.isJoinVisible).toBe(false)
+    expect(state.isJoinDisabled).toBe(true)
+    expect(state.isAccessDenied).toBe(true)
   })
 })

@@ -86,19 +86,27 @@ export function buildMeetingCardState({
   tFn
 } = {}) {
   const chatChannelId = meeting?.chat_channel_id || null
-  const isJoinVisible = meeting?.status === 'active' || meeting?.status === 'scheduled'
+  const isAccessDenied = meeting?.content_access?.allowed === false
+  const isJoinVisible = !isAccessDenied && (meeting?.status === 'active' || meeting?.status === 'scheduled')
   const status = resolveMeetingCardStatus(meeting, { tFn })
   const fallbackConnectedCount = countMeetingConnectedParticipants(meeting)
   const resolvedConnectedCount = Number.isInteger(connectedCount) ? connectedCount : fallbackConnectedCount
   const engagedCount = countMeetingEngagedParticipants(meeting)
   const isEnded = meeting?.status === 'ended'
   const isScheduled = meeting?.status === 'scheduled'
-  const summaryText = isEnded
+  const summaryText = isAccessDenied
+    ? translate(
+        tFn,
+        'meetingHistoryAccess.denied',
+        {},
+        'You do not have permission to view this meeting content under the channel settings.'
+      )
+    : isEnded
     ? translate(tFn, 'ui.components.meeting_card_engaged_count', { count: engagedCount }, `${engagedCount} engaged`)
     : isScheduled
       ? translate(tFn, 'ui.views.starts_at', {}, 'Starts')
     : translate(tFn, 'ui.components.meeting_card_live_count', { count: resolvedConnectedCount }, `${resolvedConnectedCount} in call`)
-  const miniSummary = isEnded ? resolveMeetingMiniSummary(meeting) : null
+  const miniSummary = isEnded && !isAccessDenied ? resolveMeetingMiniSummary(meeting) : null
 
   return {
     meetingId: normalizeText(meetingId),
@@ -109,6 +117,7 @@ export function buildMeetingCardState({
     statusType: status.type,
     summaryText,
     miniSummary,
+    isAccessDenied,
     isJoinVisible,
     isJoining: !!isJoining,
     isJoinDisabled: !isJoinVisible || !chatChannelId || voiceChannelId === chatChannelId || !!isJoining || meeting?.status === 'cancelled'

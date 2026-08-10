@@ -12,6 +12,17 @@ function createService({
   let rawCallIndex = 0
 
   const db = (table) => {
+    if (table === 'channels') {
+      const channelBuilder = {
+        where() {
+          return channelBuilder
+        },
+        async first() {
+          return { id: 'channel-1', type: 'private', purpose: 'default' }
+        }
+      }
+      return channelBuilder
+    }
     assert.equal(table, 'channel_members')
     const builder = {
       where(filters) {
@@ -141,7 +152,7 @@ test('message-search scopes member search and returns FTS results with stable cu
   assert.match(rawCalls[0].sql, /ORDER BY m\.created_at DESC, m\.id DESC/)
   assert.deepEqual(rawCalls[0].bindings, [
     'channel-1',
-    'user-1',
+    ...Array(7).fill('user-1'),
     '2026-03-16T10:00:00.000Z',
     '2026-03-16T10:00:00.000Z',
     'message-9',

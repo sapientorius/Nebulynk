@@ -1,5 +1,9 @@
 import { authenticate } from '@feathersjs/authentication'
-import { badRequest, forbidden } from '../../lib/errors.js'
+import { badRequest } from '../../lib/errors.js'
+import {
+  assertCanReadChannel,
+  buildChannelReadAccessSql
+} from '../../domains/meetings/content-access.js'
 
 const DEFAULT_LIMIT = 20
 const MAX_LIMIT = 50
@@ -87,13 +91,9 @@ function buildScopeClauses(searchQuery, user) {
   }
 
   if (!user?.is_admin) {
-    clauses.push(`EXISTS (
-      SELECT 1
-      FROM channel_members cm
-      WHERE cm.channel_id = m.channel_id
-        AND cm.user_id = ?
-    )`)
-    bindings.push(user?.id || null)
+    const channelAccess = buildChannelReadAccessSql('m.channel_id', user?.id || null)
+    clauses.push(channelAccess.sql)
+    bindings.push(...channelAccess.bindings)
   }
 
   if (searchQuery.beforeCreatedAt && searchQuery.beforeId) {
@@ -155,20 +155,10 @@ export class MessageSearchService {
     const searchQuery = normalizeSearchQuery(params.query)
 
     if (searchQuery.channelId && !user?.is_admin) {
-      const membership = await db('channel_members')
-        .where({
-          channel_id: searchQuery.channelId,
-          user_id: user?.id || null
-        })
-        .first()
-
-      if (!membership) {
-        throw forbidden(
-          'api.channels.membership_required',
-          { channel_id: searchQuery.channelId },
-          'You are not a member of this channel'
-        )
-      }
+      await assertCanReadChannel(db, {
+        channelId: searchQuery.channelId,
+        user
+      })
     }
 
     const { sql: whereSql, bindings: whereBindings } = buildScopeClauses(searchQuery, user)

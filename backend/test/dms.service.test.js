@@ -170,6 +170,12 @@ function createFindHarness({ channels = [], memberships = [], users = [], messag
       return Promise.resolve(rows)
     }
 
+    async update(patch) {
+      const rows = await this.execute()
+      for (const row of rows) Object.assign(row, patch)
+      return rows.length
+    }
+
     async execute() {
       let rows = this.resolveRows()
       for (const filter of this.filters) {
@@ -231,6 +237,9 @@ function createFindHarness({ channels = [], memberships = [], users = [], messag
     app: {
       channel() {
         return { connections: [], join() {} }
+      },
+      service() {
+        return { emit() {} }
       }
     }
   })
@@ -301,4 +310,42 @@ test('dms.find does not create notes DMs for guests', async () => {
   assert.deepEqual(result.data, [])
   assert.equal(tables.channels.length, 0)
   assert.equal(tables.channel_members.length, 0)
+})
+
+test('dms.patch restricts meeting history policy changes to group owners and admins', async () => {
+  const seed = {
+    channels: [{
+      id: 'group-1',
+      name: 'Project',
+      type: 'group',
+      meeting_history_access: 'all_channel_members'
+    }],
+    memberships: [
+      { channel_id: 'group-1', user_id: 'owner-1', role: 'owner' },
+      { channel_id: 'group-1', user_id: 'member-1', role: 'member' }
+    ],
+    users: [
+      { id: 'owner-1', display_name: 'Owner' },
+      { id: 'member-1', display_name: 'Member' }
+    ]
+  }
+
+  const { service, tables } = createFindHarness(seed)
+
+  await assert.rejects(
+    service.patch('group-1', { meeting_history_access: 'active_participants' }, {
+      user: { id: 'member-1', is_admin: false }
+    }),
+    (error) => error?.error_code === 'api.dms.meeting_history_access_forbidden'
+  )
+
+  await service.patch('group-1', { meeting_history_access: 'meeting_start_members' }, {
+    user: { id: 'owner-1', is_admin: false }
+  })
+  assert.equal(tables.channels[0].meeting_history_access, 'meeting_start_members')
+
+  await service.patch('group-1', { meeting_history_access: 'active_participants' }, {
+    user: { id: 'admin-1', is_admin: true }
+  })
+  assert.equal(tables.channels[0].meeting_history_access, 'active_participants')
 })

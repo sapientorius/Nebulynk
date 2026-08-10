@@ -1,6 +1,16 @@
 <template>
   <div class="workspace-context" data-testid="meeting-view">
-    <div class="main-area" :class="{ 'share-maximized': shareMaximized }">
+    <div v-if="isMeetingContentRestricted" class="meeting-access-restricted" data-testid="meeting-access-restricted">
+      <n-empty :description="$t('meetingHistoryAccess.denied')">
+        <template #icon>
+          <n-icon size="34"><lock-closed-icon /></n-icon>
+        </template>
+        <template #extra>
+          <strong>{{ $t('meetingHistoryAccess.restricted_title') }}</strong>
+        </template>
+      </n-empty>
+    </div>
+    <div v-else class="main-area" :class="{ 'share-maximized': shareMaximized }">
       <div
         class="meeting-header"
         :class="{
@@ -1134,6 +1144,7 @@ import {
   EllipsisHorizontalOutline as MoreIcon,
   HelpCircleOutline as HelpCircleIcon,
   LanguageOutline as LanguageIcon,
+  LockClosedOutline as LockClosedIcon,
   PencilOutline as EditIcon,
   PeopleOutline as PeopleIcon,
   SparklesOutline as SparklesIcon,
@@ -1207,6 +1218,7 @@ export default {
     DownloadIcon,
     DocumentTextIcon,
     HelpCircleIcon,
+    LockClosedIcon,
     MeetingScreenSharePanel,
     MeetingSummaryPanel,
     MeetingTranscriptPanel,
@@ -1313,6 +1325,9 @@ export default {
     },
     meeting() {
       return this.meetingsStore.activeMeeting
+    },
+    isMeetingContentRestricted() {
+      return this.meeting?.content_access?.allowed === false
     },
     effectiveMeetingStatus() {
       return getEffectiveMeetingStatus(this.meeting)
@@ -2532,6 +2547,13 @@ export default {
 </script>
 
 <style scoped>
+.meeting-access-restricted {
+  display: grid;
+  place-items: center;
+  min-height: 100%;
+  padding: 32px;
+}
+
 .workspace-context,
 .main-area {
   flex: 1;

@@ -3,7 +3,6 @@ import {
   assertOwnUserScope,
   assertFileExists,
   assertMessageExists,
-  assertChannelMembership,
   requiresMessageReadAccess,
   resolveRemovePermission,
   normalizeLimit,
@@ -28,7 +27,7 @@ export class FilesDomainService {
       userId: query.user_id || null,
       limit: normalizeLimit(query.$limit),
       currentUserId: params.user?.id || null,
-      restrictToAccessibleScope: isExternalNonAdmin({
+      restrictToAccessibleScope: !query.message_id && isExternalNonAdmin({
         provider: params.provider,
         user: params.user
       })
@@ -103,11 +102,7 @@ export class FilesDomainService {
       return message
     }
 
-    const membership = await this.repository.findChannelMembership(
-      message.channel_id,
-      params.user.id
-    )
-    assertChannelMembership(membership)
+    await this.repository.assertCanReadChannel(message.channel_id, params.user)
     return message
   }
 }

@@ -7,6 +7,7 @@ import {
   DEFAULT_AUTO_AWAY_MINUTES,
   DEFAULT_CHANNEL_NAME,
   DEFAULT_CHANNEL_DESCRIPTION,
+  DEFAULT_PLATFORM_MEETING_HISTORY_ACCESS,
   buildSetupResult,
   platformInitializationFailedError
 } from './policy.js'
@@ -74,6 +75,7 @@ export class PlatformDomainService {
           purpose: 'default',
           is_voice: false,
           is_archived: false,
+          meeting_history_access: DEFAULT_PLATFORM_MEETING_HISTORY_ACCESS,
           created_by: adminUser.id
         })
 
@@ -89,6 +91,7 @@ export class PlatformDomainService {
         await trxRepository.updateSetting('domain', setupData.domain)
         await trxRepository.updateSetting('default_locale', setupData.defaultLanguage)
         await trxRepository.updateSetting('default_meeting_language', setupData.defaultLanguage)
+        await trxRepository.updateSetting('default_meeting_history_access', 'all_channel_members')
       })
     } catch {
       await this.repository.deleteUserById(adminUser.id)
@@ -116,6 +119,9 @@ export class PlatformDomainService {
     }
     if (Object.prototype.hasOwnProperty.call(patch, 'meetingVideoEnabled')) {
       await this.repository.updateSetting('meeting_video_enabled', patch.meetingVideoEnabled ? 'true' : 'false')
+    }
+    if (Object.prototype.hasOwnProperty.call(patch, 'defaultMeetingHistoryAccess')) {
+      await this.repository.updateSetting('default_meeting_history_access', patch.defaultMeetingHistoryAccess)
     }
     if (Object.prototype.hasOwnProperty.call(patch, 'uploadMaxFileSizeMb')) {
       await this.repository.updateSetting(UPLOAD_SETTING_KEYS.maxFileSizeMb, String(patch.uploadMaxFileSizeMb))

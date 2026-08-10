@@ -3,6 +3,7 @@ import { createId } from '@paralleldrive/cuid2'
 import { validate } from '../../schemas/validators.js'
 import { badRequest, forbidden, notFound } from '../../lib/errors.js'
 import { createSchema, patchSchema } from './dms.schema.js'
+import { DEFAULT_MEETING_HISTORY_ACCESS, normalizeMeetingHistoryAccess } from '../../lib/meeting-history-access.js'
 
 export class DmsService {
   constructor(options) {
@@ -38,6 +39,7 @@ export class DmsService {
         'channels.topic',
         'channels.type',
         'channels.created_by',
+        'channels.meeting_history_access',
         'channels.created_at'
       )
 
@@ -168,7 +170,9 @@ export class DmsService {
       .where({ channel_id: id, user_id: userId })
       .first()
 
-    if (!membership) throw forbidden('api.dms.conversation_access_denied', {}, 'Kein Zugriff auf diese Konversation')
+    if (!membership && params.user?.is_admin !== true) {
+      throw forbidden('api.dms.conversation_access_denied', {}, 'Kein Zugriff auf diese Konversation')
+    }
 
     // Load participants
     const participants = await this.db('channel_members')
@@ -199,11 +203,24 @@ export class DmsService {
       .where({ channel_id: id, user_id: userId })
       .first()
 
-    if (!membership) throw forbidden('api.dms.conversation_access_denied', {}, 'Kein Zugriff auf diese Konversation')
+    if (!membership && params.user?.is_admin !== true) {
+      throw forbidden('api.dms.conversation_access_denied', {}, 'Kein Zugriff auf diese Konversation')
+    }
 
     const updateData = { updated_at: new Date().toISOString() }
     if (data.name !== undefined) updateData.name = data.name
     if (data.topic !== undefined) updateData.topic = data.topic
+    if (data.meeting_history_access !== undefined) {
+      const canManageMeetingHistory = params.user?.is_admin === true || membership?.role === 'owner'
+      if (!canManageMeetingHistory) {
+        throw forbidden(
+          'api.dms.meeting_history_access_forbidden',
+          {},
+          'Nur Gruppen-Owner oder Plattform-Admins duerfen den Meeting-Zugriff aendern'
+        )
+      }
+      updateData.meeting_history_access = data.meeting_history_access
+    }
 
     await this.db('channels').where('id', id).update(updateData)
 
@@ -267,10 +284,19 @@ export class DmsService {
     const now = new Date().toISOString()
     const allMemberIds = [selfId, ...userIds]
 
+    const defaultHistoryAccessSetting = await this.db('platform_settings')
+      .where('key', 'default_meeting_history_access')
+      .first()
+    const meetingHistoryAccess = normalizeMeetingHistoryAccess(
+      defaultHistoryAccessSetting?.value,
+      DEFAULT_MEETING_HISTORY_ACCESS
+    )
+
     await this.db('channels').insert({
       id: channelId,
       name: customName || `group-${channelId}`,
       type: 'group',
+      meeting_history_access: meetingHistoryAccess,
       created_by: selfId,
       created_at: now,
       updated_at: now

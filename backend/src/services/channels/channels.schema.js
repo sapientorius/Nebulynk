@@ -1,3 +1,5 @@
+import { MEETING_HISTORY_ACCESS_VALUES } from '../../lib/meeting-history-access.js'
+
 export const createSchema = {
   type: 'object',
   additionalProperties: false,
@@ -26,6 +28,7 @@ export const patchSchema = {
     topic: { type: ['string', 'null'] },
     type: { type: 'string', enum: ['public', 'private'] },
     is_voice: { type: 'boolean' },
-    is_archived: { type: 'boolean' }
+    is_archived: { type: 'boolean' },
+    meeting_history_access: { type: 'string', enum: MEETING_HISTORY_ACCESS_VALUES }
   }
 }

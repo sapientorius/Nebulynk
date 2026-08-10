@@ -4,6 +4,7 @@ import { createId } from '@paralleldrive/cuid2'
 import { checkPermission } from '../../hooks/check-permission.js'
 import { validate } from '../../schemas/validators.js'
 import { badRequest, conflict, notFound } from '../../lib/errors.js'
+import { assertCanReadChannel } from '../../domains/meetings/content-access.js'
 import { createSchema } from './pinned-messages.schema.js'
 
 export class PinnedMessagesService extends KnexService {
@@ -58,6 +59,19 @@ export const pinnedMessages = (app) => {
       all: [authenticate('jwt')]
     },
     before: {
+      find: [
+        async (context) => {
+          if (!context.params.user) return context
+          const channelId = context.params.query?.channel_id
+          if (channelId) {
+            await assertCanReadChannel(context.app.get('postgresqlClient'), {
+              channelId,
+              user: context.params.user
+            })
+          }
+          return context
+        }
+      ],
       create: [
         validate(createSchema),
         checkPermission('pin_messages'),

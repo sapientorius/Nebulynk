@@ -36,6 +36,7 @@ function normalizeMeetingDetailRequest(value) {
 
 function meetingSatisfiesDetail(meeting, detail = 'summary') {
   if (!meeting || typeof meeting !== 'object') return false
+  if (meeting.content_access?.allowed === false) return true
   if (detail !== 'full') return true
   return hasMeetingDetails(meeting)
 }
@@ -43,6 +44,7 @@ function meetingSatisfiesDetail(meeting, detail = 'summary') {
 function mergeMeetingRecords(existing, incoming) {
   if (!existing) return incoming
   if (!incoming) return existing
+  if (incoming.content_access?.allowed === false) return incoming
 
   const incomingHasDetails = hasMeetingDetails(incoming)
   const existingHasDetails = hasMeetingDetails(existing)
@@ -115,6 +117,7 @@ export const useMeetingsStore = defineStore('meetings', () => {
   const activeMeeting = ref(null)
   const incomingCalls = ref([])
   const questionsByMeetingId = ref({})
+  const historyAccessRevision = ref(0)
   const pendingMeetingLoads = new Map()
   let recoveryRefreshTimeoutId = null
   const activeSourceChannelIds = computed(() => {
@@ -201,6 +204,7 @@ export const useMeetingsStore = defineStore('meetings', () => {
     clearRecoveryRefresh()
     incomingCalls.value = []
     questionsByMeetingId.value = {}
+    historyAccessRevision.value = 0
     pendingMeetingLoads.clear()
   }
 
@@ -498,6 +502,10 @@ export const useMeetingsStore = defineStore('meetings', () => {
     const meeting = await get(meetingId)
     activeMeeting.value = meeting
 
+    if (meeting?.content_access?.allowed === false) {
+      return meeting
+    }
+
     const notificationsStore = useNotificationsStore()
     await notificationsStore.markMeetingInviteRead(meetingId).catch(() => {})
 
@@ -505,6 +513,32 @@ export const useMeetingsStore = defineStore('meetings', () => {
     await channelsStore.select(meeting.chat_channel_id)
 
     return meeting
+  }
+
+  async function handleSourceHistoryAccessChanged(sourceChannelId) {
+    if (!sourceChannelId) return
+
+    const affectedMeetingIds = meetings.value
+      .filter((meeting) => meeting.source_channel_id === sourceChannelId && meeting.status === 'ended')
+      .map((meeting) => meeting.id)
+    if (activeMeeting.value?.source_channel_id === sourceChannelId
+      && activeMeeting.value?.status === 'ended') {
+      affectedMeetingIds.push(activeMeeting.value.id)
+    }
+    const affectedIds = new Set(affectedMeetingIds)
+
+    if (affectedIds.size > 0) {
+      meetings.value = meetings.value.filter((meeting) => !affectedIds.has(meeting.id))
+    }
+    historyAccessRevision.value += 1
+
+    if (!activeMeeting.value || !affectedIds.has(activeMeeting.value.id)) return
+
+    const refreshed = await get(activeMeeting.value.id)
+    activeMeeting.value = refreshed
+    if (refreshed?.content_access?.allowed === false) {
+      useChannelsStore().clearActiveContext()
+    }
   }
 
   async function startFromChannel(sourceChannelId, initialUserIds = [], title = '') {
@@ -919,6 +953,7 @@ export const useMeetingsStore = defineStore('meetings', () => {
     activeMeetingId,
     activeMeeting,
     incomingCalls,
+    historyAccessRevision,
     activeSourceChannelIds,
     reset,
     clearActive,
@@ -935,6 +970,7 @@ export const useMeetingsStore = defineStore('meetings', () => {
     fetchActiveBySourceChannel,
     fetchBySourceChannel,
     setActive,
+    handleSourceHistoryAccessChanged,
     startFromChannel,
     scheduleFromChannel,
     invite,

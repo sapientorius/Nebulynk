@@ -1096,6 +1096,98 @@ test.describe('P2-02 core e2e paths', () => {
     }
   })
 
+  test('a member added after an ended meeting gets the default history access and is locked immediately after a retroactive policy change', async ({ page, browser }) => {
+    await login(page, {
+      email: adminEmail,
+      password: adminPassword
+    })
+
+    const sourceChannelName = `history-src-${runId}`
+    await createChannelFromSidebar(page, { name: sourceChannelName, type: 'private' })
+    const sourceChannelId = extractActiveChannelId(page.url())
+    if (!sourceChannelId) {
+      throw new Error(`Could not resolve meeting history source channel id from URL: ${page.url()}`)
+    }
+
+    await startOrJoinMeetingFromHeader(page)
+    const meetingId = extractMeetingId(page.url())
+    if (!meetingId) {
+      throw new Error(`Could not resolve meeting history meeting id from URL: ${page.url()}`)
+    }
+    await endMeeting(page)
+
+    const adminToken = await getAccessToken(page, {
+      email: adminEmail,
+      password: adminPassword
+    })
+    const memberAuth = await loginViaApi(page.request, {
+      email: inviteEmail,
+      password: invitePassword
+    })
+    const memberId = memberAuth?.user?.id
+    const memberToken = memberAuth?.accessToken
+    if (!adminToken || !memberId || !memberToken) {
+      throw new Error('Missing authentication data for meeting history access flow')
+    }
+
+    await addMemberToChannel(page, {
+      accessToken: adminToken,
+      channelId: sourceChannelId,
+      userId: memberId
+    })
+
+    const memberContext = await browser.newContext({
+      baseURL: new URL(page.url()).origin
+    })
+    const memberPage = await memberContext.newPage()
+
+    try {
+      await login(memberPage, {
+        email: inviteEmail,
+        password: invitePassword
+      })
+      await memberPage.goto(`/meetings/${meetingId}`)
+      await expect(memberPage.getByTestId('meeting-view')).toBeVisible()
+      await expect(memberPage.getByTestId('meeting-access-restricted')).toHaveCount(0)
+
+      const initialMeetingResponse = await memberPage.request.get(resolveBackendUrl(`/meetings/${meetingId}`), {
+        headers: { Authorization: `Bearer ${memberToken}` }
+      })
+      expect(initialMeetingResponse.ok()).toBe(true)
+      const initialMeeting = await initialMeetingResponse.json()
+      expect(initialMeeting.content_access?.allowed).toBe(true)
+      expect(initialMeeting.chat_channel_id).toBeTruthy()
+
+      const policyResponse = await page.request.patch(resolveBackendUrl(`/channels/${sourceChannelId}`), {
+        headers: { Authorization: `Bearer ${adminToken}` },
+        data: { meeting_history_access: 'meeting_start_members' }
+      })
+      if (!policyResponse.ok()) {
+        throw new Error(`Channel meeting history policy update failed (${policyResponse.status()}): ${await policyResponse.text()}`)
+      }
+
+      await expect(memberPage.getByTestId('meeting-access-restricted')).toBeVisible()
+
+      const pastMeetingsResponse = await memberPage.request.get(resolveBackendUrl(
+        `/meetings?include_ended=true&source_channel_id=${encodeURIComponent(sourceChannelId)}&$limit=20`
+      ), {
+        headers: { Authorization: `Bearer ${memberToken}` }
+      })
+      expect(pastMeetingsResponse.ok()).toBe(true)
+      const pastPayload = await pastMeetingsResponse.json()
+      const pastMeetings = Array.isArray(pastPayload) ? pastPayload : pastPayload?.data || []
+      const lockedMeeting = pastMeetings.find((meeting) => meeting.id === meetingId)
+      expect(lockedMeeting?.content_access).toEqual({
+        allowed: false,
+        denial_reason: 'channel_meeting_history_policy'
+      })
+      expect(lockedMeeting?.chat_channel_id).toBeUndefined()
+      expect(lockedMeeting?.participants).toBeUndefined()
+    } finally {
+      await memberContext.close()
+    }
+  })
+
   test('meeting invite notification panel shows a single meeting card with open and join actions', async ({ page, browser }) => {
     await login(page, {
       email: adminEmail,

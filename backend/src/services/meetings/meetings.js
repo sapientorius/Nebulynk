@@ -35,6 +35,10 @@ import {
 } from '../../domains/meetings/serializer.js'
 import { autoEndOverdueScheduledMeeting } from './overdue-scheduled.js'
 import { resolveFrontendUrl } from '../../lib/security-config.js'
+import {
+  resolveMeetingContentAccess,
+  snapshotMeetingStartMembers
+} from '../../domains/meetings/content-access.js'
 
 function normalizeBoolean(value) {
   return value === true || value === 'true'
@@ -156,9 +160,24 @@ export class MeetingsService {
     if (canReadActiveSourceChannelMeetings) {
       await this._assertCanReadSourceChannel(sourceChannelId, user)
     } else if (!user.is_admin) {
-      meetingQuery
-        .join('meeting_participants as self_participant', 'self_participant.meeting_id', 'meetings.id')
-        .where('self_participant.user_id', user.id)
+      meetingQuery.where((builder) => {
+        builder
+          .whereExists(function () {
+            this.select(1)
+              .from('meeting_participants as visible_participant')
+              .whereRaw('visible_participant.meeting_id = meetings.id')
+              .andWhere('visible_participant.user_id', user.id)
+          })
+          .orWhere(function () {
+            this.whereIn('meetings.status', ['ended', 'cancelled'])
+              .whereExists(function () {
+                this.select(1)
+                  .from('channel_members as visible_source_member')
+                  .whereRaw('visible_source_member.channel_id = meetings.source_channel_id')
+                  .andWhere('visible_source_member.user_id', user.id)
+              })
+          })
+      })
     }
 
     if (timeBucket === 'upcoming') {
@@ -187,7 +206,10 @@ export class MeetingsService {
 
   async get(id, params) {
     const meeting = await this._getNormalizedMeetingOrThrow(id)
-    await this._assertCanAccessMeeting(meeting.id, params.user, meeting)
+    const access = await this._resolveMeetingContentAccess(meeting, params.user)
+    if (!access.cardVisible || (meeting.status !== 'ended' && !access.allowed)) {
+      await this._assertCanAccessMeeting(meeting.id, params.user, meeting)
+    }
 
     const [enriched] = await this._serializeMeetings([meeting], {
       viewerUserId: params.user?.id || null,
@@ -352,6 +374,15 @@ export class MeetingsService {
       ]
 
       await trx('meeting_participants').insert(participantRows)
+
+      if (!isScheduledMeeting) {
+        await snapshotMeetingStartMembers(trx, {
+          meetingId,
+          sourceChannelId,
+          sourceChannelType: sourceChannel.type,
+          nowIso
+        })
+      }
 
       if (inviteeIds.length === 0) {
         notificationRows = []
@@ -678,6 +709,13 @@ export class MeetingsService {
             started_at: meeting.started_at || nowIso,
             updated_at: nowIso
           })
+
+        await snapshotMeetingStartMembers(trx, {
+          meetingId: id,
+          sourceChannelId: meeting.source_channel_id,
+          sourceChannelType: meeting.source_channel_type,
+          nowIso
+        })
       }
 
       await trx('channel_members')
@@ -1198,6 +1236,7 @@ export class MeetingsService {
         'meetings.*',
         'source_channel.name as source_channel_name',
         'source_channel.type as source_channel_type',
+        'source_channel.meeting_history_access as source_channel_meeting_history_access',
         'chat_channel.name as chat_channel_name',
         'chat_channel.purpose as chat_channel_purpose',
         'chat_channel.is_voice as chat_channel_is_voice',
@@ -1273,6 +1312,14 @@ export class MeetingsService {
       preloadedMeeting,
       findMeetingParticipant: (targetMeetingId, userId) => this._getMeetingParticipant(targetMeetingId, userId),
       loadMeetingById: (targetMeetingId) => this._getMeetingOrThrow(targetMeetingId)
+    })
+  }
+
+  async _resolveMeetingContentAccess(meeting, user) {
+    return resolveMeetingContentAccess(this.db, {
+      meetingId: meeting?.id,
+      meeting,
+      user
     })
   }
 
@@ -1416,16 +1463,76 @@ export class MeetingsService {
   }
 
   async _serializeMeetings(rows, { viewerUserId = null, viewerUser = null, detailLevel = 'summary' } = {}) {
-    return serializeMeetings({
+    if (!viewerUser) {
+      return serializeMeetings({
+        db: this.db,
+        app: this.app,
+        rows,
+        viewerUserId,
+        viewerUser,
+        detailLevel,
+        buildSourceDisplayNameIndex: (targetRows, options) => this._buildSourceChannelDisplayNameIndex(targetRows, options),
+        buildTranscriptionStateIndex: (targetRows, options) => this._buildTranscriptionRecordingStateIndex(targetRows, options),
+        enrichMeetingDetails: (targetRows, options) => this._enrichMeetingsWithDetails(targetRows, options)
+      })
+    }
+
+    const accessEntries = await Promise.all(rows.map(async (row) => ([
+      row.id,
+      await this._resolveMeetingContentAccess(row, viewerUser)
+    ])))
+    const accessByMeetingId = Object.fromEntries(accessEntries)
+    const readableRows = rows.filter((row) => {
+      const access = accessByMeetingId[row.id]
+      return access?.allowed || (row.status !== 'ended' && access?.cardVisible)
+    })
+    const serializedAllowed = await serializeMeetings({
       db: this.db,
       app: this.app,
-      rows,
+      rows: readableRows,
       viewerUserId,
       viewerUser,
       detailLevel,
       buildSourceDisplayNameIndex: (targetRows, options) => this._buildSourceChannelDisplayNameIndex(targetRows, options),
       buildTranscriptionStateIndex: (targetRows, options) => this._buildTranscriptionRecordingStateIndex(targetRows, options),
       enrichMeetingDetails: (targetRows, options) => this._enrichMeetingsWithDetails(targetRows, options)
+    })
+    const allowedById = Object.fromEntries(serializedAllowed.map((meeting) => [meeting.id, meeting]))
+
+    return rows.map((row) => {
+      const access = accessByMeetingId[row.id]
+      if (access?.allowed || (row.status !== 'ended' && access?.cardVisible)) {
+        return {
+          ...allowedById[row.id],
+          content_access: {
+            allowed: true,
+            denial_reason: null
+          }
+        }
+      }
+
+      return {
+        id: row.id,
+        title: row.title || null,
+        status: row.status,
+        source_channel_id: row.source_channel_id || null,
+        scheduled_start_at: row.scheduled_start_at || null,
+        scheduled_end_at: row.scheduled_end_at || null,
+        cancelled_at: row.cancelled_at || null,
+        started_at: row.started_at || null,
+        ended_at: row.ended_at || null,
+        detail_level: 'card',
+        source_channel: {
+          id: row.source_channel_id || null,
+          name: row.source_channel_name || null,
+          type: row.source_channel_type || null,
+          display_name: row.source_channel_name || null
+        },
+        content_access: {
+          allowed: false,
+          denial_reason: access?.denialReason || 'channel_meeting_history_policy'
+        }
+      }
     })
   }
 

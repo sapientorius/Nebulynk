@@ -85,6 +85,12 @@
               <span class="platform-settings-hint">{{ $t('ui.components.admin.image_upload_quality_help') }}</span>
             </div>
           </n-form-item>
+          <n-form-item :label="$t('meetingHistoryAccess.global_label')">
+            <div class="platform-settings-field" data-testid="platform-default-meeting-history-access">
+              <MeetingHistoryAccessSelect v-model="defaultMeetingHistoryAccess" />
+              <span class="platform-settings-hint">{{ $t('meetingHistoryAccess.global_copy_help') }}</span>
+            </div>
+          </n-form-item>
           <template v-if="isPrimaryAdmin">
             <n-divider />
             <h4 class="platform-settings-subtitle">{{ $t('sponsorship.settings_title') }}</h4>
@@ -130,6 +136,8 @@ import {
   DEFAULT_MEETING_LANGUAGE,
   getMeetingLanguageOptions
 } from '../../lib/meeting-languages.js'
+import { DEFAULT_MEETING_HISTORY_ACCESS } from '../../lib/meeting-history-access.js'
+import MeetingHistoryAccessSelect from '../MeetingHistoryAccessSelect.vue'
 import {
   DEFAULT_IMAGE_UPLOAD_MAX_DIMENSION_PX,
   DEFAULT_IMAGE_UPLOAD_QUALITY,
@@ -138,11 +146,13 @@ import {
 
 export default {
   name: 'PlatformSettings',
+  components: { MeetingHistoryAccessSelect },
   data() {
     return {
       saving: false,
       defaultLanguage: 'en',
       defaultMeetingLanguage: DEFAULT_MEETING_LANGUAGE,
+      defaultMeetingHistoryAccess: DEFAULT_MEETING_HISTORY_ACCESS,
       autoAwayMinutes: 15,
       meetingVideoEnabled: true,
       uploadMaxFileSizeMb: DEFAULT_UPLOAD_MAX_FILE_SIZE_MB,
@@ -188,6 +198,7 @@ export default {
         const settings = await this.adminStore.refreshPlatformSettings()
         this.defaultLanguage = settings?.default_locale || this.defaultLanguage
         this.defaultMeetingLanguage = settings?.default_meeting_language || this.defaultMeetingLanguage
+        this.defaultMeetingHistoryAccess = settings?.default_meeting_history_access || this.defaultMeetingHistoryAccess
         this.autoAwayMinutes = Number.parseInt(settings?.auto_away_minutes, 10) || this.autoAwayMinutes
         this.meetingVideoEnabled = settings?.meeting_video_enabled !== 'false'
         this.uploadMaxFileSizeMb = this.normalizeNumber(
@@ -227,6 +238,7 @@ export default {
         const settings = await this.adminStore.updatePlatformSettings({
           defaultLanguage: this.defaultLanguage,
           defaultMeetingLanguage: this.defaultMeetingLanguage,
+          defaultMeetingHistoryAccess: this.defaultMeetingHistoryAccess,
           autoAwayMinutes,
           meetingVideoEnabled: this.meetingVideoEnabled,
           uploadMaxFileSizeMb,
@@ -235,6 +247,7 @@ export default {
         })
         setPlatformDefaultLocale(settings?.default_locale || this.defaultLanguage)
         this.defaultMeetingLanguage = settings?.default_meeting_language || this.defaultMeetingLanguage
+        this.defaultMeetingHistoryAccess = settings?.default_meeting_history_access || this.defaultMeetingHistoryAccess
         this.autoAwayMinutes = Number.parseInt(settings?.auto_away_minutes, 10) || autoAwayMinutes
         this.uploadMaxFileSizeMb = this.normalizeNumber(
           settings?.upload_max_file_size_mb,

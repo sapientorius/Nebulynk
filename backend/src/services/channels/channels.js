@@ -8,6 +8,7 @@ import { validate } from '../../schemas/validators.js'
 import { createSchema, patchSchema } from './channels.schema.js'
 import { ChannelsRepository } from '../../domains/channels/repository.js'
 import { ChannelsDomainService } from '../../domains/channels/service.js'
+import { DEFAULT_MEETING_HISTORY_ACCESS, normalizeMeetingHistoryAccess } from '../../lib/meeting-history-access.js'
 
 function joinConnectionsToChannel(app, channelId, userIds) {
   try {
@@ -142,6 +143,17 @@ export const channels = (app) => {
         validate(createSchema),
         checkPermission('create_channels'),
         setUserId('created_by'),
+        async (context) => {
+          const db = context.app.get('postgresqlClient')
+          const setting = await db('platform_settings')
+            .where('key', 'default_meeting_history_access')
+            .first()
+          context.data.meeting_history_access = normalizeMeetingHistoryAccess(
+            setting?.value,
+            DEFAULT_MEETING_HISTORY_ACCESS
+          )
+          return context
+        },
         async (context) => {
           const initialUserIds = Array.isArray(context.data?.initial_user_ids)
             ? [...new Set(context.data.initial_user_ids.filter((entry) => typeof entry === 'string' && entry.trim()))]

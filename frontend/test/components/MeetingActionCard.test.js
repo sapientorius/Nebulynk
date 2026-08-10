@@ -16,6 +16,13 @@ describe('MeetingActionCard', () => {
     expect(source).toContain('meeting-card-mini-summary-popover')
   })
 
+  it('hides actions and styles cards whose meeting contents are restricted', () => {
+    const source = readFileSync(resolve('src/components/MeetingActionCard.vue'), 'utf8')
+    expect(source).toContain("'meeting-card-restricted': isAccessDenied")
+    expect(source).toContain('v-if="!isAccessDenied"')
+    expect(source).toContain("isAccessDenied: {")
+  })
+
   it('supports an overview variant that expands cards to the grid width', () => {
     const source = readFileSync(resolve('src/components/MeetingActionCard.vue'), 'utf8')
 

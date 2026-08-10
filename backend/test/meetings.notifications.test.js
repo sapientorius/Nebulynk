@@ -46,10 +46,24 @@ test('meetings notifications: create stores structured meeting_invite notificati
         }
         return builder
       }
-      if (table === 'channel_members' || table === 'meeting_participants' || table === 'meeting_artifacts') {
-        return {
+      if (table === 'channel_members') {
+        const builder = {
+          where() { return builder },
+          async select() { return [{ user_id: 'user-1' }, { user_id: 'user-2' }] },
           async insert() { return undefined }
         }
+        return builder
+      }
+      if (table === 'meeting_participants' || table === 'meeting_artifacts') {
+        return { async insert() { return undefined } }
+      }
+      if (table === 'meeting_start_members') {
+        const builder = {
+          insert() { return builder },
+          onConflict() { return builder },
+          async ignore() { return undefined }
+        }
+        return builder
       }
       if (table === 'notifications') {
         return {

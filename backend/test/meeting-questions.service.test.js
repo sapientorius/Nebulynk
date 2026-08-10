@@ -108,7 +108,8 @@ test('meeting-questions create stores private question history with citations', 
         meeting_id: 'meeting-1',
         user_id: 'user-1',
         role: 'host',
-        invite_status: 'left'
+        invite_status: 'left',
+        joined_at: '2026-03-26T09:00:00.000Z'
       }],
       channels: [{
         id: 'source-1',
@@ -191,7 +192,8 @@ test('meeting-questions create rejects active meetings', async () => {
         meeting_id: 'meeting-active',
         user_id: 'user-1',
         role: 'host',
-        invite_status: 'joined'
+        invite_status: 'joined',
+        joined_at: '2026-03-26T09:00:00.000Z'
       }]
     }
   })
@@ -235,7 +237,8 @@ test('meeting-questions create includes transcript context beyond the former seg
         meeting_id: 'meeting-long-question-context',
         user_id: 'user-1',
         role: 'host',
-        invite_status: 'left'
+        invite_status: 'left',
+        joined_at: '2026-03-26T09:00:00.000Z'
       }],
       channels: [{
         id: 'source-1',
@@ -302,7 +305,8 @@ test('meeting-questions create respects env overrides for shared prompt caps', a
           meeting_id: 'meeting-env-question-context',
           user_id: 'user-1',
           role: 'host',
-          invite_status: 'left'
+          invite_status: 'left',
+          joined_at: '2026-03-26T09:00:00.000Z'
         }],
         channels: [{
           id: 'source-1',
@@ -352,7 +356,8 @@ test('meeting-questions find is owner-scoped through meeting membership and user
         meeting_id: 'meeting-private',
         user_id: 'user-1',
         role: 'host',
-        invite_status: 'left'
+        invite_status: 'left',
+        joined_at: '2026-03-26T09:00:00.000Z'
       }],
       meeting_questions: [{
         id: 'question-1',

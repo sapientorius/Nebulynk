@@ -567,7 +567,11 @@ test('meetings serialization: full payload keeps participants and artifacts', as
       const builder = {
         join() { return builder },
         leftJoin() { return builder },
+        where() { return builder },
         whereIn() { return builder },
+        async first() {
+          return { joined_at: '2026-03-13T10:00:00.000Z' }
+        },
         async select() {
           return [
             {
@@ -610,6 +614,13 @@ test('meetings serialization: full payload keeps participants and artifacts', as
         }
       }
       return builder
+    }
+
+    if (table === 'channel_members') {
+      return {
+        where() { return this },
+        first: async () => undefined
+      }
     }
 
     if (table === 'meeting_artifacts') {
@@ -681,6 +692,7 @@ test('meetings serialization: full payload keeps participants and artifacts', as
     ended_by: 'user-joined',
     source_channel_name: 'general',
     source_channel_type: 'private',
+    source_channel_meeting_history_access: 'all_channel_members',
     chat_channel_name: 'meeting-meeting-1',
     chat_channel_purpose: 'meeting',
     chat_channel_is_voice: true,
@@ -709,7 +721,11 @@ test('meetings serialization: full payload hides legacy pending summary placehol
       const builder = {
         join() { return builder },
         leftJoin() { return builder },
+        where() { return builder },
         whereIn() { return builder },
+        async first() {
+          return { joined_at: '2026-03-13T10:00:00.000Z' }
+        },
         async select() {
           return [{
             meeting_id: 'meeting-1',
@@ -726,6 +742,13 @@ test('meetings serialization: full payload hides legacy pending summary placehol
         }
       }
       return builder
+    }
+
+    if (table === 'channel_members') {
+      return {
+        where() { return this },
+        first: async () => undefined
+      }
     }
 
     if (table === 'meeting_artifacts') {
@@ -835,6 +858,7 @@ test('meetings serialization: full payload hides legacy pending summary placehol
     ended_by: 'user-joined',
     source_channel_name: 'general',
     source_channel_type: 'private',
+    source_channel_meeting_history_access: 'all_channel_members',
     chat_channel_name: 'meeting-meeting-1',
     chat_channel_purpose: 'meeting',
     chat_channel_is_voice: true,
@@ -872,7 +896,11 @@ test('meetings serialization: transcript retry remains hidden from non-host view
       const builder = {
         join() { return builder },
         leftJoin() { return builder },
+        where() { return builder },
         whereIn() { return builder },
+        async first() {
+          return { joined_at: '2026-03-13T10:00:00.000Z' }
+        },
         async select() {
           return [{
             meeting_id: 'meeting-1',
@@ -889,6 +917,13 @@ test('meetings serialization: transcript retry remains hidden from non-host view
         }
       }
       return builder
+    }
+
+    if (table === 'channel_members') {
+      return {
+        where() { return this },
+        first: async () => undefined
+      }
     }
 
     if (table === 'meeting_artifacts') {
@@ -969,6 +1004,7 @@ test('meetings serialization: transcript retry remains hidden from non-host view
     ended_by: 'user-host',
     source_channel_name: 'general',
     source_channel_type: 'private',
+    source_channel_meeting_history_access: 'all_channel_members',
     chat_channel_name: 'meeting-meeting-1',
     chat_channel_purpose: 'meeting',
     chat_channel_is_voice: true,

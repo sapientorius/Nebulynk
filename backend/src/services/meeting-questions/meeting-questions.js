@@ -1,6 +1,6 @@
 import { authenticate } from '@feathersjs/authentication'
 import { createId } from '@paralleldrive/cuid2'
-import { badRequest, forbidden, notFound } from '../../lib/errors.js'
+import { badRequest, notFound } from '../../lib/errors.js'
 import { generateStructuredObject } from '../../lib/ai-provider-adapters.js'
 import {
   buildQuestionPromptInput,
@@ -10,6 +10,7 @@ import {
   normalizeText
 } from '../../lib/meeting-ai.js'
 import { getActiveMeetingSummaryRuntime } from '../../lib/meeting-recordings.js'
+import { assertCanAccessMeetingContent } from '../../domains/meetings/content-access.js'
 
 function normalizeCitations(value) {
   if (Array.isArray(value)) return value
@@ -59,18 +60,7 @@ async function assertCanAccessEndedMeeting(db, meetingId, user) {
     throw notFound('api.meetings.not_found', { meeting_id: meetingId }, 'Meeting nicht gefunden')
   }
 
-  if (!user?.is_admin) {
-    const participant = await db('meeting_participants')
-      .where({
-        meeting_id: meetingId,
-        user_id: user?.id || null
-      })
-      .first()
-
-    if (!participant) {
-      throw forbidden('api.meetings.membership_required', { meeting_id: meetingId }, 'Kein Zugriff auf dieses Meeting')
-    }
-  }
+  await assertCanAccessMeetingContent(db, { meetingId, meeting, user })
 
   if (meeting.status !== 'ended') {
     throw badRequest('api.meeting_questions.meeting_not_ended', { meeting_id: meetingId }, 'Ask the Meeting ist erst nach Meeting-Ende verfuegbar')

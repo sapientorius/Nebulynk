@@ -256,6 +256,11 @@ export function setupRealtimeListeners(socket, {
   })
 
   socket.on('channels patched', (channel) => {
+    const previousChannel = (channelsStore.channels || []).find((entry) => entry.id === channel.id)
+      || (dmsStore.dmChannels || []).find((entry) => entry.id === channel.id)
+    const historyAccessChanged = !!previousChannel
+      && previousChannel.meeting_history_access !== channel.meeting_history_access
+
     if (channel.type === 'dm' || channel.type === 'group') {
       dmsStore.refreshChannel(channel.id).catch(() => {
         scheduleDmsRefresh()
@@ -264,6 +269,10 @@ export function setupRealtimeListeners(socket, {
       patchMeetingChannelLocally(channel)
     } else if (channelsStore.hasChannel(channel.id)) {
       channelsStore.patchChannel(channel)
+    }
+
+    if (historyAccessChanged) {
+      meetingsStore.handleSourceHistoryAccessChanged?.(channel.id)?.catch?.(() => {})
     }
   })
 

@@ -65,6 +65,7 @@ export const apiErrorMessages = {
         conversation_access_denied: 'No access to this conversation',
         dm_not_found: 'DM not found',
         guest_accounts_forbidden: 'Guest accounts cannot use direct messages',
+        meeting_history_access_forbidden: 'Only the group owner or a platform administrator can change meeting history access',
         one_or_more_user_ids_invalid: 'One or more user IDs are invalid',
         only_group_dms_editable: 'Only group DMs can be edited',
         user_ids_must_not_contain_self: 'user_ids must not contain your own id'
@@ -511,6 +512,7 @@ export const apiErrorMessages = {
         conversation_access_denied: 'Kein Zugriff auf diese Konversation',
         dm_not_found: 'DM nicht gefunden',
         guest_accounts_forbidden: 'Gast-Konten duerfen keine Direktnachrichten verwenden',
+        meeting_history_access_forbidden: 'Nur der Gruppen-Owner oder ein Plattform-Admin kann den Zugriff auf vergangene Meetings aendern',
         one_or_more_user_ids_invalid: 'Eine oder mehrere User-IDs sind ungueltig',
         only_group_dms_editable: 'Nur Gruppen-DMs koennen bearbeitet werden',
         user_ids_must_not_contain_self: 'user_ids darf die eigene ID nicht enthalten'

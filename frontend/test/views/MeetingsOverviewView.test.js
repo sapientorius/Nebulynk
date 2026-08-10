@@ -35,5 +35,8 @@ describe('MeetingsOverviewView', () => {
     expect(source).toContain('pastVisibleCount: this.pastVisibleCount + this.pastPageSize')
     expect(source).toContain("meeting.ended_at || meeting.scheduled_end_at || meeting.started_at")
     expect(source).toContain("return this.$t('ui.views.time_unspecified')")
+    expect(source).toContain(':tabindex="isMeetingRestricted(meeting) ? -1 : 0"')
+    expect(source).toContain('if (this.isMeetingRestricted(meeting)) return')
+    expect(source).toContain("'meetingsStore.historyAccessRevision'")
   })
 })

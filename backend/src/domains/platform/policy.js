@@ -3,6 +3,10 @@ import { badRequest } from '../../lib/errors.js'
 import { DEFAULT_LOCALE, normalizeLocale } from '../../lib/locales.js'
 import { DEFAULT_MEETING_LANGUAGE, normalizeMeetingLanguage } from '../../lib/meeting-languages.js'
 import {
+  DEFAULT_MEETING_HISTORY_ACCESS,
+  normalizeMeetingHistoryAccess
+} from '../../lib/meeting-history-access.js'
+import {
   normalizeUploadSettingsMap,
   normalizeUploadSettingsPatch
 } from '../../lib/upload-settings.js'
@@ -18,6 +22,7 @@ export const DEFAULT_PLATFORM_LANGUAGE = DEFAULT_LOCALE
 export const DEFAULT_PLATFORM_MEETING_LANGUAGE = DEFAULT_MEETING_LANGUAGE
 export const DEFAULT_AUTO_AWAY_MINUTES = 15
 export const DEFAULT_MEETING_VIDEO_ENABLED = true
+export const DEFAULT_PLATFORM_MEETING_HISTORY_ACCESS = DEFAULT_MEETING_HISTORY_ACCESS
 export const DEFAULT_CHANNEL_NAME = 'General'
 export const DEFAULT_CHANNEL_DESCRIPTION = 'Standard-Channel f\u00fcr alle'
 
@@ -34,6 +39,9 @@ export function mapSettingsRows(settingsRows) {
   }
   if (!Object.prototype.hasOwnProperty.call(result, 'meeting_video_enabled')) {
     result.meeting_video_enabled = DEFAULT_MEETING_VIDEO_ENABLED ? 'true' : 'false'
+  }
+  if (!Object.prototype.hasOwnProperty.call(result, 'default_meeting_history_access')) {
+    result.default_meeting_history_access = DEFAULT_PLATFORM_MEETING_HISTORY_ACCESS
   }
   return {
     ...result,
@@ -79,6 +87,12 @@ export function normalizeSettingsPatch(data = {}) {
   }
   if (Object.prototype.hasOwnProperty.call(data, 'meetingVideoEnabled')) {
     patch.meetingVideoEnabled = data.meetingVideoEnabled === true
+  }
+  if (Object.prototype.hasOwnProperty.call(data, 'defaultMeetingHistoryAccess')) {
+    patch.defaultMeetingHistoryAccess = normalizeMeetingHistoryAccess(
+      data.defaultMeetingHistoryAccess,
+      DEFAULT_PLATFORM_MEETING_HISTORY_ACCESS
+    )
   }
   return {
     ...patch,

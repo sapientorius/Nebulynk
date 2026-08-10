@@ -2,6 +2,7 @@ import { KnexService } from '@feathersjs/knex'
 import { authenticate } from '@feathersjs/authentication'
 import { setUserId } from '../../hooks/set-user-id.js'
 import { isChannelMember } from '../../hooks/is-channel-member.js'
+import { isChannelReadable } from '../../hooks/is-channel-readable.js'
 import { checkPermission } from '../../hooks/check-permission.js'
 import { parseMentions } from '../../hooks/parse-mentions.js'
 import { createNotifications } from '../../hooks/create-notifications.js'
@@ -618,7 +619,7 @@ export const messages = (app) => {
           domainService.assertFindAccess(context.params.query)
           return context
         },
-        isChannelMember()
+        isChannelReadable()
       ],
       get: [
         async (context) => {
@@ -631,7 +632,7 @@ export const messages = (app) => {
             ...(context.params.query || {}),
             channel_id: message.channel_id
           }
-          return isChannelMember()(context)
+          return isChannelReadable()(context)
         }
       ],
       patch: [
