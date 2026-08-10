@@ -360,6 +360,7 @@ describe('channels store membership flows', () => {
 
     const store = useChannelsStore()
     store.activeChannelId = 'channel-1'
+    store.myMembership = { id: 'membership-1', channel_id: 'channel-1', user_id: 'user-self' }
     await store.queueReadWatermark('channel-1', '2026-03-15T09:00:00.000Z')
     await store.select('channel-2')
 
@@ -372,8 +373,7 @@ describe('channels store membership flows', () => {
   it('marks empty meeting channels as read immediately when selected', async () => {
     apiMock.patch.mockResolvedValue({ data: { updated: true } })
     apiMock.get
-      .mockResolvedValueOnce({ data: { data: [] } })
-      .mockResolvedValueOnce({ data: { data: [] } })
+      .mockResolvedValueOnce({ data: { data: [{ id: 'membership-1', user_id: 'user-self' }] } })
       .mockResolvedValueOnce({ data: { permissions: [] } })
 
     const store = useChannelsStore()
@@ -392,6 +392,113 @@ describe('channels store membership flows', () => {
       channel_id: 'meeting-channel-1'
     })
     expect(typeof apiMock.patch.mock.calls[0][1].last_read_at).toBe('string')
+  })
+
+  it('does not mark a historical meeting chat as read without membership', async () => {
+    apiMock.get
+      .mockResolvedValueOnce({ data: { data: [{ id: 'membership-other', user_id: 'user-other' }] } })
+      .mockResolvedValueOnce({ data: { permissions: [] } })
+
+    const store = useChannelsStore()
+    store.channels = [{
+      id: 'meeting-channel-1',
+      name: 'meeting-1',
+      purpose: 'meeting',
+      is_voice: true
+    }]
+    store.myMembership = { id: 'previous-membership', channel_id: 'channel-previous', user_id: 'user-self' }
+
+    await store.select('meeting-channel-1')
+
+    expect(store.myMembership).toBe(null)
+    expect(apiMock.patch).not.toHaveBeenCalled()
+  })
+
+  it('stops retrying membership-rejected watermarks after switching channels', async () => {
+    vi.useFakeTimers()
+    const membershipRequiredError = {
+      response: {
+        status: 403,
+        data: {
+          data: {
+            error_code: 'api.channels.membership_required'
+          }
+        }
+      }
+    }
+    apiMock.patch.mockRejectedValue(membershipRequiredError)
+
+    const store = useChannelsStore()
+    await expect(store.queueReadWatermark(
+      'meeting-channel-1',
+      '2026-03-15T09:00:00.000Z',
+      { immediate: true }
+    )).rejects.toBe(membershipRequiredError)
+
+    store.activeChannelId = 'channel-2'
+    await store.queueReadWatermark('meeting-channel-1', '2026-03-15T09:05:00.000Z')
+    await vi.advanceTimersByTimeAsync(500)
+    await flushAsyncWork()
+
+    expect(apiMock.patch).toHaveBeenCalledTimes(1)
+    vi.useRealTimers()
+  })
+
+  it('unblocks read watermarks when membership is later confirmed', async () => {
+    const membershipRequiredError = {
+      response: {
+        status: 403,
+        data: {
+          data: {
+            error_code: 'api.channels.membership_required'
+          }
+        }
+      }
+    }
+    apiMock.patch
+      .mockRejectedValueOnce(membershipRequiredError)
+      .mockResolvedValueOnce({ data: { updated: true } })
+
+    const store = useChannelsStore()
+    await expect(store.queueReadWatermark(
+      'meeting-channel-1',
+      '2026-03-15T09:00:00.000Z',
+      { immediate: true }
+    )).rejects.toBe(membershipRequiredError)
+
+    store.activeChannelId = 'meeting-channel-1'
+    apiMock.get.mockResolvedValueOnce({
+      data: { data: [{ id: 'membership-1', user_id: 'user-self' }] }
+    })
+    await store.refreshMembers()
+    await store.queueReadWatermark(
+      'meeting-channel-1',
+      '2026-03-15T09:05:00.000Z',
+      { immediate: true }
+    )
+
+    expect(apiMock.patch).toHaveBeenCalledTimes(2)
+  })
+
+  it('keeps retrying read watermarks after transient failures', async () => {
+    vi.useFakeTimers()
+    const transientError = new Error('Network unavailable')
+    apiMock.patch
+      .mockRejectedValueOnce(transientError)
+      .mockResolvedValueOnce({ data: { updated: true } })
+
+    const store = useChannelsStore()
+    await expect(store.queueReadWatermark(
+      'channel-1',
+      '2026-03-15T09:00:00.000Z',
+      { immediate: true }
+    )).rejects.toBe(transientError)
+
+    await vi.advanceTimersByTimeAsync(250)
+    await flushAsyncWork()
+
+    expect(apiMock.patch).toHaveBeenCalledTimes(2)
+    vi.useRealTimers()
   })
 
   it('flushes all pending watermarks on page hide', async () => {

@@ -1,12 +1,14 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import api from '../lib/api.js'
+import { getApiErrorCode } from '../lib/api-error.js'
 import { useSessionStore } from './session.js'
 import { useDmsStore } from './dms.js'
 import { useMessagesStore } from './messages.js'
 
 const READ_WATERMARK_DEBOUNCE_MS = 250
 const CHANNEL_LIST_FRESHNESS_MS = 30_000
+const READ_WATERMARK_MEMBERSHIP_REQUIRED_ERROR = 'api.channels.membership_required'
 
 function asList(payload) {
   if (Array.isArray(payload)) return payload
@@ -68,6 +70,7 @@ export const useChannelsStore = defineStore('channels', () => {
   const pendingReadWatermarks = new Map()
   const inFlightReadWatermarks = new Map()
   const flushTimers = new Map()
+  const readStateBlockedChannelIds = new Set()
   let readLifecycleBound = false
   let standardChannelsRefreshPromise = null
   let archivedChannelsRefreshPromise = null
@@ -93,6 +96,22 @@ export const useChannelsStore = defineStore('channels', () => {
     const next = { ...optimisticReadStateByChannel.value }
     delete next[channelId]
     optimisticReadStateByChannel.value = next
+  }
+
+  function discardReadWatermark(channelId) {
+    clearFlushTimer(channelId)
+    pendingReadWatermarks.delete(channelId)
+    clearOptimisticReadState(channelId)
+  }
+
+  function isMembershipRequiredReadStateError(error) {
+    return error?.response?.status === 403
+      && getApiErrorCode(error) === READ_WATERMARK_MEMBERSHIP_REQUIRED_ERROR
+  }
+
+  function canQueueReadWatermark(channelId) {
+    if (readStateBlockedChannelIds.has(channelId)) return false
+    return channelId !== activeChannelId.value || !!myMembership.value
   }
 
   function scheduleReadWatermarkFlush(channelId) {
@@ -212,6 +231,7 @@ export const useChannelsStore = defineStore('channels', () => {
     flushTimers.clear()
     pendingReadWatermarks.clear()
     inFlightReadWatermarks.clear()
+    readStateBlockedChannelIds.clear()
     standardChannelsRefreshPromise = null
     archivedChannelsRefreshPromise = null
     channels.value = []
@@ -378,7 +398,6 @@ export const useChannelsStore = defineStore('channels', () => {
 
   async function select(channelId) {
     const messagesStore = useMessagesStore()
-    const sessionStore = useSessionStore()
     const previousChannelId = activeChannelId.value
     const selectedChannel = channels.value.find((channel) => channel.id === channelId)
       || useDmsStore().dmChannels.find((channel) => channel.id === channelId)
@@ -388,16 +407,20 @@ export const useChannelsStore = defineStore('channels', () => {
     }
 
     activeChannelId.value = channelId
+    members.value = []
+    myMembership.value = null
+    channelRole.value = null
     messagesStore.resetChannelMessages()
     clearUnread(channelId)
 
     await messagesStore.loadLatest()
-    await refreshMembers()
-
-    myMembership.value = members.value.find((member) => member.user_id === sessionStore.user?.id) || null
+    await refreshMembers(channelId)
+    if (activeChannelId.value !== channelId) return
 
     await messagesStore.loadPins(channelId)
+    if (activeChannelId.value !== channelId) return
     await loadChannelPermissions(channelId)
+    if (activeChannelId.value !== channelId) return
 
     const latestVisibleAt = messagesStore.messages[messagesStore.messages.length - 1]?.created_at || null
     if (latestVisibleAt) {
@@ -411,15 +434,23 @@ export const useChannelsStore = defineStore('channels', () => {
     }
   }
 
-  async function refreshMembers() {
-    if (!activeChannelId.value) return
+  async function refreshMembers(channelId = activeChannelId.value) {
+    if (!channelId) return []
     try {
       const { data } = await api.get('/channel-members', {
-        params: { channel_id: activeChannelId.value, $limit: 100 }
+        params: { channel_id: channelId, $limit: 100 }
       })
+      if (activeChannelId.value !== channelId) return []
+
       members.value = asList(data)
+      myMembership.value = members.value.find((member) => member.user_id === useSessionStore().user?.id) || null
+      if (myMembership.value) {
+        readStateBlockedChannelIds.delete(channelId)
+      }
+      return members.value
     } catch (error) {
       console.error('Failed to load members:', error)
+      return []
     }
   }
 
@@ -473,10 +504,15 @@ export const useChannelsStore = defineStore('channels', () => {
         return data
       })
       .catch((error) => {
-        pendingReadWatermarks.set(
-          channelId,
-          maxIsoTimestamp(pendingReadWatermarks.get(channelId), pendingLastReadAt)
-        )
+        if (isMembershipRequiredReadStateError(error)) {
+          readStateBlockedChannelIds.add(channelId)
+          discardReadWatermark(channelId)
+        } else {
+          pendingReadWatermarks.set(
+            channelId,
+            maxIsoTimestamp(pendingReadWatermarks.get(channelId), pendingLastReadAt)
+          )
+        }
         throw error
       })
       .finally(() => {
@@ -505,7 +541,7 @@ export const useChannelsStore = defineStore('channels', () => {
 
   async function queueReadWatermark(channelId, lastReadAt, { immediate = false } = {}) {
     const sessionStore = useSessionStore()
-    if (!sessionStore.user?.id || !channelId || !lastReadAt) return null
+    if (!sessionStore.user?.id || !channelId || !lastReadAt || !canQueueReadWatermark(channelId)) return null
 
     bindReadLifecycleIfNeeded()
     pendingReadWatermarks.set(
@@ -586,6 +622,8 @@ export const useChannelsStore = defineStore('channels', () => {
   }
 
   function removeChannel(channelId) {
+    discardReadWatermark(channelId)
+    readStateBlockedChannelIds.delete(channelId)
     channels.value = channels.value.filter((entry) => entry.id !== channelId)
     archivedChannels.value = archivedChannels.value.filter((entry) => entry.id !== channelId)
   }
