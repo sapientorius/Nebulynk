@@ -19,4 +19,12 @@ describe('NotificationsPanel notification delivery controls', () => {
     expect(source).toContain("path: `/channels/${notif.channel_id}`")
     expect(source).toContain("query: notif.message_id ? { message: notif.message_id } : {}")
   })
+
+  it('opens registration notifications in the registration settings tab', () => {
+    const source = readFileSync(resolve('src/components/NotificationsPanel.vue'), 'utf8')
+
+    expect(source).toContain("notif?.type === 'registration_pending'")
+    expect(source).toContain("query: { tab: 'registration' }")
+    expect(source).toContain("this.$t('selfRegistrationAdmin.title')")
+  })
 })

@@ -131,6 +131,10 @@ function createStoreMocks() {
     handleRecordingStateUpdated: vi.fn()
   }
 
+  const adminStore = {
+    setPendingRegistrationAlertCount: vi.fn()
+  }
+
   const messageSummariesStore = {
     applyRealtimeSummary: vi.fn(),
     applyRealtimeSummaryRemoved: vi.fn()
@@ -142,6 +146,7 @@ function createStoreMocks() {
     dmsStore,
     messagesStore,
     notificationsStore,
+    adminStore,
     voiceStore,
     meetingsStore,
     messageSummariesStore
@@ -373,6 +378,19 @@ describe('realtime socket contract', () => {
     })
     expect(sfxMock.playSfx).toHaveBeenCalledTimes(1)
     expect(sfxMock.playSfx).toHaveBeenCalledWith(sfxMock.SFX_EVENTS.NOTIFICATION)
+  })
+
+  it('applies targeted pending-registration summary updates', () => {
+    const { socket, emit } = createSocketHarness()
+    const stores = createStoreMocks()
+    setupRealtimeListeners(socket, stores)
+
+    emit('message', {
+      type: 'pending-registration-summary updated',
+      data: { count: 3 }
+    })
+
+    expect(stores.adminStore.setPendingRegistrationAlertCount).toHaveBeenCalledWith(3)
   })
 
   it('dispatches one native desktop notification for a non-visible active Electron workspace', async () => {

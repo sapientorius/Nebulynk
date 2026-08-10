@@ -2,6 +2,7 @@ import { authenticate } from '@feathersjs/authentication'
 import { checkPermission } from '../../hooks/check-permission.js'
 import { getEmailDeliveryStatus, sendAccountActivatedEmail } from '../../email.js'
 import { badRequest, notFound } from '../../lib/errors.js'
+import { broadcastPendingRegistrationSummary } from '../../lib/registration-pending-alerts.js'
 import {
   REGISTRATION_STATUS,
   assignDefaultMemberRole,
@@ -64,6 +65,7 @@ export class PendingRegistrationsService {
         is_verified: true,
         email_verified_at: user.email_verified_at || nowIso,
         registration_status: REGISTRATION_STATUS.active,
+        registration_pending_reason: null,
         updated_at: nowIso
       })
       await trx('registration_email_tokens')
@@ -82,6 +84,8 @@ export class PendingRegistrationsService {
         email_verified_at: user.email_verified_at || nowIso
       }
     })
+
+    await broadcastPendingRegistrationSummary(this.app)
 
     const locale = activatedUser.preferred_locale || await getPlatformDefaultLocale(this.db)
     let emailResult
@@ -122,6 +126,7 @@ export class PendingRegistrationsService {
     }
 
     await this.db('users').where('id', user.id).del()
+    await broadcastPendingRegistrationSummary(this.app)
     return serializePendingRegistration(user)
   }
 }

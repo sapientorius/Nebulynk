@@ -10,6 +10,7 @@ import {
   confirmPendingRegistration as confirmPendingRegistrationRequest,
   disableUser as disableUserRequest,
   getPlatformStatus,
+  getPendingRegistrationSummary as getPendingRegistrationSummaryRequest,
   getRegistrationSettings as getRegistrationSettingsRequest,
   getSecuritySettings as getSecuritySettingsRequest,
   getSmtpSettings as getSmtpSettingsRequest,
@@ -47,6 +48,7 @@ export const useAdminStore = defineStore('admin', () => {
   const smtpSettings = ref({})
   const registrationSettings = ref({})
   const pendingRegistrations = ref([])
+  const pendingRegistrationAlertCount = ref(0)
   const securitySettings = ref({})
   const aiProviderInstances = ref([])
   const aiFunctionConfigs = ref([])
@@ -185,6 +187,26 @@ export const useAdminStore = defineStore('admin', () => {
     return pendingRegistrations.value
   }
 
+  async function loadPendingRegistrationSummary() {
+    const summary = await getPendingRegistrationSummaryRequest()
+    const count = Number(summary?.count)
+    pendingRegistrationAlertCount.value = Number.isFinite(count)
+      ? Math.max(0, Math.trunc(count))
+      : 0
+    return pendingRegistrationAlertCount.value
+  }
+
+  async function refreshPendingRegistrationSummary() {
+    return loadPendingRegistrationSummary()
+  }
+
+  function setPendingRegistrationAlertCount(count) {
+    const normalized = Number(count)
+    pendingRegistrationAlertCount.value = Number.isFinite(normalized)
+      ? Math.max(0, Math.trunc(normalized))
+      : 0
+  }
+
   async function refreshPendingRegistrations() {
     loadingPendingRegistrations.value = true
     try {
@@ -197,12 +219,14 @@ export const useAdminStore = defineStore('admin', () => {
   async function confirmPendingRegistration(id) {
     const result = await confirmPendingRegistrationRequest(id)
     pendingRegistrations.value = pendingRegistrations.value.filter((entry) => entry.id !== id)
+    await refreshPendingRegistrationSummary().catch(() => {})
     return result
   }
 
   async function deletePendingRegistration(id) {
     const result = await deletePendingRegistrationRequest(id)
     pendingRegistrations.value = pendingRegistrations.value.filter((entry) => entry.id !== id)
+    await refreshPendingRegistrationSummary().catch(() => {})
     return result
   }
 
@@ -492,6 +516,7 @@ export const useAdminStore = defineStore('admin', () => {
     smtpSettings,
     registrationSettings,
     pendingRegistrations,
+    pendingRegistrationAlertCount,
     securitySettings,
     aiProviderInstances,
     aiFunctionConfigs,
@@ -517,6 +542,7 @@ export const useAdminStore = defineStore('admin', () => {
     loadSmtpSettings,
     loadRegistrationSettings,
     loadPendingRegistrations,
+    loadPendingRegistrationSummary,
     loadSecuritySettings,
     refreshRoleData,
     refreshUserRoleData,
@@ -525,6 +551,7 @@ export const useAdminStore = defineStore('admin', () => {
     refreshSmtpSettings,
     refreshRegistrationSettings,
     refreshPendingRegistrations,
+    refreshPendingRegistrationSummary,
     refreshSecuritySettings,
     loadAiProviderInstances,
     refreshAiProviderInstances,
@@ -550,6 +577,7 @@ export const useAdminStore = defineStore('admin', () => {
     revokeInvite,
     updatePlatformSettings,
     updateRegistrationSettings,
+    setPendingRegistrationAlertCount,
     confirmPendingRegistration,
     deletePendingRegistration,
     updateSecuritySettings,

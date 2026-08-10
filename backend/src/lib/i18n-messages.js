@@ -52,7 +52,9 @@ export const backendMessages = {
     push: {
       dmTitle: '{actor}',
       mentionTitle: '{actor} hat dich erwaehnt',
-      reminderTitle: 'Erinnerung'
+      reminderTitle: 'Erinnerung',
+      registrationPendingTitle: 'Registrierung wartet auf Freigabe',
+      registrationPendingBody: '{actor} hat sich registriert und wartet auf Freigabe.'
     }
   },
   en: {
@@ -108,7 +110,9 @@ export const backendMessages = {
     push: {
       dmTitle: '{actor}',
       mentionTitle: '{actor} mentioned you',
-      reminderTitle: 'Reminder'
+      reminderTitle: 'Reminder',
+      registrationPendingTitle: 'Registration awaiting approval',
+      registrationPendingBody: '{actor} has registered and is awaiting approval.'
     }
   }
 }

@@ -12,6 +12,10 @@ import {
   isPlatformInitialized
 } from '../../lib/self-registration.js'
 import { getConfiguredPasswordStrengthPolicy, serializePasswordStrengthPolicy } from '../../lib/password-policy.js'
+import {
+  notifyRegistrationPending,
+  REGISTRATION_PENDING_REASON
+} from '../../lib/registration-pending-alerts.js'
 import { validate } from '../../schemas/validators.js'
 import {
   createSelfRegistrationCreateRateLimitHook,
@@ -84,7 +88,13 @@ export class SelfRegistrationService {
       throw conflict('api.self_registration.email_already_registered', {}, 'Diese E-Mail-Adresse wird bereits verwendet')
     }
 
-    const defaultLocale = await getPlatformDefaultLocale(this.db)
+    const [defaultLocale, deliveryStatus] = await Promise.all([
+      getPlatformDefaultLocale(this.db),
+      this.getEmailDelivery(this.app)
+    ])
+    const registrationPendingReason = deliveryStatus.configured
+      ? null
+      : REGISTRATION_PENDING_REASON.smtpUnavailable
     let user
     try {
       user = await this.app.service('users').create({
@@ -95,7 +105,8 @@ export class SelfRegistrationService {
         is_admin: false,
         is_verified: false,
         registration_status: REGISTRATION_STATUS.pendingEmailVerification,
-        email_verified_at: null
+        email_verified_at: null,
+        registration_pending_reason: registrationPendingReason
       }, {})
     } catch (error) {
       if (error?.code === '23505') {
@@ -104,8 +115,8 @@ export class SelfRegistrationService {
       throw error
     }
 
-    const deliveryStatus = await this.getEmailDelivery(this.app)
     if (!deliveryStatus.configured) {
+      await notifyRegistrationPending(this.app, user)
       return buildPendingResponse()
     }
 
@@ -143,7 +154,7 @@ export class SelfRegistrationService {
     }
 
     const now = this.now()
-    return this.db.transaction(async (trx) => {
+    const result = await this.db.transaction(async (trx) => {
       const tokenRecord = await trx('registration_email_tokens')
         .where('token_hash', this.hashToken(normalizedToken))
         .forUpdate()
@@ -168,6 +179,9 @@ export class SelfRegistrationService {
       const registrationStatus = settings.requiresAdminApproval
         ? REGISTRATION_STATUS.pendingAdminApproval
         : REGISTRATION_STATUS.active
+      const registrationPendingReason = registrationStatus === REGISTRATION_STATUS.pendingAdminApproval
+        ? REGISTRATION_PENDING_REASON.emailConfirmedAdminApproval
+        : null
       const nowIso = now.toISOString()
 
       await trx('registration_email_tokens').where('id', tokenRecord.id).update({
@@ -178,6 +192,7 @@ export class SelfRegistrationService {
         is_verified: true,
         email_verified_at: nowIso,
         registration_status: registrationStatus,
+        registration_pending_reason: registrationPendingReason,
         updated_at: nowIso
       })
 
@@ -186,11 +201,27 @@ export class SelfRegistrationService {
       }
 
       return {
-        ok: true,
-        registration_status: registrationStatus,
-        activated: registrationStatus === REGISTRATION_STATUS.active
+        response: {
+          ok: true,
+          registration_status: registrationStatus,
+          activated: registrationStatus === REGISTRATION_STATUS.active
+        },
+        pendingRegistration: registrationPendingReason
+          ? {
+              ...user,
+              registration_status: registrationStatus,
+              registration_pending_reason: registrationPendingReason,
+              email_verified_at: nowIso
+            }
+          : null
       }
     })
+
+    if (result.pendingRegistration) {
+      await notifyRegistrationPending(this.app, result.pendingRegistration)
+    }
+
+    return result.response
   }
 }
 

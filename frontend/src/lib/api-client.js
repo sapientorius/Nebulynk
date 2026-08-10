@@ -932,6 +932,11 @@ export function createApiClient(options = {}) {
     return data
   }
 
+  async function getPendingRegistrationSummary() {
+    const { data } = await http.get('/pending-registration-summary')
+    return data
+  }
+
   async function confirmPendingRegistration(id) {
     const { data } = await http.patch(`/pending-registrations/${encodeURIComponent(id)}`, {
       action: 'confirm'
@@ -1256,6 +1261,7 @@ export function createApiClient(options = {}) {
     getRegistrationSettings,
     updateRegistrationSettings,
     listPendingRegistrations,
+    getPendingRegistrationSummary,
     confirmPendingRegistration,
     deletePendingRegistration,
     getSecuritySettings,

@@ -4,7 +4,14 @@ import { validate } from '../../schemas/validators.js'
 import { patchSchema } from './notifications.schema.js'
 import { badRequest, forbidden, notFound } from '../../lib/errors.js'
 
-const ALLOWED_NOTIFICATION_TYPES = new Set(['mention', 'mention_all', 'dm_message', 'meeting_invite', 'message_reminder'])
+const ALLOWED_NOTIFICATION_TYPES = new Set([
+  'mention',
+  'mention_all',
+  'dm_message',
+  'meeting_invite',
+  'message_reminder',
+  'registration_pending'
+])
 
 function normalizeBoolean(value) {
   if (value === true || value === 'true') return true

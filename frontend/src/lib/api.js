@@ -115,6 +115,10 @@ export async function listPendingRegistrations() {
   return activeApiClient.listPendingRegistrations()
 }
 
+export async function getPendingRegistrationSummary() {
+  return activeApiClient.getPendingRegistrationSummary()
+}
+
 export async function confirmPendingRegistration(id) {
   return activeApiClient.confirmPendingRegistration(id)
 }

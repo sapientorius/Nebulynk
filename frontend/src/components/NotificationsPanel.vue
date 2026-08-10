@@ -56,7 +56,7 @@
               />
             </div>
             <template v-else>
-              <span class="notif-channel">{{ getChannelName(notif.channel_id) }}</span>
+              <span class="notif-channel">{{ notificationContextLabel(notif) }}</span>
               <p class="notif-snippet">{{ notificationSnippet(notif) }}</p>
             </template>
           </div>
@@ -229,6 +229,12 @@ export default {
       }
       return this.$t('ui.components.unknown_channel')
     },
+    notificationContextLabel(notif) {
+      if (notif?.type === 'registration_pending') {
+        return this.$t('selfRegistrationAdmin.title')
+      }
+      return this.getChannelName(notif?.channel_id)
+    },
     getNotificationMeetingId(notif) {
       return resolveNotificationMeetingId(notif)
     },
@@ -300,6 +306,15 @@ export default {
     async openNotification(notif) {
       await this.markNotificationRead(notif)
       this.notificationsStore.showPanel = false
+
+      if (notif?.type === 'registration_pending') {
+        try {
+          await this.$router.push({ path: '/admin', query: { tab: 'registration' } })
+        } catch {
+          // Ignore navigation errors (e.g. duplicate route).
+        }
+        return
+      }
 
       const meetingId = this.getNotificationMeetingId(notif)
       if (meetingId) {

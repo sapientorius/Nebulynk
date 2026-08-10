@@ -45,6 +45,7 @@ import { useMeetingsStore } from './meetings.js'
 import { useVoiceMessageArtifactsStore } from './voice-message-artifacts.js'
 import { useMessageSummariesStore } from './message-summaries.js'
 import { usePlatformUpdatesStore } from './platform-updates.js'
+import { useAdminStore } from './admin.js'
 import { setupRealtimeListeners } from './realtime.js'
 
 function asList(payload) {
@@ -475,6 +476,7 @@ export const useSessionStore = defineStore('session', () => {
     const dmsStore = useDmsStore()
     const messagesStore = useMessagesStore()
     const notificationsStore = useNotificationsStore()
+    const adminStore = useAdminStore()
     const voiceStore = useVoiceStore()
     const meetingsStore = useMeetingsStore()
     const voiceMessageArtifactsStore = useVoiceMessageArtifactsStore()
@@ -488,6 +490,7 @@ export const useSessionStore = defineStore('session', () => {
         dmsStore,
         messagesStore,
         notificationsStore,
+        adminStore,
         voiceStore,
         meetingsStore,
         voiceMessageArtifactsStore,
@@ -531,6 +534,12 @@ export const useSessionStore = defineStore('session', () => {
       notificationsStore.refreshNotifications(),
       voiceStore.refreshParticipants()
     ])
+
+    if (user.value?.is_admin === true || channelsStore.can?.('manage_users') === true) {
+      await adminStore.refreshPendingRegistrationSummary().catch(() => {})
+    } else {
+      adminStore.setPendingRegistrationAlertCount(0)
+    }
 
     // Keep meeting channels/topic metadata in store after channel refreshes.
     await meetingsStore.refresh(true)

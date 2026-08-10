@@ -9,6 +9,10 @@ export function buildDesktopNotificationRoute({
   notification = null,
   meetingByChatChannelId = {}
 } = {}) {
+  if (notification?.type === 'registration_pending') {
+    return '/admin?tab=registration'
+  }
+
   if (!notification?.channel_id && !notification?.meeting_id) {
     return '/channels'
   }

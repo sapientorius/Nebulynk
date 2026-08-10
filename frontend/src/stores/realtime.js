@@ -48,6 +48,7 @@ export function setupRealtimeListeners(socket, {
   dmsStore,
   messagesStore,
   notificationsStore,
+  adminStore,
   voiceStore,
   meetingsStore,
   voiceMessageArtifactsStore,
@@ -337,6 +338,10 @@ export function setupRealtimeListeners(socket, {
 
     if (msg.type === 'notifications created') {
       handleIncomingNotification(msg.data)
+    }
+
+    if (msg.type === 'pending-registration-summary updated') {
+      adminStore?.setPendingRegistrationAlertCount?.(msg.data?.count)
     }
   })
 

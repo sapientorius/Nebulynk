@@ -36,6 +36,12 @@ describe('desktop notification routing', () => {
     })).toBe('/channels/channel-44')
   })
 
+  it('opens pending-registration notifications in registration settings', () => {
+    expect(buildDesktopNotificationRoute({
+      notification: { type: 'registration_pending' }
+    })).toBe('/admin?tab=registration')
+  })
+
   it('deep-links channel notifications with message ids to the source message', () => {
     expect(buildDesktopNotificationRoute({
       notification: {

@@ -4,6 +4,7 @@ import { feathers } from '@feathersjs/feathers'
 import { selfRegistration } from '../src/services/self-registration/self-registration.js'
 import { PendingRegistrationsService } from '../src/services/pending-registrations/pending-registrations.js'
 import { hashRegistrationToken } from '../src/lib/self-registration.js'
+import { getPendingRegistrationAlertCount } from '../src/lib/registration-pending-alerts.js'
 import { createMemoryDb } from './helpers/memory-db.js'
 import { createRateLimiter, MemoryRateLimitStore } from '../src/lib/rate-limit.js'
 
@@ -14,6 +15,7 @@ function createRegistrationHarness({
   allowedDomains = [],
   requiresAdminApproval = false,
   smtpConfigured = true,
+  confirmationEmailResult = { ok: true },
   passwordStrengthLevel = 'basic',
   seed = {}
 } = {}) {
@@ -70,7 +72,7 @@ function createRegistrationHarness({
     }),
     sendConfirmationEmail: async (_serviceApp, payload) => {
       calls.confirmationEmails.push(payload)
-      return { ok: true }
+      return confirmationEmailResult
     }
   })
 
@@ -89,6 +91,20 @@ function registrationPayload(overrides = {}) {
     display_name: 'New Member',
     email: 'new.member@example.com',
     password: 'NewMember1!',
+    ...overrides
+  }
+}
+
+function registrationManager(overrides = {}) {
+  return {
+    id: 'registration-manager',
+    email: 'manager@example.com',
+    display_name: 'Registration Manager',
+    preferred_locale: 'en',
+    account_type: 'member',
+    is_admin: true,
+    registration_status: 'active',
+    disabled_at: null,
     ...overrides
   }
 }
@@ -151,7 +167,8 @@ test('self-registration normalizes and enforces the configured exact email domai
 
 test('self-registration keeps registrations manually confirmable when SMTP is unavailable', async () => {
   const { app, calls, db } = createRegistrationHarness({
-    smtpConfigured: false
+    smtpConfigured: false,
+    seed: { users: [registrationManager()] }
   })
 
   const result = await app.service('self-registration').create(registrationPayload(), publicParams())
@@ -161,9 +178,20 @@ test('self-registration keeps registrations manually confirmable when SMTP is un
     registration_status: 'pending_email_verification',
     confirmation_delivery: 'manual'
   })
-  assert.equal(db.tables.users[0].registration_status, 'pending_email_verification')
+  const registration = db.tables.users.find((user) => user.email === 'new.member@example.com')
+  assert.equal(registration.registration_status, 'pending_email_verification')
+  assert.equal(registration.registration_pending_reason, 'smtp_unavailable')
   assert.equal(db.tables.registration_email_tokens.length, 0)
   assert.deepEqual(calls.confirmationEmails, [])
+  assert.deepEqual(db.tables.notifications.map((notification) => ({
+    user_id: notification.user_id,
+    type: notification.type,
+    actor_id: notification.actor_id
+  })), [{
+    user_id: 'registration-manager',
+    type: 'registration_pending',
+    actor_id: registration.id
+  }])
 })
 
 test('self-registration confirms an email once, activates the account, and assigns the member role', async () => {
@@ -210,7 +238,8 @@ test('self-registration confirms an email once, activates the account, and assig
 
 test('self-registration transitions email-confirmed accounts to admin approval when required', async () => {
   const { app, db } = createRegistrationHarness({
-    requiresAdminApproval: true
+    requiresAdminApproval: true,
+    seed: { users: [registrationManager()] }
   })
 
   await app.service('self-registration').create(registrationPayload(), publicParams())
@@ -225,9 +254,29 @@ test('self-registration transitions email-confirmed accounts to admin approval w
     registration_status: 'pending_admin_approval',
     activated: false
   })
-  assert.equal(db.tables.users[0].is_verified, true)
-  assert.equal(db.tables.users[0].registration_status, 'pending_admin_approval')
+  const registration = db.tables.users.find((user) => user.email === 'new.member@example.com')
+  assert.equal(registration.is_verified, true)
+  assert.equal(registration.registration_status, 'pending_admin_approval')
+  assert.equal(registration.registration_pending_reason, 'email_confirmed_admin_approval')
   assert.equal(db.tables.user_roles.length, 0)
+  assert.equal(db.tables.notifications.length, 1)
+  assert.equal(db.tables.notifications[0].user_id, 'registration-manager')
+  assert.equal(db.tables.notifications[0].type, 'registration_pending')
+})
+
+test('self-registration leaves SMTP delivery failures unclassified and unannounced', async () => {
+  const { app, db } = createRegistrationHarness({
+    confirmationEmailResult: { ok: false, errorCode: 'api.smtp.delivery_failed' },
+    seed: { users: [registrationManager()] }
+  })
+
+  const result = await app.service('self-registration').create(registrationPayload(), publicParams())
+  const registration = db.tables.users.find((user) => user.email === 'new.member@example.com')
+
+  assert.equal(result.confirmation_delivery, 'manual')
+  assert.equal(registration.registration_pending_reason, null)
+  assert.equal(db.tables.registration_email_tokens.length, 0)
+  assert.equal(db.tables.notifications.length, 0)
 })
 
 test('self-registration rejects expired confirmation tokens and rate-limits public attempts', async () => {
@@ -269,6 +318,7 @@ test('pending registrations can be manually activated or deleted by an administr
         preferred_locale: 'de',
         is_verified: false,
         registration_status: 'pending_email_verification',
+        registration_pending_reason: 'smtp_unavailable',
         created_at: DEFAULT_NOW,
         updated_at: DEFAULT_NOW
       },
@@ -279,6 +329,7 @@ test('pending registrations can be manually activated or deleted by an administr
         preferred_locale: 'en',
         is_verified: true,
         registration_status: 'pending_admin_approval',
+        registration_pending_reason: 'email_confirmed_admin_approval',
         created_at: DEFAULT_NOW,
         updated_at: DEFAULT_NOW
       }
@@ -310,11 +361,13 @@ test('pending registrations can be manually activated or deleted by an administr
 
   const open = await service.find()
   assert.deepEqual(open.map((entry) => entry.id), ['pending-email', 'pending-approval'])
+  assert.equal(await getPendingRegistrationAlertCount(db), 2)
 
   const result = await service.patch('pending-email', { action: 'confirm' })
   assert.equal(result.ok, true)
   assert.equal(result.email_sent, false)
   assert.equal(db.tables.users.find((user) => user.id === 'pending-email').registration_status, 'active')
+  assert.equal(db.tables.users.find((user) => user.id === 'pending-email').registration_pending_reason, null)
   assert.equal(db.tables.registration_email_tokens[0].consumed_at, DEFAULT_NOW)
   assert.deepEqual(sentActivationEmails, [{
     email: 'pending@example.com',
@@ -323,10 +376,12 @@ test('pending registrations can be manually activated or deleted by an administr
   assert.equal(db.tables.user_roles.some((entry) => (
     entry.user_id === 'pending-email' && entry.role_id === 'role-member'
   )), true)
+  assert.equal(await getPendingRegistrationAlertCount(db), 1)
 
   const removed = await service.remove('pending-approval')
   assert.equal(removed.id, 'pending-approval')
   assert.equal(db.tables.users.some((user) => user.id === 'pending-approval'), false)
+  assert.equal(await getPendingRegistrationAlertCount(db), 0)
 
   db.tables.users.push({
     id: 'pending-email-error',

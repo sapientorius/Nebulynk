@@ -4,6 +4,7 @@ import { bt } from './i18n.js'
 import { hasVisibleChannelSession } from '../presence.js'
 
 function buildNotificationUrl(notification) {
+  if (notification?.type === 'registration_pending') return '/admin?tab=registration'
   if (!notification?.channel_id) return '/channels'
   const channelId = encodeURIComponent(notification.channel_id)
   if (notification.message_id) {
@@ -15,6 +16,10 @@ function buildNotificationUrl(notification) {
 function buildPushTitle(notification, user) {
   if (notification.type === 'message_reminder') {
     return bt(user?.preferred_locale, 'push.reminderTitle')
+  }
+
+  if (notification.type === 'registration_pending') {
+    return bt(user?.preferred_locale, 'push.registrationPendingTitle')
   }
 
   if (notification.type === 'dm_message') {

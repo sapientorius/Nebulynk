@@ -14,8 +14,16 @@
         :title="$t('common.profile')"
         :aria-label="$t('common.profile')"
       >
-        <n-badge :color="statusColor" dot :offset="[-4, 22]">
-          <UserAvatar :size="32" :user="user" :avatar-url="user?.avatar_url" />
+        <n-badge
+          :value="pendingRegistrationAlertCount"
+          :max="99"
+          :show="canManageUsers && pendingRegistrationAlertCount > 0"
+          type="error"
+          :offset="[-2, 2]"
+        >
+          <n-badge :color="statusColor" dot :offset="[-4, 22]">
+            <UserAvatar :size="32" :user="user" :avatar-url="user?.avatar_url" />
+          </n-badge>
         </n-badge>
       </button>
     </template>
@@ -82,8 +90,22 @@
           <n-icon size="16"><document-text-outline-icon /></n-icon>
           <span>{{ $t('common.notes') }}</span>
         </button>
+      </div>
+
+      <div v-if="canManageUsers && pendingRegistrationAlertCount > 0" class="user-menu-section registration-alert-section">
         <button
-          v-if="canAdmin"
+          type="button"
+          class="user-menu-action registration-alert-action"
+          data-testid="user-menu-open-pending-registrations"
+          @click="openPendingRegistrations"
+        >
+          <n-icon size="16"><person-add-outline-icon /></n-icon>
+          <span>{{ pendingRegistrationAlertLabel }}</span>
+        </button>
+      </div>
+
+      <div v-if="!isGuestUser && canAdmin" class="user-menu-section">
+        <button
           type="button"
           class="user-menu-action"
           data-testid="user-menu-open-admin"
@@ -110,11 +132,12 @@ import {
   DocumentTextOutline as DocumentTextOutlineIcon,
   HappyOutline as HappyOutlineIcon,
   LogOutOutline as LogOutOutlineIcon,
+  PersonAddOutline as PersonAddOutlineIcon,
   PersonOutline as PersonOutlineIcon,
   SettingsOutline as SettingsOutlineIcon,
   ShieldCheckmarkOutline as ShieldCheckmarkOutlineIcon
 } from '@vicons/ionicons5'
-import { useChannelsStore, useDmsStore, useSessionStore, useUiStore } from '../stores/index.js'
+import { useAdminStore, useChannelsStore, useDmsStore, useSessionStore, useUiStore } from '../stores/index.js'
 import { buildQuickStatusPayload, canAccessAdmin } from '../lib/user-account-menu.js'
 import { getPresenceStatusColor } from '../lib/user-presence.js'
 import UserAvatar from './UserAvatar.vue'
@@ -127,6 +150,7 @@ export default {
     DocumentTextOutlineIcon,
     HappyOutlineIcon,
     LogOutOutlineIcon,
+    PersonAddOutlineIcon,
     PersonOutlineIcon,
     SettingsOutlineIcon,
     ShieldCheckmarkOutlineIcon
@@ -144,6 +168,9 @@ export default {
     },
     channelsStore() {
       return useChannelsStore()
+    },
+    adminStore() {
+      return useAdminStore()
     },
     uiStore() {
       return useUiStore()
@@ -177,6 +204,37 @@ export default {
     },
     canAdmin() {
       return this.user?.is_admin === true || canAccessAdmin(this.channelsStore)
+    },
+    canManageUsers() {
+      return this.user?.is_admin === true || this.channelsStore.can?.('manage_users') === true
+    },
+    pendingRegistrationAlertCount() {
+      return this.adminStore.pendingRegistrationAlertCount
+    },
+    pendingRegistrationAlertLabel() {
+      return this.$t(
+        this.pendingRegistrationAlertCount === 1
+          ? 'selfRegistrationAdmin.pendingMenuOne'
+          : 'selfRegistrationAdmin.pendingMenuMany',
+        {
+          count: this.pendingRegistrationAlertCount
+        }
+      )
+    }
+  },
+  watch: {
+    showMenu(value) {
+      if (value) this.refreshPendingRegistrationSummary()
+    },
+    canManageUsers: {
+      immediate: true,
+      handler(value) {
+        if (value) {
+          this.refreshPendingRegistrationSummary()
+        } else {
+          this.adminStore.setPendingRegistrationAlertCount(0)
+        }
+      }
     }
   },
   methods: {
@@ -218,6 +276,17 @@ export default {
     openAdmin() {
       this.closeMenu()
       this.$router.push('/admin').catch(() => {})
+    },
+    openPendingRegistrations() {
+      this.closeMenu()
+      this.$router.push({
+        path: '/admin',
+        query: { ...this.$route.query, tab: 'registration' }
+      }).catch(() => {})
+    },
+    async refreshPendingRegistrationSummary() {
+      if (!this.canManageUsers) return
+      await this.adminStore.refreshPendingRegistrationSummary().catch(() => {})
     },
     async setQuickStatus(status) {
       if (!status || this.pendingStatus || this.user?.status === status) {
@@ -342,6 +411,15 @@ export default {
 
 .user-menu-action.danger:hover {
   color: var(--theme-error);
+}
+
+.registration-alert-action {
+  color: var(--theme-error);
+  font-weight: 700;
+}
+
+.registration-alert-action:hover {
+  background: color-mix(in srgb, var(--theme-error) 12%, transparent);
 }
 
 .user-menu-check {

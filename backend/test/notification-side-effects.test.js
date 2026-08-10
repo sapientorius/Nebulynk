@@ -310,3 +310,47 @@ test('notification side effects dispatcher deep-links message notifications and 
   assert.equal(pushed[0].payload.title, 'Erinnerung')
   assert.equal(pushed[0].payload.url, '/channels/channel-visible?message=message-1')
 })
+
+test('notification side effects dispatcher routes registration alerts to registration settings', async () => {
+  const pushed = []
+  const app = {
+    get(key) {
+      if (key !== 'postgresqlClient') throw new Error(`Unexpected app.get(${key})`)
+      return createUsersDb([
+        { id: 'user-1', status: 'online', preferred_locale: 'en' }
+      ])
+    },
+    service() {
+      return { emit() {} }
+    }
+  }
+
+  const dispatcher = createNotificationSideEffectsDispatcher(app, {
+    sendPush: async (_app, userId, payload) => {
+      pushed.push({ userId, payload })
+    },
+    hasVisibleSession: () => false,
+    schedule(task) {
+      task()
+    }
+  })
+
+  dispatcher.enqueue([{
+    id: 'notification-registration-1',
+    user_id: 'user-1',
+    type: 'registration_pending',
+    actor_display_name: 'New Member',
+    message_snippet: 'New Member has registered and is awaiting approval.'
+  }])
+
+  await dispatcher.flush()
+
+  assert.deepEqual(pushed, [{
+    userId: 'user-1',
+    payload: {
+      title: 'Registration awaiting approval',
+      body: 'New Member has registered and is awaiting approval.',
+      url: '/admin?tab=registration'
+    }
+  }])
+})

@@ -40,6 +40,7 @@ import { videoBackgrounds } from './video-backgrounds/video-backgrounds.js'
 import { selfRegistration } from './self-registration/self-registration.js'
 import { registrationSettings } from './registration-settings/registration-settings.js'
 import { pendingRegistrations } from './pending-registrations/pending-registrations.js'
+import { pendingRegistrationSummary } from './pending-registration-summary/pending-registration-summary.js'
 import { securitySettings } from './security-settings/security-settings.js'
 
 export const services = (app) => {
@@ -85,5 +86,6 @@ export const services = (app) => {
   app.configure(selfRegistration)
   app.configure(registrationSettings)
   app.configure(pendingRegistrations)
+  app.configure(pendingRegistrationSummary)
   app.configure(securitySettings)
 }

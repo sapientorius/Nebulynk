@@ -40,4 +40,15 @@ describe('user account menu helpers', () => {
     expect(source).toContain('data-testid="user-menu-open-admin"')
     expect(source).toContain('data-testid="user-menu-open-status-picker"')
   })
+
+  it('shows a managed-registration badge and direct registration-settings action for user managers', () => {
+    const source = readFileSync(resolve('src/components/UserAccountMenu.vue'), 'utf8')
+
+    expect(source).toContain('pendingRegistrationAlertCount')
+    expect(source).toContain('canManageUsers && pendingRegistrationAlertCount > 0')
+    expect(source).toContain('data-testid="user-menu-open-pending-registrations"')
+    expect(source).toContain("tab: 'registration'")
+    expect(source).toContain('selfRegistrationAdmin.pendingMenuOne')
+    expect(source).toContain('selfRegistrationAdmin.pendingMenuMany')
+  })
 })
