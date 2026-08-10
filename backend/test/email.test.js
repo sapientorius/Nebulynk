@@ -4,11 +4,14 @@ import {
   appendInviteEmailStatus
 } from '../src/services/invites/invites.js'
 import {
+  getEmailDeliveryStatus,
   parseSmtpBoolean,
   resolveEnvSmtpConfig,
+  sendAccountActivatedEmail,
   sendInviteEmail,
-  sendPlatformSecurityUpdateEmail,
-  sendPasswordResetEmail
+  sendPasswordResetEmail,
+  sendRegistrationConfirmationEmail,
+  sendPlatformSecurityUpdateEmail
 } from '../src/email.js'
 import { createMemoryDb } from './helpers/memory-db.js'
 
@@ -94,6 +97,76 @@ test('email helpers parse SMTP booleans and compatibility aliases', () => {
   })
 
   assert.equal(inferredSecure.secure, true)
+})
+
+test('admin-managed disabled SMTP blocks env fallback for all delivery helpers', async () => {
+  let sendMailCalls = 0
+  const { app } = createApp({
+    seed: {
+      smtp_settings: [{
+        id: 'default',
+        admin_managed: true,
+        enabled: false,
+        host: 'smtp.admin.test',
+        port: 587,
+        secure: false,
+        ignore_tls: false,
+        user: 'admin-user',
+        from_email: 'noreply@admin.test',
+        from_name: null
+      }]
+    },
+    transportFactory: () => ({
+      async sendMail() {
+        sendMailCalls += 1
+        return { accepted: ['recipient@example.test'], rejected: [] }
+      }
+    })
+  })
+
+  await withEnv({
+    SMTP_HOST: 'smtp.env.test',
+    SMTP_PORT: '587',
+    SMTP_USER: 'env-user',
+    SMTP_PASS: 'env-pass',
+    SMTP_FROM: 'noreply@env.test'
+  }, async () => {
+    assert.deepEqual(await getEmailDeliveryStatus(app), {
+      configured: false,
+      source: null
+    })
+
+    const results = await Promise.all([
+      sendInviteEmail(app, {
+        email: 'invitee@example.test',
+        token: 'invite-token',
+        inviterName: 'Admin',
+        platformName: 'Nebulynk',
+        message: null,
+        locale: 'en'
+      }),
+      sendPasswordResetEmail(app, {
+        email: 'user@example.test',
+        token: 'reset-token',
+        locale: 'en'
+      }),
+      sendRegistrationConfirmationEmail(app, {
+        email: 'registrant@example.test',
+        token: 'registration-token',
+        locale: 'en'
+      }),
+      sendAccountActivatedEmail(app, {
+        email: 'activated@example.test',
+        locale: 'en'
+      })
+    ])
+
+    for (const result of results) {
+      assert.equal(result.ok, false)
+      assert.equal(result.errorCode, 'api.smtp.not_configured')
+    }
+    assert.equal(sendMailCalls, 0)
+  })
 })
 
 test('sendInviteEmail reports failure when SMTP accepts no recipients', async () => {

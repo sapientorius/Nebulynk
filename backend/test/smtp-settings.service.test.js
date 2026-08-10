@@ -128,7 +128,24 @@ test('smtp-settings patch stores encrypted password and exposes sanitized admin 
   })
 })
 
-test('smtp-settings find keeps an incomplete admin draft but reports env as effective fallback', async () => {
+test('smtp-settings uses env fallback until admin settings are saved', async () => {
+  const { app } = createHarness()
+
+  await withEnv({
+    SMTP_HOST: 'smtp.env.test',
+    SMTP_PORT: '587',
+    SMTP_USER: 'env-user',
+    SMTP_PASS: 'env-pass',
+    SMTP_FROM: 'noreply@env.test'
+  }, async () => {
+    const result = await app.service('smtp-settings').find(adminParams())
+
+    assert.equal(result.configured, true)
+    assert.equal(result.effective_source, 'env')
+  })
+})
+
+test('smtp-settings blocks env fallback for an incomplete admin draft', async () => {
   const { app } = createHarness()
 
   await withEnv({
@@ -160,9 +177,38 @@ test('smtp-settings find keeps an incomplete admin draft but reports env as effe
       from_email: 'noreply@admin.test',
       from_name: '',
       has_password: false,
-      configured: true,
-      effective_source: 'env'
+      configured: false,
+      effective_source: null
     })
+  })
+})
+
+test('smtp-settings blocks env fallback when an admin disables SMTP', async () => {
+  const { app } = createHarness()
+
+  await withEnv({
+    SMTP_HOST: 'smtp.env.test',
+    SMTP_PORT: '587',
+    SMTP_USER: 'env-user',
+    SMTP_PASS: 'env-pass',
+    SMTP_FROM: 'noreply@env.test'
+  }, async () => {
+    await app.service('smtp-settings').patch(null, {
+      enabled: true,
+      host: 'smtp.admin.test',
+      port: 587,
+      secure: false,
+      ignore_tls: false,
+      user: 'admin-user',
+      password: 'admin-pass',
+      from_email: 'noreply@admin.test'
+    }, adminParams())
+    await app.service('smtp-settings').patch(null, { enabled: false }, adminParams())
+
+    const result = await app.service('smtp-settings').find(adminParams())
+
+    assert.equal(result.configured, false)
+    assert.equal(result.effective_source, null)
   })
 })
 

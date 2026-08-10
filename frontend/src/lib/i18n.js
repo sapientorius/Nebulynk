@@ -161,7 +161,7 @@ const baseMessages = {
         emailTitle: 'Check your email',
         emailDescription: 'We sent you a confirmation link. Open it to finish your registration.',
         manualTitle: 'Registration received',
-        manualDescription: 'An administrator must confirm your account before you can sign in.'
+        manualDescription: 'An administrator will review and activate your account before you can sign in.'
       },
       confirmation: {
         loading: 'Confirming your account...',
@@ -995,7 +995,7 @@ const baseMessages = {
         emailTitle: 'Pruefe deine E-Mails',
         emailDescription: 'Wir haben dir einen Bestaetigungslink gesendet. Oeffne ihn, um die Registrierung abzuschliessen.',
         manualTitle: 'Anmeldung eingegangen',
-        manualDescription: 'Ein Administrator muss dein Konto bestaetigen, bevor du dich anmelden kannst.'
+        manualDescription: 'Ein Administrator prueft und schaltet dein Konto frei. Du kannst dich anmelden, sobald es aktiviert wurde.'
       },
       confirmation: {
         loading: 'Dein Konto wird bestaetigt...',

@@ -164,6 +164,10 @@ function hasStoredSmtpDraft(config) {
   )
 }
 
+function hasStoredSmtpAdminControl(config) {
+  return config?.admin_managed === true || hasStoredSmtpDraft(config)
+}
+
 export async function getStoredSmtpConfig(app) {
   const db = app?.get?.('postgresqlClient')
   if (!db) return null
@@ -176,6 +180,7 @@ export async function getStoredSmtpConfig(app) {
   }
 
   return {
+    admin_managed: row?.admin_managed === true,
     enabled: row?.enabled === true,
     host: normalizeNullableString(row?.host),
     port: normalizePort(row?.port),
@@ -207,8 +212,8 @@ function sanitizeSmtpConfig(config, { configured = false, effectiveSource = null
 
 export async function resolveEffectiveSmtpConfig(app) {
   const stored = await getStoredSmtpConfig(app)
-  if (stored?.enabled && isSmtpConfigComplete(stored)) {
-    return stored
+  if (stored && hasStoredSmtpAdminControl(stored)) {
+    return isSmtpConfigComplete(stored) ? stored : null
   }
 
   const envConfig = resolveEnvSmtpConfig()
@@ -232,7 +237,7 @@ export async function buildSmtpSettingsResponse(app) {
   const envConfig = resolveEnvSmtpConfig()
   const effectiveConfig = await resolveEffectiveSmtpConfig(app)
 
-  if (storedConfig && hasStoredSmtpDraft(storedConfig)) {
+  if (storedConfig && hasStoredSmtpAdminControl(storedConfig)) {
     return sanitizeSmtpConfig(storedConfig, {
       configured: !!effectiveConfig,
       effectiveSource: effectiveConfig?.source || null,

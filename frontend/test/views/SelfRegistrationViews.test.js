@@ -19,12 +19,14 @@ describe('self-registration views', () => {
   it('shows password guidance and handles SMTP-less registration states', () => {
     const registration = source('src/views/RegisterView.vue')
     const setup = source('src/views/SetupView.vue')
+    const i18n = source('src/lib/i18n.js')
 
     expect(registration).toContain('data-testid="self-registration-view"')
     expect(registration).toContain('passwordPolicyHint')
     expect(registration).toContain('isPasswordValidForPolicy(this.form.password, this.passwordPolicy)')
     expect(registration).toContain("success.confirmation_delivery === 'email'")
     expect(registration).toContain("$t('selfRegistration.success.manualDescription')")
+    expect(i18n).toContain('Ein Administrator prueft und schaltet dein Konto frei.')
     expect(setup).toContain('setup-password-policy')
     expect(setup).toContain('isPasswordValidForPolicy(this.form.password, this.passwordPolicy)')
   })

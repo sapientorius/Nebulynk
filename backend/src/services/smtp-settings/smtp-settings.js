@@ -39,6 +39,7 @@ export class SmtpSettingsService {
       const settingsRow = await trx('smtp_settings').where('id', DEFAULT_SMTP_SETTINGS_ID).first()
       const nextRow = {
         id: DEFAULT_SMTP_SETTINGS_ID,
+        admin_managed: true,
         enabled: Object.prototype.hasOwnProperty.call(patch, 'enabled')
           ? patch.enabled
           : (settingsRow?.enabled ?? false),
