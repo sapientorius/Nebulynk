@@ -8,7 +8,7 @@ vi.mock('socket.io-client', () => ({
 
 function createSocketHarness() {
   const handlers = new Map()
-  let authCallback = null
+  const authAttempts = []
 
   const socket = {
     connected: false,
@@ -18,7 +18,7 @@ function createSocketHarness() {
     }),
     emit: vi.fn((eventName, serviceName, payload, callback) => {
       if (eventName === 'create' && serviceName === 'authentication') {
-        authCallback = callback
+        authAttempts.push({ payload, callback })
       }
     }),
     connect: vi.fn(() => {
@@ -40,8 +40,14 @@ function createSocketHarness() {
       socket.connected = false
       handlers.get('disconnect')?.(reason)
     },
-    failAuthentication(error = new Error('jwt expired')) {
-      authCallback?.(error)
+    getAuthAttempt(index = authAttempts.length - 1) {
+      return authAttempts[index]
+    },
+    failAuthentication(index = authAttempts.length - 1, error = new Error('jwt expired')) {
+      authAttempts[index]?.callback?.(error)
+    },
+    succeedAuthentication(index = authAttempts.length - 1, result = { accessToken: 'accepted-token' }) {
+      authAttempts[index]?.callback?.(null, result)
     }
   }
 }
@@ -87,6 +93,53 @@ describe('createSocketClient', () => {
     expect(harness.socket.disconnect).toHaveBeenCalledTimes(1)
     expect(harness.socket.connect).toHaveBeenCalledTimes(1)
     expect(harness.socket.auth).toEqual({ token: 'rotated-token' })
+
+    harness.triggerConnect()
+    expect(harness.getAuthAttempt(1).payload).toEqual({
+      strategy: 'jwt',
+      accessToken: 'rotated-token'
+    })
+    harness.succeedAuthentication(1)
+    expect(apiClient.restoreBrowserSession).toHaveBeenCalledTimes(1)
+
+    client.destroy()
+  })
+
+  it('ignores a late failure for a token that has already been rotated', async () => {
+    const harness = createSocketHarness()
+    socketIoMock.mockReturnValue(harness.socket)
+
+    let accessToken = 'revoked-token'
+    let authStateListener = null
+    const apiClient = {
+      getStoredAccessToken: vi.fn(() => accessToken),
+      getBaseUrl: vi.fn(() => 'https://chat.example.com/api'),
+      subscribeToAuthState: vi.fn((listener) => {
+        authStateListener = listener
+        return () => {
+          authStateListener = null
+        }
+      }),
+      restoreBrowserSession: vi.fn()
+    }
+
+    const { createSocketClient } = await import('../../src/lib/socket-client.js')
+    const client = createSocketClient({ apiClient })
+
+    client.connectSocket()
+    harness.triggerConnect()
+    expect(harness.getAuthAttempt(0).payload.accessToken).toBe('revoked-token')
+
+    accessToken = 'rotated-token'
+    authStateListener?.({ accessToken })
+    harness.triggerConnect()
+    harness.succeedAuthentication(1)
+    harness.failAuthentication(0)
+    await Promise.resolve()
+
+    expect(apiClient.restoreBrowserSession).not.toHaveBeenCalled()
+    expect(harness.socket.__nebulynkAuthReady).toBe(true)
+    expect(harness.getAuthAttempt(1).payload.accessToken).toBe('rotated-token')
 
     client.destroy()
   })

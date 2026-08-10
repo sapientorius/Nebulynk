@@ -4,6 +4,7 @@ import { createServer } from 'node:http'
 import { feathers } from '@feathersjs/feathers'
 import { koa, bodyParser } from '@feathersjs/koa'
 import { configureAuthSessionRoutes } from '../src/routes/auth-session.js'
+import { assertAccessTokenVersion } from '../src/lib/auth-token-version.js'
 import { logger } from '../src/logger.js'
 
 function createQueryBuilder(rows, options = {}) {
@@ -116,15 +117,20 @@ async function createHarness({ nodeEnv = 'development', dbOptions = {} } = {}) {
   app.set('authentication', {
     browserJwtOptions: { expiresIn: '15m' }
   })
+  const issuedAccessTokenPayloads = []
   const services = {
     authentication: {
       async verifyAccessToken(token) {
         if (token === 'valid-access-token' || token === 'browser-access-token') {
           return { sub: 'user-1' }
         }
+        if (token === 'reactivated-access-token') {
+          return { sub: 'user-1', auth_version: 3 }
+        }
         throw new Error('Invalid token')
       },
-      async createAccessToken(_payload, options = {}) {
+      async createAccessToken(payload, options = {}) {
+        issuedAccessTokenPayloads.push({ payload, options })
         const ttl = options.expiresIn || 'default'
         return ttl === '15m'
           ? 'browser-refreshed-access-token'
@@ -144,6 +150,7 @@ async function createHarness({ nodeEnv = 'development', dbOptions = {} } = {}) {
 
   return {
     db,
+    issuedAccessTokenPayloads,
     baseUrl: `http://127.0.0.1:${address.port}`,
     async close() {
       process.env.NODE_ENV = previousNodeEnv
@@ -636,6 +643,45 @@ test('auth session bootstrap logs unexpected failures before returning the gener
     assert.match(loggerCalls[0].meta.error, /insert failed unexpectedly/)
   } finally {
     logger.error = originalLoggerError
+    await harness.close()
+  }
+})
+
+test('refresh issues a token for the current auth version after account reactivation', async () => {
+  const harness = await createHarness()
+  harness.db._state.users[0].auth_version = 3
+
+  try {
+    const bootstrapResponse = await fetch(`${harness.baseUrl}/auth/session/bootstrap`, {
+      method: 'POST',
+      headers: {
+        Authorization: 'Bearer reactivated-access-token',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        transport: 'body',
+        remember: false
+      })
+    })
+    const bootstrapPayload = await bootstrapResponse.json()
+
+    const refreshResponse = await fetch(`${harness.baseUrl}/auth/session/refresh`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        refreshToken: bootstrapPayload.refreshToken
+      })
+    })
+
+    assert.equal(refreshResponse.status, 200)
+    assert.deepEqual(harness.issuedAccessTokenPayloads.at(-1)?.payload, { auth_version: 3 })
+    assert.throws(
+      () => assertAccessTokenVersion({ auth_version: 1 }, harness.db._state.users[0]),
+      (error) => error.name === 'NotAuthenticated'
+    )
+  } finally {
     await harness.close()
   }
 })

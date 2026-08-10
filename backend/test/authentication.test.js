@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
   assertActiveLocalAuthenticationResult,
+  assertCurrentAccessTokenVersion,
   resolveBrowserJwtOptions,
   resolveRememberJwtOptions
 } from '../src/authentication.js'
@@ -64,6 +65,81 @@ test('access tokens are bound to the current user auth version', () => {
   assert.throws(
     () => assertAccessTokenVersion({ auth_version: 2 }, { auth_version: 3 }),
     (error) => error.name === 'NotAuthenticated'
+  )
+})
+
+function createAuthVersionApp(currentUser) {
+  const calls = []
+  const db = (table) => ({
+    select(...columns) {
+      calls.push({ operation: 'select', table, columns })
+      return this
+    },
+    where(column, value) {
+      calls.push({ operation: 'where', column, value })
+      return this
+    },
+    async first() {
+      return currentUser ? { ...currentUser } : undefined
+    }
+  })
+
+  return {
+    app: {
+      get(key) {
+        return key === 'postgresqlClient' ? db : null
+      }
+    },
+    calls
+  }
+}
+
+test('jwt validation uses the internal auth version when the external user is protected', async () => {
+  const protectedUser = { id: 'reactivated-user', display_name: 'Reactivated User' }
+  const { app, calls } = createAuthVersionApp({
+    id: protectedUser.id,
+    auth_version: 5
+  })
+
+  await assert.doesNotReject(
+    assertCurrentAccessTokenVersion(
+      app,
+      { sub: protectedUser.id, auth_version: 5 },
+      protectedUser
+    )
+  )
+
+  assert.equal(Object.hasOwn(protectedUser, 'auth_version'), false)
+  assert.deepEqual(calls, [
+    { operation: 'select', table: 'users', columns: ['id', 'auth_version'] },
+    { operation: 'where', column: 'id', value: protectedUser.id }
+  ])
+})
+
+test('jwt validation still rejects stale tokens and missing internal users', async () => {
+  const protectedUser = { id: 'reactivated-user' }
+  const currentUserHarness = createAuthVersionApp({
+    id: protectedUser.id,
+    auth_version: 5
+  })
+
+  await assert.rejects(
+    assertCurrentAccessTokenVersion(
+      currentUserHarness.app,
+      { sub: protectedUser.id, auth_version: 4 },
+      protectedUser
+    ),
+    (error) => error.name === 'NotAuthenticated'
+  )
+
+  const missingUserHarness = createAuthVersionApp(null)
+  await assert.rejects(
+    assertCurrentAccessTokenVersion(
+      missingUserHarness.app,
+      { sub: protectedUser.id, auth_version: 5 },
+      protectedUser
+    ),
+    (error) => error.name === 'NotAuthenticated' && error.message === 'User not found'
   )
 })
 

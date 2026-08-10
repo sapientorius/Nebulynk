@@ -42,7 +42,17 @@ export function createSocketClient(options = {}) {
     socket.__nebulynkIntentionalDisconnect = true
   }
 
-  async function attemptAuthRecovery(reason) {
+  function isCurrentSocketAuthAttempt(candidateSocket, accessToken) {
+    return socket === candidateSocket
+      && candidateSocket?.__nebulynkAccessToken === accessToken
+      && getToken() === accessToken
+  }
+
+  async function attemptAuthRecovery(reason, { candidateSocket = null, accessToken = null } = {}) {
+    if (candidateSocket && !isCurrentSocketAuthAttempt(candidateSocket, accessToken)) {
+      return null
+    }
+
     if (authRecoveryRequest) {
       return authRecoveryRequest
     }
@@ -69,50 +79,66 @@ export function createSocketClient(options = {}) {
     const token = getToken()
     if (!token) return null
 
-    socket = io(getBackendUrl(), {
+    const connectedSocket = io(getBackendUrl(), {
       auth: { token }
     })
-    socket.__nebulynkAccessToken = token
-    socket.__nebulynkAuthReady = false
-    socket.__nebulynkIntentionalDisconnect = false
+    socket = connectedSocket
+    connectedSocket.__nebulynkAccessToken = token
+    connectedSocket.__nebulynkAuthReady = false
+    connectedSocket.__nebulynkIntentionalDisconnect = false
 
-    socket.on('connect', () => {
+    connectedSocket.on('connect', () => {
+      if (socket !== connectedSocket) return
+
       const currentToken = getToken()
       if (!currentToken) return
-      socket.__nebulynkIntentionalDisconnect = false
-      socket.__nebulynkAccessToken = currentToken
-      socket.auth = { token: currentToken }
+      connectedSocket.__nebulynkIntentionalDisconnect = false
+      connectedSocket.__nebulynkAccessToken = currentToken
+      connectedSocket.auth = { token: currentToken }
 
-      socket.emit('create', 'authentication', {
+      connectedSocket.emit('create', 'authentication', {
         strategy: 'jwt',
         accessToken: currentToken
       }, (error, result) => {
-        if (error) {
-          console.error('Socket auth failed:', error)
-          socket.__nebulynkAuthReady = false
-          attemptAuthRecovery('auth_failed').catch(() => {})
+        if (!isCurrentSocketAuthAttempt(connectedSocket, currentToken)) {
           return
         }
 
-        socket.__nebulynkAuthReady = true
-        notifyAuthenticatedListeners(socket, result)
+        if (error) {
+          console.error('Socket auth failed:', error)
+          connectedSocket.__nebulynkAuthReady = false
+          attemptAuthRecovery('auth_failed', {
+            candidateSocket: connectedSocket,
+            accessToken: currentToken
+          }).catch(() => {})
+          return
+        }
+
+        connectedSocket.__nebulynkAuthReady = true
+        notifyAuthenticatedListeners(connectedSocket, result)
       })
     })
 
-    socket.on('disconnect', (reason) => {
-      const shouldAttemptRecovery = socket.__nebulynkIntentionalDisconnect !== true
-        && reason === 'io server disconnect'
-        && !!getToken()
+    connectedSocket.on('disconnect', (reason) => {
+      if (socket !== connectedSocket) return
 
-      socket.__nebulynkIntentionalDisconnect = false
-      socket.__nebulynkAuthReady = false
+      const accessToken = connectedSocket.__nebulynkAccessToken
+      const shouldAttemptRecovery = connectedSocket.__nebulynkIntentionalDisconnect !== true
+        && reason === 'io server disconnect'
+        && isCurrentSocketAuthAttempt(connectedSocket, accessToken)
+
+      connectedSocket.__nebulynkIntentionalDisconnect = false
+      connectedSocket.__nebulynkAuthReady = false
 
       if (shouldAttemptRecovery) {
-        attemptAuthRecovery(reason).catch(() => {})
+        attemptAuthRecovery(reason, {
+          candidateSocket: connectedSocket,
+          accessToken
+        }).catch(() => {})
       }
     })
 
-    return socket
+    return connectedSocket
   }
 
   function getSocket() {

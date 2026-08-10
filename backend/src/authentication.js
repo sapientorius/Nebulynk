@@ -1,11 +1,35 @@
 import { AuthenticationService, JWTStrategy } from '@feathersjs/authentication'
 import { LocalStrategy } from '@feathersjs/authentication-local'
+import { NotAuthenticated } from '@feathersjs/errors'
 import {
   clearAuthenticationRateLimitHook,
   createAuthenticationRateLimitHook
 } from './hooks/rate-limit.js'
 import { assertUserAccountActive } from './lib/account-state.js'
 import { assertAccessTokenVersion, buildAuthTokenPayload } from './lib/auth-token-version.js'
+
+export async function assertCurrentAccessTokenVersion(app, payload, user) {
+  const userId = typeof payload?.sub === 'string' && payload.sub
+    ? payload.sub
+    : user?.id
+  const db = app?.get?.('postgresqlClient')
+
+  if (!db || !userId) {
+    assertAccessTokenVersion(payload, user)
+    return
+  }
+
+  const currentUser = await db('users')
+    .select('id', 'auth_version')
+    .where('id', userId)
+    .first()
+
+  if (!currentUser) {
+    throw new NotAuthenticated('User not found')
+  }
+
+  assertAccessTokenVersion(payload, currentUser)
+}
 
 export function resolveRememberJwtOptions(data, configuration) {
   const rememberRequested = data?.strategy === 'local' && data?.remember === true
@@ -68,7 +92,11 @@ class NebulynkAuthenticationService extends AuthenticationService {
 class NebulynkJwtStrategy extends JWTStrategy {
   async authenticate(authentication, params) {
     const result = await super.authenticate(authentication, params)
-    assertAccessTokenVersion(result.authentication?.payload, result.user)
+    await assertCurrentAccessTokenVersion(
+      this.app,
+      result.authentication?.payload,
+      result.user
+    )
     return result
   }
 }
