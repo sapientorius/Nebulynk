@@ -274,12 +274,18 @@ function createChannelsHarness(dbOptions) {
   channels(app)
   const service = app.service('channels')
   const findCalls = []
+  const getCalls = []
   const patchCalls = []
   const removeCalls = []
 
   service._find = async (params) => {
     findCalls.push(params)
     return []
+  }
+
+  service._get = async (id, params) => {
+    getCalls.push({ id, ...params })
+    return { id }
   }
 
   service._patch = async (id, patchData, params) => {
@@ -304,6 +310,7 @@ function createChannelsHarness(dbOptions) {
   return {
     service,
     findCalls,
+    getCalls,
     patchCalls,
     removeCalls
   }
@@ -609,6 +616,35 @@ test('channels.find hook-chain: include_archived stays enabled with manage_chann
   assert.equal(findCalls.length, 1)
   assert.equal(findCalls[0].query.include_archived, true)
   assert.deepEqual(findCalls[0]._accessibleChannelIds, ['private-3'])
+})
+
+test('channels.get hook-chain: member access scopes targeted channel reads', async () => {
+  const { service, getCalls } = createChannelsHarness({
+    membershipsByUser: {
+      'user-1': ['private-1', 'private-2']
+    }
+  })
+
+  await service.get('private-1', externalParams())
+
+  assert.equal(getCalls.length, 1)
+  assert.equal(getCalls[0].id, 'private-1')
+  assert.deepEqual(getCalls[0]._accessibleChannelIds, ['private-1', 'private-2'])
+  assert.equal(getCalls[0]._includeArchived, true)
+  assert.equal(getCalls[0]._includeMeeting, true)
+})
+
+test('channels.get hook-chain: non-members retain an empty access scope', async () => {
+  const { service, getCalls } = createChannelsHarness({
+    membershipsByUser: {
+      'user-1': []
+    }
+  })
+
+  await service.get('private-1', externalParams())
+
+  assert.equal(getCalls.length, 1)
+  assert.deepEqual(getCalls[0]._accessibleChannelIds, [])
 })
 
 test('channels.patch hook-chain: patching channels requires manage_channels', async () => {

@@ -134,6 +134,13 @@ export const channels = (app) => {
       ],
       get: [
         async (context) => {
+          const access = await domainService.resolveFindAccess({
+            provider: context.params.provider,
+            user: context.params.user,
+            query: context.params.query || {}
+          })
+
+          context.params._accessibleChannelIds = access.accessibleChannelIds
           context.params._includeArchived = true
           context.params._includeMeeting = true
           return context
