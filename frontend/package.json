@@ -32,7 +32,7 @@
     "@tauri-apps/api": "^2.0.0",
     "@vicons/ionicons5": "^0.13.0",
     "axios": "^1.13.5",
-    "dompurify": "^3.3.3",
+    "dompurify": "^3.4.13",
     "livekit-client": "^2.17.2",
     "markdown-it": "^15.0.0",
     "markdown-it-task-lists": "^2.1.1",
