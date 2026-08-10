@@ -52,6 +52,7 @@ const signalDesktopWorkspaceLogoutMock = vi.hoisted(() => vi.fn(async () => {}))
 
 const channelsStoreMock = vi.hoisted(() => ({
   activeChannelId: null,
+  channels: [],
   hasChannel: vi.fn(() => false),
   refresh: vi.fn(),
   refreshChannel: vi.fn(),
@@ -231,6 +232,7 @@ function resetMocks() {
   syncDesktopWorkspaceSessionMock.mockReset()
   signalDesktopWorkspaceLogoutMock.mockReset()
   channelsStoreMock.activeChannelId = null
+  channelsStoreMock.channels = []
   channelsStoreMock.hasChannel.mockReset()
   channelsStoreMock.hasChannel.mockReturnValue(false)
   channelsStoreMock.refresh.mockReset()
@@ -1187,6 +1189,21 @@ describe('session store api actions', () => {
     expect(channelsStoreMock.refreshChannel).toHaveBeenCalledWith('channel-1')
     expect(dmsStoreMock.refreshChannel).not.toHaveBeenCalled()
     expect(messagesStoreMock.syncActiveTimelineFromLatest).toHaveBeenCalledTimes(1)
+  })
+
+  it('syncForegroundResumeState skips metadata refresh for archived meeting history', async () => {
+    const store = useSessionStore()
+    channelsStoreMock.activeChannelId = 'meeting-channel-1'
+    channelsStoreMock.channels = [{
+      id: 'meeting-channel-1',
+      purpose: 'meeting',
+      is_archived: true
+    }]
+    channelsStoreMock.hasChannel.mockReturnValue(true)
+
+    await store.syncForegroundResumeState()
+
+    expect(channelsStoreMock.refreshChannel).not.toHaveBeenCalled()
   })
 
   it('syncForegroundResumeState refreshes active DM metadata without forcing timeline catch-up', async () => {

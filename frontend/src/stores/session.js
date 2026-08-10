@@ -323,6 +323,8 @@ export const useSessionStore = defineStore('session', () => {
     const notificationsStore = useNotificationsStore()
 
     const activeChannelId = channelsStore.activeChannelId
+    const activeChannel = channelsStore.channels?.find?.((channel) => channel.id === activeChannelId) || null
+    const isHistoricalMeetingChannel = activeChannel?.purpose === 'meeting' && !!activeChannel?.is_archived
     const forceUnreadCountsRefresh = reason === 'socket-authenticated'
     const forceDmRefresh = reason === 'socket-authenticated'
     const safeTask = (task) => Promise.resolve()
@@ -341,7 +343,7 @@ export const useSessionStore = defineStore('session', () => {
       activeChannelId
         ? dmsStore.hasDmChannel?.(activeChannelId)
           ? safeTask(() => dmsStore.refreshChannel(activeChannelId))
-          : channelsStore.hasChannel?.(activeChannelId)
+          : channelsStore.hasChannel?.(activeChannelId) && !isHistoricalMeetingChannel
             ? safeTask(() => channelsStore.refreshChannel(activeChannelId))
             : Promise.resolve()
         : Promise.resolve()

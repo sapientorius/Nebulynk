@@ -33,6 +33,10 @@ function isMeetingChannel(channel) {
   return channel?.purpose === 'meeting'
 }
 
+function isHistoricalMeetingChannel(channel) {
+  return isMeetingChannel(channel) && !!channel?.is_archived
+}
+
 function isArchivedStandardChannel(channel) {
   return !isMeetingChannel(channel) && !!channel?.is_archived
 }
@@ -287,6 +291,8 @@ export const useChannelsStore = defineStore('channels', () => {
     if (!channelId) return null
 
     const { removeOnMissing = true } = options
+    const existingChannel = channels.value.find((channel) => channel.id === channelId)
+      || archivedChannels.value.find((channel) => channel.id === channelId)
 
     try {
       const { data } = await api.get(`/channels/${channelId}`)
@@ -294,6 +300,9 @@ export const useChannelsStore = defineStore('channels', () => {
     } catch (error) {
       const status = error?.response?.status
       if (removeOnMissing && (status === 403 || status === 404)) {
+        if (isHistoricalMeetingChannel(existingChannel)) {
+          return existingChannel
+        }
         removeChannel(channelId)
         return null
       }
@@ -414,7 +423,9 @@ export const useChannelsStore = defineStore('channels', () => {
     clearUnread(channelId)
 
     await messagesStore.loadLatest()
-    await refreshMembers(channelId)
+    if (!isHistoricalMeetingChannel(selectedChannel)) {
+      await refreshMembers(channelId)
+    }
     if (activeChannelId.value !== channelId) return
 
     await messagesStore.loadPins(channelId)

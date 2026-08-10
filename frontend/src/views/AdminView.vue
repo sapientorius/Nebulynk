@@ -43,6 +43,7 @@
         <DesignSettings v-if="activeTab === 'design'" />
         <SmtpSettings v-if="activeTab === 'smtp'" />
         <AiSettings v-if="activeTab === 'ai'" />
+        <MeetingSettings v-if="activeTab === 'meetings'" />
         <UpdateCenter v-if="activeTab === 'updates'" />
       </main>
     </div>
@@ -80,13 +81,14 @@ const SecuritySettings = defineAsyncComponent(() => import('../components/admin/
 const DesignSettings = defineAsyncComponent(() => import('../components/admin/DesignSettings.vue'))
 const SmtpSettings = defineAsyncComponent(() => import('../components/admin/SmtpSettings.vue'))
 const AiSettings = defineAsyncComponent(() => import('../components/admin/AiSettings.vue'))
+const MeetingSettings = defineAsyncComponent(() => import('../components/admin/MeetingSettings.vue'))
 const UpdateCenter = defineAsyncComponent(() => import('../components/admin/UpdateCenter.vue'))
 const SPONSORSHIP_URL = 'https://nebulynk.net/sponsorship'
 const SPONSORSHIP_MENU_KEY = 'sponsorship'
 
 export default {
   name: 'AdminView',
-  components: { RoleManager, UserRoleManager, InviteManager, PlatformSettings, RegistrationSettings, SecuritySettings, DesignSettings, SmtpSettings, AiSettings, UpdateCenter, MenuIcon },
+  components: { RoleManager, UserRoleManager, InviteManager, PlatformSettings, RegistrationSettings, SecuritySettings, DesignSettings, SmtpSettings, AiSettings, MeetingSettings, UpdateCenter, MenuIcon },
   data() {
     return {
       activeTab: 'roles',
@@ -134,6 +136,7 @@ export default {
         options.push({ label: this.$t('ui.components.admin.design_settings'), key: 'design' })
         options.push({ label: this.$t('ui.components.admin.smtp_settings'), key: 'smtp' })
         options.push({ label: this.$t('ui.components.admin.ai_settings'), key: 'ai' })
+        options.push({ label: this.$t('ui.views.meetings'), key: 'meetings' })
       }
       if (this.sessionStore.user?.is_admin === true) {
         const count = this.updatesStore.unacknowledgedCount

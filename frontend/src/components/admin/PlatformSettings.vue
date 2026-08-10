@@ -14,13 +14,6 @@
               :options="languageOptions"
             />
           </n-form-item>
-          <n-form-item :label="$t('ui.components.admin.default_meeting_language')">
-            <n-select
-              data-testid="platform-default-meeting-language"
-              v-model:value="defaultMeetingLanguage"
-              :options="meetingLanguageOptions"
-            />
-          </n-form-item>
           <n-form-item :label="$t('ui.components.admin.auto_away_timeout_minutes')">
             <div class="platform-settings-field">
               <n-input-number
@@ -31,17 +24,6 @@
                 style="width: 180px"
               />
               <span class="platform-settings-hint">{{ $t('ui.components.admin.auto_away_timeout_help') }}</span>
-            </div>
-          </n-form-item>
-          <n-divider />
-          <h4 class="platform-settings-subtitle">{{ $t('ui.components.admin.call_settings') }}</h4>
-          <n-form-item :label="$t('ui.components.admin.meeting_video_enabled')">
-            <div class="platform-settings-field">
-              <n-switch
-                v-model:value="meetingVideoEnabled"
-                data-testid="platform-meeting-video-enabled"
-              />
-              <span class="platform-settings-hint">{{ $t('ui.components.admin.meeting_video_enabled_help') }}</span>
             </div>
           </n-form-item>
           <n-divider />
@@ -83,12 +65,6 @@
                 style="width: 180px"
               />
               <span class="platform-settings-hint">{{ $t('ui.components.admin.image_upload_quality_help') }}</span>
-            </div>
-          </n-form-item>
-          <n-form-item :label="$t('meetingHistoryAccess.global_label')">
-            <div class="platform-settings-field" data-testid="platform-default-meeting-history-access">
-              <MeetingHistoryAccessSelect v-model="defaultMeetingHistoryAccess" />
-              <span class="platform-settings-hint">{{ $t('meetingHistoryAccess.global_copy_help') }}</span>
             </div>
           </n-form-item>
           <template v-if="isPrimaryAdmin">
@@ -133,12 +109,6 @@ import { useAdminStore, useSessionStore, useUiStore, useUploadsStore } from '../
 import { getSponsorshipPromptPreference, updateSponsorshipPromptPreference } from '../../lib/api.js'
 import { getLocaleOptions, setPlatformDefaultLocale } from '../../lib/i18n.js'
 import {
-  DEFAULT_MEETING_LANGUAGE,
-  getMeetingLanguageOptions
-} from '../../lib/meeting-languages.js'
-import { DEFAULT_MEETING_HISTORY_ACCESS } from '../../lib/meeting-history-access.js'
-import MeetingHistoryAccessSelect from '../MeetingHistoryAccessSelect.vue'
-import {
   DEFAULT_IMAGE_UPLOAD_MAX_DIMENSION_PX,
   DEFAULT_IMAGE_UPLOAD_QUALITY,
   DEFAULT_UPLOAD_MAX_FILE_SIZE_MB
@@ -146,15 +116,11 @@ import {
 
 export default {
   name: 'PlatformSettings',
-  components: { MeetingHistoryAccessSelect },
   data() {
     return {
       saving: false,
       defaultLanguage: 'en',
-      defaultMeetingLanguage: DEFAULT_MEETING_LANGUAGE,
-      defaultMeetingHistoryAccess: DEFAULT_MEETING_HISTORY_ACCESS,
       autoAwayMinutes: 15,
-      meetingVideoEnabled: true,
       uploadMaxFileSizeMb: DEFAULT_UPLOAD_MAX_FILE_SIZE_MB,
       imageUploadMaxDimensionPx: DEFAULT_IMAGE_UPLOAD_MAX_DIMENSION_PX,
       imageUploadQuality: DEFAULT_IMAGE_UPLOAD_QUALITY,
@@ -183,9 +149,6 @@ export default {
     },
     languageOptions() {
       return getLocaleOptions()
-    },
-    meetingLanguageOptions() {
-      return getMeetingLanguageOptions(this.$t)
     }
   },
   async created() {
@@ -197,10 +160,7 @@ export default {
       try {
         const settings = await this.adminStore.refreshPlatformSettings()
         this.defaultLanguage = settings?.default_locale || this.defaultLanguage
-        this.defaultMeetingLanguage = settings?.default_meeting_language || this.defaultMeetingLanguage
-        this.defaultMeetingHistoryAccess = settings?.default_meeting_history_access || this.defaultMeetingHistoryAccess
         this.autoAwayMinutes = Number.parseInt(settings?.auto_away_minutes, 10) || this.autoAwayMinutes
-        this.meetingVideoEnabled = settings?.meeting_video_enabled !== 'false'
         this.uploadMaxFileSizeMb = this.normalizeNumber(
           settings?.upload_max_file_size_mb,
           DEFAULT_UPLOAD_MAX_FILE_SIZE_MB,
@@ -237,17 +197,12 @@ export default {
         const imageUploadQuality = this.normalizeNumber(this.imageUploadQuality, DEFAULT_IMAGE_UPLOAD_QUALITY, 1, 100)
         const settings = await this.adminStore.updatePlatformSettings({
           defaultLanguage: this.defaultLanguage,
-          defaultMeetingLanguage: this.defaultMeetingLanguage,
-          defaultMeetingHistoryAccess: this.defaultMeetingHistoryAccess,
           autoAwayMinutes,
-          meetingVideoEnabled: this.meetingVideoEnabled,
           uploadMaxFileSizeMb,
           imageUploadMaxDimensionPx,
           imageUploadQuality
         })
         setPlatformDefaultLocale(settings?.default_locale || this.defaultLanguage)
-        this.defaultMeetingLanguage = settings?.default_meeting_language || this.defaultMeetingLanguage
-        this.defaultMeetingHistoryAccess = settings?.default_meeting_history_access || this.defaultMeetingHistoryAccess
         this.autoAwayMinutes = Number.parseInt(settings?.auto_away_minutes, 10) || autoAwayMinutes
         this.uploadMaxFileSizeMb = this.normalizeNumber(
           settings?.upload_max_file_size_mb,

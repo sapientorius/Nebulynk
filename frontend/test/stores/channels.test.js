@@ -253,6 +253,25 @@ describe('channels store membership flows', () => {
     expect(store.channels).toEqual([])
   })
 
+  it('refreshChannel preserves historical meeting channels on 403 or 404', async () => {
+    apiMock.get.mockRejectedValueOnce({
+      response: { status: 404 }
+    })
+
+    const store = useChannelsStore()
+    store.channels = [{
+      id: 'meeting-channel-1',
+      name: 'Historical meeting',
+      purpose: 'meeting',
+      is_archived: true
+    }]
+
+    const channel = await store.refreshChannel('meeting-channel-1')
+
+    expect(channel).toEqual(store.channels[0])
+    expect(store.channels).toHaveLength(1)
+  })
+
   it('update moves channels between the active and archived lists when archive state changes', async () => {
     apiMock.patch
       .mockResolvedValueOnce({
@@ -394,23 +413,25 @@ describe('channels store membership flows', () => {
     expect(typeof apiMock.patch.mock.calls[0][1].last_read_at).toBe('string')
   })
 
-  it('does not mark a historical meeting chat as read without membership', async () => {
-    apiMock.get
-      .mockResolvedValueOnce({ data: { data: [{ id: 'membership-other', user_id: 'user-other' }] } })
-      .mockResolvedValueOnce({ data: { permissions: [] } })
+  it('does not load memberships or mark a historical meeting chat as read', async () => {
+    apiMock.get.mockResolvedValueOnce({ data: { permissions: [] } })
 
     const store = useChannelsStore()
     store.channels = [{
       id: 'meeting-channel-1',
       name: 'meeting-1',
       purpose: 'meeting',
-      is_voice: true
+      is_voice: true,
+      is_archived: true
     }]
     store.myMembership = { id: 'previous-membership', channel_id: 'channel-previous', user_id: 'user-self' }
 
     await store.select('meeting-channel-1')
 
     expect(store.myMembership).toBe(null)
+    expect(apiMock.get).not.toHaveBeenCalledWith('/channel-members', {
+      params: { channel_id: 'meeting-channel-1', $limit: 100 }
+    })
     expect(apiMock.patch).not.toHaveBeenCalled()
   })
 

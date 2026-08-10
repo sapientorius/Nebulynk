@@ -789,6 +789,13 @@ test.describe('P2-02 core e2e paths', () => {
     await page.getByTestId('admin-mobile-menu-trigger').click()
     const adminDrawer = page.getByTestId('admin-mobile-menu-drawer')
     await expect(adminDrawer).toBeVisible()
+    await adminDrawer.getByRole('menuitem', { name: /Meetings/ }).click()
+    await expect(adminDrawer).toBeHidden()
+    await expect(page.getByTestId('admin-mobile-section-label')).toContainText(/Meetings/)
+    await expect(page.getByTestId('meeting-settings-panel')).toBeVisible()
+
+    await page.getByTestId('admin-mobile-menu-trigger').click()
+    await expect(adminDrawer).toBeVisible()
     await adminDrawer.getByRole('menuitem', { name: /Roles|Rollen/ }).click()
     await expect(adminDrawer).toBeHidden()
     await expect(page.getByTestId('admin-mobile-section-label')).toContainText(/Roles|Rollen/)
