@@ -12,28 +12,36 @@ function createService({
   let rawCallIndex = 0
 
   const db = (table) => {
-    if (table === 'channels') {
+    if (table === 'channels as read_channel') {
       const channelBuilder = {
-        where() {
+        leftJoin(_table, callback) {
+          if (typeof callback === 'function') {
+            const join = {
+              on() { return join },
+              andOnVal() { return join }
+            }
+            callback.call(join)
+          }
           return channelBuilder
         },
+        where(_column, channelId) {
+          membershipWhereCalls.push({ channel_id: channelId, user_id: 'user-1' })
+          return channelBuilder
+        },
+        select() { return channelBuilder },
         async first() {
-          return { id: 'channel-1', type: 'private', purpose: 'default' }
+          return {
+            read_channel_id: 'channel-1',
+            read_channel_purpose: 'default',
+            membership_id: membership ? (membership.id || 'membership-1') : null,
+            membership_channel_id: membership?.channel_id || null,
+            membership_user_id: membership?.user_id || null
+          }
         }
       }
       return channelBuilder
     }
-    assert.equal(table, 'channel_members')
-    const builder = {
-      where(filters) {
-        membershipWhereCalls.push(filters)
-        return builder
-      },
-      async first() {
-        return membership
-      }
-    }
-    return builder
+    throw new Error(`Unexpected table: ${table}`)
   }
 
   db.raw = async (sql, bindings) => {
@@ -152,7 +160,7 @@ test('message-search scopes member search and returns FTS results with stable cu
   assert.match(rawCalls[0].sql, /ORDER BY m\.created_at DESC, m\.id DESC/)
   assert.deepEqual(rawCalls[0].bindings, [
     'channel-1',
-    ...Array(7).fill('user-1'),
+    ...Array(6).fill('user-1'),
     '2026-03-16T10:00:00.000Z',
     '2026-03-16T10:00:00.000Z',
     'message-9',

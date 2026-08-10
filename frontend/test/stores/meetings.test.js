@@ -658,6 +658,158 @@ describe('meetings store', () => {
     ])
   })
 
+  it('fetchBySourceChannel deduplicates identical in-flight source requests', async () => {
+    let resolveRequest
+    apiMock.get.mockImplementationOnce(() => new Promise((resolve) => {
+      resolveRequest = resolve
+    }))
+
+    const store = useMeetingsStore()
+    const first = store.fetchBySourceChannel('channel-42', {
+      includeEnded: true,
+      detail: 'full',
+      limit: 5,
+      timeBucket: 'past'
+    })
+    const second = store.fetchBySourceChannel('channel-42', {
+      includeEnded: true,
+      detail: 'full',
+      limit: 5,
+      timeBucket: 'past'
+    })
+
+    expect(apiMock.get).toHaveBeenCalledTimes(1)
+    resolveRequest({
+      data: {
+        data: [{
+          id: 'meeting-deduped-1',
+          source_channel_id: 'channel-42',
+          status: 'ended',
+          content_access: { allowed: true, denial_reason: null }
+        }]
+      }
+    })
+
+    await expect(first).resolves.toHaveLength(1)
+    await expect(second).resolves.toHaveLength(1)
+  })
+
+  it('fetchBySourceChannel discards stale responses after a history access change', async () => {
+    let resolveFirstRequest
+    apiMock.get
+      .mockImplementationOnce(() => new Promise((resolve) => {
+        resolveFirstRequest = resolve
+      }))
+      .mockResolvedValueOnce({
+        data: {
+          data: [{
+            id: 'meeting-stale-1',
+            source_channel_id: 'channel-42',
+            status: 'ended',
+            detail_level: 'card',
+            content_access: {
+              allowed: false,
+              denial_reason: 'channel_meeting_history_policy'
+            }
+          }]
+        }
+      })
+
+    const store = useMeetingsStore()
+    const request = store.fetchBySourceChannel('channel-42', {
+      includeEnded: true,
+      timeBucket: 'past'
+    })
+    await store.handleSourceHistoryAccessChanged('channel-42')
+    resolveFirstRequest({
+      data: {
+        data: [{
+          id: 'meeting-stale-1',
+          source_channel_id: 'channel-42',
+          status: 'ended',
+          content_access: { allowed: true, denial_reason: null }
+        }]
+      }
+    })
+
+    const meetings = await request
+    expect(apiMock.get).toHaveBeenCalledTimes(2)
+    expect(meetings[0].content_access.allowed).toBe(false)
+    expect(store.getMeetingById('meeting-stale-1')?.content_access.allowed).toBe(false)
+  })
+
+  it('loads a direct meeting URL after an earlier access-revision change', async () => {
+    apiMock.get.mockResolvedValue({
+      data: {
+        id: 'meeting-direct-1',
+        source_channel_id: 'channel-42',
+        status: 'ended',
+        content_access: { allowed: false, denial_reason: 'channel_meeting_history_policy' }
+      }
+    })
+
+    const store = useMeetingsStore()
+    await store.handleSourceHistoryAccessChanged('channel-42')
+
+    await expect(store.get('meeting-direct-1')).resolves.toMatchObject({
+      id: 'meeting-direct-1',
+      content_access: { allowed: false }
+    })
+    expect(apiMock.get).toHaveBeenCalledTimes(1)
+  })
+
+  it('refresh retries instead of restoring a stale protected meeting card', async () => {
+    let resolveFirstRequest
+    apiMock.get
+      .mockImplementationOnce(() => new Promise((resolve) => {
+        resolveFirstRequest = resolve
+      }))
+      .mockResolvedValueOnce({
+        data: {
+          data: [{
+            id: 'meeting-refresh-1',
+            source_channel_id: 'channel-42',
+            status: 'ended',
+            content_access: { allowed: false, denial_reason: 'channel_meeting_history_policy' }
+          }]
+        }
+      })
+
+    const store = useMeetingsStore()
+    const request = store.refresh(true)
+    await store.handleSourceHistoryAccessChanged('channel-42')
+    resolveFirstRequest({
+      data: {
+        data: [{
+          id: 'meeting-refresh-1',
+          source_channel_id: 'channel-42',
+          status: 'ended',
+          content_access: { allowed: true, denial_reason: null }
+        }]
+      }
+    })
+
+    await request
+    expect(apiMock.get).toHaveBeenCalledTimes(2)
+    expect(store.getMeetingById('meeting-refresh-1')?.content_access.allowed).toBe(false)
+  })
+
+  it('clears cached meeting questions when history access changes', async () => {
+    apiMock.post.mockResolvedValue({ data: { id: 'question-1', question: 'Confidential?' } })
+    const store = useMeetingsStore()
+    store.upsertMeeting({
+      id: 'meeting-question-cache-1',
+      source_channel_id: 'channel-42',
+      status: 'ended',
+      content_access: { allowed: true, denial_reason: null }
+    })
+    await store.askQuestion('meeting-question-cache-1', 'Confidential?')
+
+    await store.handleSourceHistoryAccessChanged('channel-42')
+
+    expect(store.getQuestions('meeting-question-cache-1')).toEqual([])
+  })
+
   it('findMeetingByChatChannelId prefers active meeting from current store state', async () => {
     const store = useMeetingsStore()
     store.upsertMeeting({

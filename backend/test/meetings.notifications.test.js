@@ -49,6 +49,9 @@ test('meetings notifications: create stores structured meeting_invite notificati
       if (table === 'channel_members') {
         const builder = {
           where() { return builder },
+          andWhere() { return builder },
+          orderBy() { return builder },
+          limit() { return builder },
           async select() { return [{ user_id: 'user-1' }, { user_id: 'user-2' }] },
           async insert() { return undefined }
         }

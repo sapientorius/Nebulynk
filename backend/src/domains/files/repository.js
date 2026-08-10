@@ -40,17 +40,15 @@ export class FilesRepository {
     if (restrictToAccessibleScope) {
       const db = this.db
       const channelAccess = buildChannelReadAccessSql('messages.channel_id', currentUserId)
+      const readableMessageIds = db('messages')
+        .select('messages.id')
+        .whereRaw(channelAccess.sql, channelAccess.bindings)
       query.andWhere(function () {
         this.where(function () {
           this.where('files.user_id', currentUserId)
             .whereNull('files.message_id')
         })
-          .orWhereExists(function () {
-            this.select(db.raw('1'))
-              .from('messages')
-              .whereRaw('messages.id = files.message_id')
-              .andWhereRaw(channelAccess.sql, channelAccess.bindings)
-          })
+          .orWhereIn('files.message_id', readableMessageIds)
       })
     }
 

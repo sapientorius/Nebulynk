@@ -12,28 +12,36 @@ function createService({
   let rawCallIndex = 0
 
   const db = (table) => {
-    if (table === 'channels') {
+    if (table === 'channels as read_channel') {
       const channelBuilder = {
-        where() {
+        leftJoin(_table, callback) {
+          if (typeof callback === 'function') {
+            const join = {
+              on() { return join },
+              andOnVal() { return join }
+            }
+            callback.call(join)
+          }
           return channelBuilder
         },
+        where(_column, channelId) {
+          membershipWhereCalls.push({ channel_id: channelId, user_id: 'user-1' })
+          return channelBuilder
+        },
+        select() { return channelBuilder },
         async first() {
-          return { id: 'channel-1', type: 'private', purpose: 'default' }
+          return {
+            read_channel_id: 'channel-1',
+            read_channel_purpose: 'default',
+            membership_id: membership ? (membership.id || 'membership-1') : null,
+            membership_channel_id: membership?.channel_id || null,
+            membership_user_id: membership?.user_id || null
+          }
         }
       }
       return channelBuilder
     }
-    assert.equal(table, 'channel_members')
-    const builder = {
-      where(filters) {
-        membershipWhereCalls.push(filters)
-        return builder
-      },
-      async first() {
-        return membership
-      }
-    }
-    return builder
+    throw new Error(`Unexpected table: ${table}`)
   }
 
   db.raw = async (sql, bindings) => {
@@ -166,11 +174,12 @@ test('search returns message results with keyword fallback metadata and cursor',
   assert.equal(rawCalls.length, 1)
   assert.match(rawCalls[0].sql, /websearch_to_tsquery/)
   assert.deepEqual(rawCalls[0].bindings, [
+    ...Array(6).fill('user-1'),
     'alpha',
     'message',
     'channel-1',
     'user-2',
-    ...Array(8).fill('user-1'),
+    'user-1',
     '2026-03-16T10:00:00.000Z',
     '2026-03-16T10:00:00.000Z',
     'message:message-9',
@@ -233,9 +242,10 @@ test('search falls back to trigram and supports file filters', async () => {
   assert.match(rawCalls[1].sql, /LIKE \? ESCAPE/)
   assert.match(rawCalls[1].sql, /ESCAPE '\\'/)
   assert.deepEqual(rawCalls[1].bindings, [
+    ...Array(6).fill('user-1'),
     'file',
     'pdf',
-    ...Array(8).fill('user-1'),
+    'user-1',
     '%spe%',
     20
   ])
@@ -260,11 +270,12 @@ test('search keeps date bindings aligned when query text contains natural langua
 
   assert.equal(rawCalls.length, 2)
   assert.deepEqual(rawCalls[0].bindings, [
+    ...Array(6).fill('user-1'),
     'noch nicht',
     'message',
     'channel-1',
     '2026-03-18T00:00:00.000Z',
-    ...Array(8).fill('user-1'),
+    'user-1',
     'noch nicht',
     20
   ])
@@ -307,10 +318,11 @@ test('search supports filter-only queries without ranking bindings', async () =>
   assert.equal(rawCalls.length, 1)
   assert.doesNotMatch(rawCalls[0].sql, /websearch_to_tsquery/)
   assert.deepEqual(rawCalls[0].bindings, [
+    ...Array(6).fill('user-1'),
     'message',
     'channel-1',
     '2026-03-18T00:00:00.000Z',
-    ...Array(8).fill('user-1'),
+    'user-1',
     20
   ])
   assert.equal(result.data[0].id, 'message:message-5')
@@ -352,6 +364,8 @@ test('search scope includes meeting participant membership for meeting artifacts
     }
   })
 
+  assert.match(rawCalls[0].sql, /WITH accessible_meeting_ids AS/)
+  assert.match(rawCalls[0].sql, /accessible_channel_ids AS/)
   assert.match(rawCalls[0].sql, /meeting_participants access_joined/)
   assert.match(rawCalls[0].sql, /meeting_start_members access_snapshot/)
   assert.equal(result.data[0].document_type, 'meeting_summary')
@@ -405,6 +419,7 @@ test('search meetings tab defaults to transcript and summary documents and match
   assert.match(rawCalls[0].sql, /sd\.document_type IN \(\?, \?\)/)
   assert.match(rawCalls[0].sql, /metadata->>'meeting_chat_channel_id'/)
   assert.deepEqual(rawCalls[0].bindings, [
+    ...Array(6).fill('user-1'),
     'rollout',
     'meeting_transcript',
     'meeting_summary',
@@ -413,7 +428,7 @@ test('search meetings tab defaults to transcript and summary documents and match
     'meeting_summary',
     'meeting-chat-2',
     '2026-03-27T00:00:00.000Z',
-    ...Array(8).fill('user-1'),
+    'user-1',
     'rollout',
     20
   ])
@@ -505,6 +520,7 @@ test('search meetings tab uses author or speaker filter for meeting chat message
   assert.match(rawCalls[0].sql, /sd\.author_user_id = \?/)
   assert.doesNotMatch(rawCalls[0].sql, /author_display_name/)
   assert.deepEqual(rawCalls[0].bindings, [
+    ...Array(6).fill('user-1'),
     'alex',
     'message',
     'meeting_transcript_segment',
@@ -513,7 +529,7 @@ test('search meetings tab uses author or speaker filter for meeting chat message
     'meeting-chat-2',
     'user-2',
     'user-2',
-    ...Array(8).fill('user-1'),
+    'user-1',
     'alex',
     20
   ])
@@ -544,13 +560,14 @@ test('search ignores guest author filters for external workspace queries', async
   assert.equal(rawCalls.length, 2)
   assert.match(rawCalls[0].sql, /search_author\.account_type = 'member'/)
   assert.deepEqual(rawCalls[0].bindings, [
+    ...Array(6).fill('user-1'),
     'alex',
     'message',
     'meeting_transcript_segment',
     'guest-1',
     'guest-1',
     'guest-1',
-    ...Array(8).fill('user-1'),
+    'user-1',
     'alex',
     20
   ])

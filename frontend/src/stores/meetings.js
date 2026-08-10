@@ -119,6 +119,8 @@ export const useMeetingsStore = defineStore('meetings', () => {
   const questionsByMeetingId = ref({})
   const historyAccessRevision = ref(0)
   const pendingMeetingLoads = new Map()
+  const pendingSourceMeetingLoads = new Map()
+  const sourceHistoryAccessGenerations = new Map()
   let recoveryRefreshTimeoutId = null
   const activeSourceChannelIds = computed(() => {
     const ids = meetings.value
@@ -206,6 +208,30 @@ export const useMeetingsStore = defineStore('meetings', () => {
     questionsByMeetingId.value = {}
     historyAccessRevision.value = 0
     pendingMeetingLoads.clear()
+    pendingSourceMeetingLoads.clear()
+    sourceHistoryAccessGenerations.clear()
+  }
+
+  function getSourceHistoryAccessGeneration(sourceChannelId) {
+    return sourceHistoryAccessGenerations.get(sourceChannelId) || 0
+  }
+
+  function createSourceMeetingLoadKey({
+    sourceChannelId,
+    includeEnded,
+    detailLevel,
+    limit,
+    timeBucket,
+    generation
+  }) {
+    return [
+      sourceChannelId,
+      includeEnded ? 'ended' : 'current',
+      detailLevel,
+      limit,
+      timeBucket || 'all',
+      generation
+    ].join(':')
   }
 
   function hasMeetingChatChannel(channelId) {
@@ -331,13 +357,20 @@ export const useMeetingsStore = defineStore('meetings', () => {
     channelsStore.patchChannel(channel)
   }
 
-  async function refresh(includeEnded = false, extraParams = {}) {
+  async function refresh(includeEnded = false, extraParams = {}, retryOnHistoryAccessChange = true) {
+    const revision = historyAccessRevision.value
     try {
       const { data } = await api.get('/meetings', {
         params: includeEnded
           ? { include_ended: true, $limit: 100, ...extraParams }
           : { $limit: 100, ...extraParams }
       })
+      if (revision !== historyAccessRevision.value) {
+        if (retryOnHistoryAccessChange) {
+          return refresh(includeEnded, extraParams, false)
+        }
+        return
+      }
       const previousById = new Map(meetings.value.map((meeting) => [meeting.id, meeting]))
       meetings.value = asList(data).map((meeting) => mergeMeetingRecords(previousById.get(meeting.id), meeting))
       for (const meeting of meetings.value) {
@@ -355,7 +388,8 @@ export const useMeetingsStore = defineStore('meetings', () => {
     }
   }
 
-  async function loadOverviewBuckets(options = {}) {
+  async function loadOverviewBuckets(options = {}, retryOnHistoryAccessChange = true) {
+    const revision = historyAccessRevision.value
     const requestedPastVisibleCount = Number(options.pastVisibleCount)
     const pastVisibleCount = Number.isFinite(requestedPastVisibleCount)
       ? Math.min(Math.max(Math.trunc(requestedPastVisibleCount), 1), 99)
@@ -390,6 +424,18 @@ export const useMeetingsStore = defineStore('meetings', () => {
       })
     ])
 
+    if (revision !== historyAccessRevision.value) {
+      if (retryOnHistoryAccessChange) {
+        return loadOverviewBuckets(options, false)
+      }
+      return {
+        upcoming: [],
+        live: [],
+        past: [],
+        pastHasMore: false
+      }
+    }
+
     const upcoming = asList(upcomingResponse.data)
     const live = asList(liveResponse.data)
     const pastWithProbe = asList(pastResponse.data)
@@ -410,8 +456,26 @@ export const useMeetingsStore = defineStore('meetings', () => {
     }
   }
 
-  async function get(meetingId) {
+  async function get(meetingId, { retryOnHistoryAccessChange = true } = {}) {
+    const knownMeeting = getMeetingById(meetingId)
+    const sourceChannelId = knownMeeting?.source_channel_id || null
+    const generation = sourceChannelId
+      ? getSourceHistoryAccessGeneration(sourceChannelId)
+      : null
+    const revision = historyAccessRevision.value
     const { data } = await api.get(`/meetings/${meetingId}`)
+    const responseSourceChannelId = data?.source_channel_id || sourceChannelId
+    const sourceAccessChanged = responseSourceChannelId && (
+      generation !== null
+        ? generation !== getSourceHistoryAccessGeneration(responseSourceChannelId)
+        : revision !== historyAccessRevision.value
+    )
+    if (sourceAccessChanged) {
+      if (retryOnHistoryAccessChange) {
+        return get(meetingId, { retryOnHistoryAccessChange: false })
+      }
+      return null
+    }
     upsertMeeting(data)
     return data
   }
@@ -479,7 +543,19 @@ export const useMeetingsStore = defineStore('meetings', () => {
     } = options
     const detailLevel = detail === 'full' ? 'full' : 'summary'
     const resolvedLimit = Math.min(Math.max(Number(limit) || 100, 1), 100)
-    const { data } = await api.get('/meetings', {
+    const generation = getSourceHistoryAccessGeneration(sourceChannelId)
+    const requestKey = createSourceMeetingLoadKey({
+      sourceChannelId,
+      includeEnded,
+      detailLevel,
+      limit: resolvedLimit,
+      timeBucket,
+      generation
+    })
+    const pending = pendingSourceMeetingLoads.get(requestKey)
+    if (pending) return pending
+
+    const request = api.get('/meetings', {
       params: {
         source_channel_id: sourceChannelId,
         ...(includeEnded ? { include_ended: true } : {}),
@@ -488,12 +564,23 @@ export const useMeetingsStore = defineStore('meetings', () => {
         $limit: resolvedLimit
       }
     })
+      .then(({ data }) => {
+        if (generation !== getSourceHistoryAccessGeneration(sourceChannelId)) {
+          return fetchBySourceChannel(sourceChannelId, options)
+        }
 
-    const list = asList(data)
-    for (const meeting of list) {
-      upsertMeeting(meeting)
-    }
-    return list
+        const list = asList(data)
+        for (const meeting of list) {
+          upsertMeeting(meeting)
+        }
+        return list
+      })
+      .finally(() => {
+        pendingSourceMeetingLoads.delete(requestKey)
+      })
+
+    pendingSourceMeetingLoads.set(requestKey, request)
+    return request
   }
 
   async function setActive(meetingId) {
@@ -501,6 +588,11 @@ export const useMeetingsStore = defineStore('meetings', () => {
 
     const meeting = await get(meetingId)
     activeMeeting.value = meeting
+
+    if (!meeting) {
+      clearActive()
+      return null
+    }
 
     if (meeting?.content_access?.allowed === false) {
       return meeting
@@ -518,6 +610,11 @@ export const useMeetingsStore = defineStore('meetings', () => {
   async function handleSourceHistoryAccessChanged(sourceChannelId) {
     if (!sourceChannelId) return
 
+    sourceHistoryAccessGenerations.set(
+      sourceChannelId,
+      getSourceHistoryAccessGeneration(sourceChannelId) + 1
+    )
+
     const affectedMeetingIds = meetings.value
       .filter((meeting) => meeting.source_channel_id === sourceChannelId && meeting.status === 'ended')
       .map((meeting) => meeting.id)
@@ -529,6 +626,10 @@ export const useMeetingsStore = defineStore('meetings', () => {
 
     if (affectedIds.size > 0) {
       meetings.value = meetings.value.filter((meeting) => !affectedIds.has(meeting.id))
+      questionsByMeetingId.value = Object.fromEntries(
+        Object.entries(questionsByMeetingId.value)
+          .filter(([meetingId]) => !affectedIds.has(meetingId))
+      )
     }
     historyAccessRevision.value += 1
 
@@ -536,7 +637,7 @@ export const useMeetingsStore = defineStore('meetings', () => {
 
     const refreshed = await get(activeMeeting.value.id)
     activeMeeting.value = refreshed
-    if (refreshed?.content_access?.allowed === false) {
+    if (!refreshed || refreshed.content_access?.allowed === false) {
       useChannelsStore().clearActiveContext()
     }
   }

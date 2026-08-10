@@ -2,7 +2,7 @@ import { authenticate } from '@feathersjs/authentication'
 import { badRequest } from '../../lib/errors.js'
 import {
   assertCanReadChannel,
-  buildMeetingContentAccessSql
+  buildAccessibleContentScopeSql
 } from '../../domains/meetings/content-access.js'
 
 const DEFAULT_LIMIT = 20
@@ -162,6 +162,7 @@ function buildTypeClause(documentTypes) {
 function buildScopeClauses(searchQuery, user, { enforceMemberAuthorFilter = false } = {}) {
   const clauses = []
   const bindings = []
+  let accessScope = null
   const typeClause = buildTypeClause(searchQuery.documentTypes)
 
   clauses.push(typeClause.sql)
@@ -228,18 +229,13 @@ function buildScopeClauses(searchQuery, user, { enforceMemberAuthorFilter = fals
   }
 
   if (!user?.is_admin) {
-    const meetingAccess = buildMeetingContentAccessSql('sd.source_meeting_id', user?.id || null)
+    accessScope = buildAccessibleContentScopeSql(user?.id || null)
     clauses.push(`(
-      (sd.source_meeting_id IS NULL AND sd.source_channel_id IS NOT NULL AND EXISTS (
-        SELECT 1
-        FROM channel_members cm
-        WHERE cm.channel_id = sd.source_channel_id
-          AND cm.user_id = ?
-      ))
-      OR (sd.source_meeting_id IS NOT NULL AND ${meetingAccess.sql})
+      (sd.source_meeting_id IS NULL AND sd.source_channel_id IN (SELECT channel_id FROM ${accessScope.channelCteName}))
+      OR (sd.source_meeting_id IS NOT NULL AND sd.source_meeting_id IN (SELECT meeting_id FROM ${accessScope.meetingCteName}))
       OR (sd.source_meeting_id IS NULL AND sd.owner_user_id = ?)
     )`)
-    bindings.push(user?.id || null, ...meetingAccess.bindings, user?.id || null)
+    bindings.push(user?.id || null)
   }
 
   if (searchQuery.beforeCreatedAt && searchQuery.beforeId) {
@@ -249,11 +245,12 @@ function buildScopeClauses(searchQuery, user, { enforceMemberAuthorFilter = fals
 
   return {
     sql: clauses.join('\n      AND '),
-    bindings
+    bindings,
+    accessScope
   }
 }
 
-function buildSelectSql({ whereSql, matchConditionSql, includeRanking = false }) {
+function buildSelectSql({ withSql = '', whereSql, matchConditionSql, includeRanking = false }) {
   const rankingSql = includeRanking
     ? `,
       ts_rank_cd(
@@ -264,6 +261,7 @@ function buildSelectSql({ whereSql, matchConditionSql, includeRanking = false })
       0::float AS rank_score`
 
   return `
+    ${withSql}
     SELECT
       sd.id,
       sd.document_type,
@@ -408,7 +406,7 @@ export class SearchService {
       })
     }
 
-    const { sql: whereSql, bindings: whereBindings } = buildScopeClauses(searchQuery, user, {
+    const { sql: whereSql, bindings: whereBindings, accessScope } = buildScopeClauses(searchQuery, user, {
       enforceMemberAuthorFilter
     })
     let rows = []
@@ -416,12 +414,14 @@ export class SearchService {
 
     if (searchQuery.q) {
       const ftsSql = buildSelectSql({
+        withSql: accessScope?.sql || '',
         whereSql,
         matchConditionSql: "to_tsvector('simple', concat_ws(' ', coalesce(sd.title, ''), coalesce(sd.content_text, ''), coalesce(sd.file_name, ''))) @@ websearch_to_tsquery('simple', ?)",
         includeRanking: true
       })
 
       rows = normalizeRawRows(await db.raw(ftsSql, [
+        ...(accessScope?.bindings || []),
         searchQuery.q,
         ...whereBindings,
         searchQuery.q,
@@ -431,12 +431,14 @@ export class SearchService {
 
       if (rows.length === 0) {
         const trigramSql = buildSelectSql({
+          withSql: accessScope?.sql || '',
           whereSql,
           matchConditionSql: "lower(concat_ws(' ', coalesce(sd.title, ''), coalesce(sd.content_text, ''), coalesce(sd.file_name, ''))) LIKE ? ESCAPE '\\'",
           includeRanking: false
         })
 
         rows = normalizeRawRows(await db.raw(trigramSql, [
+          ...(accessScope?.bindings || []),
           ...whereBindings,
           `%${escapeLike(searchQuery.qLower)}%`,
           searchQuery.limit
@@ -445,11 +447,13 @@ export class SearchService {
       }
     } else {
       const sql = buildSelectSql({
+        withSql: accessScope?.sql || '',
         whereSql,
         matchConditionSql: 'TRUE',
         includeRanking: false
       })
       rows = normalizeRawRows(await db.raw(sql, [
+        ...(accessScope?.bindings || []),
         ...whereBindings,
         searchQuery.limit
       ]))

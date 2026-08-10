@@ -31,6 +31,7 @@ test('meetings transcription timeout default is 30 minutes', () => {
 })
 
 test('meetings behavior: create returns existing active meeting for same source channel', async () => {
+  let transactionOptions = null
   const db = (table) => {
     if (table === 'platform_settings') {
       return createPlatformSettingsQuery()
@@ -46,7 +47,8 @@ test('meetings behavior: create returns existing active meeting for same source 
     throw new Error(`Unexpected table: ${table}`)
   }
 
-  db.transaction = async (callback) => {
+  db.transaction = async (callback, options) => {
+    transactionOptions = options
     const trx = (table) => {
       if (table === 'channels') {
         const builder = {
@@ -86,6 +88,7 @@ test('meetings behavior: create returns existing active meeting for same source 
 
   assert.equal(result.id, 'meeting-existing')
   assert.equal(result.status, 'active')
+  assert.deepEqual(transactionOptions, { isolationLevel: 'repeatable read' })
 })
 
 test('meetings behavior: find allows source-channel members to see active meetings for that source channel', async () => {
@@ -556,6 +559,9 @@ test('meetings behavior: create does not precreate summary placeholder artifacts
       if (table === 'channel_members') {
         const builder = {
           where() { return builder },
+          andWhere() { return builder },
+          orderBy() { return builder },
+          limit() { return builder },
           async select() { return [{ user_id: 'user-1' }] },
           async insert() { return undefined }
         }

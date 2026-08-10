@@ -44,7 +44,7 @@ test('search service is authenticated and meeting-content-policy scoped', async 
   const src = await read('src/services/search/search.js')
   assert.match(src, /authenticate\('jwt'\)/)
   assert.match(src, /assertCanReadChannel/)
-  assert.match(src, /buildMeetingContentAccessSql/)
+  assert.match(src, /buildAccessibleContentScopeSql/)
 })
 
 test('messages.find enforces channel_id', async () => {
@@ -58,10 +58,14 @@ test('messages.find enforces channel_id', async () => {
 test('files service has read/remove policy checks', async () => {
   const src = await read('src/services/files/files.js')
   const policy = await read('src/domains/files/policy.js')
+  const repository = await read('src/domains/files/repository.js')
   assert.match(src, /resolveGetAccess/)
   assert.match(src, /resolveRemoveAccess/)
   assert.match(src, /checkPermission\('manage_messages'\)/)
   assert.match(policy, /Kein Zugriff auf Dateien anderer Nutzer/)
+  assert.match(repository, /buildChannelReadAccessSql/)
+  assert.match(repository, /orWhereIn\('files\.message_id', readableMessageIds\)/)
+  assert.doesNotMatch(repository, /orWhereExists/)
 })
 
 test('voice create is RBAC and membership protected', async () => {

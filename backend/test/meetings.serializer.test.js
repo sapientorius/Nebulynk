@@ -569,6 +569,7 @@ test('meetings serialization: full payload keeps participants and artifacts', as
         leftJoin() { return builder },
         where() { return builder },
         whereIn() { return builder },
+        andWhere() { return builder },
         async first() {
           return { joined_at: '2026-03-13T10:00:00.000Z' }
         },
@@ -617,10 +618,14 @@ test('meetings serialization: full payload keeps participants and artifacts', as
     }
 
     if (table === 'channel_members') {
-      return {
-        where() { return this },
-        first: async () => undefined
+      const builder = {
+        where() { return builder },
+        whereIn() { return builder },
+        andWhere() { return builder },
+        first: async () => undefined,
+        select: async () => []
       }
+      return builder
     }
 
     if (table === 'meeting_artifacts') {
@@ -723,6 +728,7 @@ test('meetings serialization: full payload hides legacy pending summary placehol
         leftJoin() { return builder },
         where() { return builder },
         whereIn() { return builder },
+        andWhere() { return builder },
         async first() {
           return { joined_at: '2026-03-13T10:00:00.000Z' }
         },
@@ -745,10 +751,14 @@ test('meetings serialization: full payload hides legacy pending summary placehol
     }
 
     if (table === 'channel_members') {
-      return {
-        where() { return this },
-        first: async () => undefined
+      const builder = {
+        where() { return builder },
+        whereIn() { return builder },
+        andWhere() { return builder },
+        first: async () => undefined,
+        select: async () => []
       }
+      return builder
     }
 
     if (table === 'meeting_artifacts') {
@@ -898,6 +908,7 @@ test('meetings serialization: transcript retry remains hidden from non-host view
         leftJoin() { return builder },
         where() { return builder },
         whereIn() { return builder },
+        andWhere() { return builder },
         async first() {
           return { joined_at: '2026-03-13T10:00:00.000Z' }
         },
@@ -920,10 +931,14 @@ test('meetings serialization: transcript retry remains hidden from non-host view
     }
 
     if (table === 'channel_members') {
-      return {
-        where() { return this },
-        first: async () => undefined
+      const builder = {
+        where() { return builder },
+        whereIn() { return builder },
+        andWhere() { return builder },
+        first: async () => undefined,
+        select: async () => []
       }
+      return builder
     }
 
     if (table === 'meeting_artifacts') {

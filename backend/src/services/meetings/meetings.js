@@ -37,6 +37,7 @@ import { autoEndOverdueScheduledMeeting } from './overdue-scheduled.js'
 import { resolveFrontendUrl } from '../../lib/security-config.js'
 import {
   resolveMeetingContentAccess,
+  resolveMeetingContentAccessBatch,
   snapshotMeetingStartMembers
 } from '../../domains/meetings/content-access.js'
 
@@ -405,7 +406,7 @@ export class MeetingsService {
       }))
 
       await trx('notifications').insert(notificationRows)
-    })
+    }, { isolationLevel: 'repeatable read' })
 
     if (!created && reusedMeetingId) {
       return this.get(reusedMeetingId, params)
@@ -729,7 +730,7 @@ export class MeetingsService {
         })
         .onConflict(['channel_id', 'user_id'])
         .ignore()
-    })
+    }, { isolationLevel: 'repeatable read' })
 
     this._joinConnectionsToChannel(meeting.chat_channel_id, [user.id])
 
@@ -1477,13 +1478,12 @@ export class MeetingsService {
       })
     }
 
-    const accessEntries = await Promise.all(rows.map(async (row) => ([
-      row.id,
-      await this._resolveMeetingContentAccess(row, viewerUser)
-    ])))
-    const accessByMeetingId = Object.fromEntries(accessEntries)
+    const accessByMeetingId = await resolveMeetingContentAccessBatch(this.db, {
+      meetings: rows,
+      user: viewerUser
+    })
     const readableRows = rows.filter((row) => {
-      const access = accessByMeetingId[row.id]
+      const access = accessByMeetingId.get(row.id)
       return access?.allowed || (row.status !== 'ended' && access?.cardVisible)
     })
     const serializedAllowed = await serializeMeetings({
@@ -1500,7 +1500,7 @@ export class MeetingsService {
     const allowedById = Object.fromEntries(serializedAllowed.map((meeting) => [meeting.id, meeting]))
 
     return rows.map((row) => {
-      const access = accessByMeetingId[row.id]
+      const access = accessByMeetingId.get(row.id)
       if (access?.allowed || (row.status !== 'ended' && access?.cardVisible)) {
         return {
           ...allowedById[row.id],
