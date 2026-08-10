@@ -24,7 +24,7 @@ export const PLATFORM_UPDATE_MAX_INDEX_BYTES = 256 * 1024
 export const PLATFORM_UPDATE_MAX_RELEASE_BYTES = 128 * 1024
 const PLATFORM_UPDATE_MAX_BACKOFF_MS = 6 * 60 * 60 * 1000
 const PLATFORM_UPDATE_SCHEDULER_TICK_MS = 60_000
-const DEFAULT_FEED_BASE_URL = 'https://updates.nebulynk.net/v1/'
+const DEFAULT_FEED_BASE_URL = 'https://update.nebulynk.net'
 
 function asIso(value) {
   if (!value) return null

@@ -197,7 +197,7 @@ test('feed client reuses verified cache on 304 and never accepts 304 without cac
   const app = { get: () => null }
   const manager = new PlatformUpdateManager(app, {
     publicKeys: signed.publicKeys,
-    feedBaseUrl: 'https://updates.nebulynk.net/v1/',
+    feedBaseUrl: 'https://update.nebulynk.net',
     fetchImpl: async () => new Response(null, { status: 304 })
   })
   const cached = { sequence: 1, releases: [release('0.2.0')] }
@@ -214,7 +214,7 @@ test('feed client validates each signed descriptor digest and enforces response 
   const signed = createSignedFeed([document])
   const manager = new PlatformUpdateManager({ get: () => null }, {
     publicKeys: signed.publicKeys,
-    feedBaseUrl: 'https://updates.nebulynk.net/v1/',
+    feedBaseUrl: 'https://update.nebulynk.net',
     fetchImpl: async (url) => {
       if (url.pathname.endsWith('/index.json')) {
         return Response.json(signed.envelope, { headers: { ETag: '"two"' } })
@@ -228,7 +228,7 @@ test('feed client validates each signed descriptor digest and enforces response 
 
   const oversized = new PlatformUpdateManager({ get: () => null }, {
     publicKeys: signed.publicKeys,
-    feedBaseUrl: 'https://updates.nebulynk.net/v1/',
+    feedBaseUrl: 'https://update.nebulynk.net',
     fetchImpl: async () => new Response('{}', { headers: { 'Content-Length': String(300 * 1024) } })
   })
   await assert.rejects(oversized.fetchCatalog({ feed_sequence: 0 }), { message: 'update_feed_response_too_large' })
@@ -237,7 +237,7 @@ test('feed client validates each signed descriptor digest and enforces response 
 test('concurrent checks keep one lease owner through security delivery', async () => {
   const manager = new PlatformUpdateManager({ get: () => null }, {
     publicKeys: { test: 'unused' },
-    feedBaseUrl: 'https://updates.nebulynk.net/v1/'
+    feedBaseUrl: 'https://update.nebulynk.net'
   })
   let leaseHeld = false
   let deliveries = 0
@@ -277,7 +277,7 @@ test('security delivery selects active member admins, bundles releases, retries 
   const app = { get: (key) => key === 'postgresqlClient' ? db : null }
   const manager = new PlatformUpdateManager(app, {
     publicKeys: { test: 'unused' },
-    feedBaseUrl: 'https://updates.nebulynk.net/v1/',
+    feedBaseUrl: 'https://update.nebulynk.net',
     sendSecurityEmail: async (_app, payload) => {
       calls.push(payload)
       if (payload.user.id === 'owner' && failOwnerOnce) {
@@ -321,7 +321,7 @@ test('a detected downgrade invalidates old acknowledgements and security deliver
   })
   const manager = new PlatformUpdateManager({ get: (key) => key === 'postgresqlClient' ? db : null }, {
     publicKeys: { test: 'unused' },
-    feedBaseUrl: 'https://updates.nebulynk.net/v1/',
+    feedBaseUrl: 'https://update.nebulynk.net',
     now: () => new Date('2026-08-01T12:00:00.000Z')
   })
   const state = await manager.getState()
@@ -336,7 +336,7 @@ test('a failed fetch keeps the verified cache and still retries pending security
   const cachedCatalog = { releases: [release('0.2.0'), release('0.3.0', { security: [advisory('high')] })] }
   const manager = new PlatformUpdateManager({ get: () => null }, {
     publicKeys: { test: 'unused' },
-    feedBaseUrl: 'https://updates.nebulynk.net/v1/',
+    feedBaseUrl: 'https://update.nebulynk.net',
     log: { warn() {}, error() {} }
   })
   let retainedLease = false
