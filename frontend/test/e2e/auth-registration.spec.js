@@ -41,14 +41,43 @@ async function expectRegistrationFace(page) {
   return inner
 }
 
+async function readAuthViewport(page) {
+  return page.getByTestId('login-view').evaluate((element) => ({
+    clientWidth: element.clientWidth,
+    clientHeight: element.clientHeight,
+    scrollWidth: element.scrollWidth,
+    scrollHeight: element.scrollHeight
+  }))
+}
+
+async function expectAuthViewportToFit(page) {
+  const viewport = await readAuthViewport(page)
+  expect(viewport.scrollWidth).toBeLessThanOrEqual(viewport.clientWidth + 1)
+  expect(viewport.scrollHeight).toBeLessThanOrEqual(viewport.clientHeight + 1)
+}
+
+async function expectAuthViewportToStayFitted(page) {
+  for (let sample = 0; sample < 4; sample += 1) {
+    await expectAuthViewportToFit(page)
+    await page.waitForTimeout(300)
+  }
+}
+
+async function expectNoHorizontalAuthOverflow(page) {
+  const viewport = await readAuthViewport(page)
+  expect(viewport.scrollWidth).toBeLessThanOrEqual(viewport.clientWidth + 1)
+}
+
 test.describe('login and registration flip card', () => {
   test('flips through the URL, supports direct registration, history, and reduced motion', async ({ page }) => {
     await ensureAdmin(page, adminCredentials)
     await mockRegistrationConfig(page, enabledRegistrationConfig)
+    await page.setViewportSize({ width: 1280, height: 900 })
     await page.goto('/login')
 
     await expect(page.getByTestId('login-view')).toBeVisible()
     await expect(page.getByTestId('login-register')).toBeVisible()
+    await expectAuthViewportToFit(page)
 
     const card = page.getByTestId('auth-flip-card')
     const cardBox = await card.boundingBox()
@@ -64,15 +93,18 @@ test.describe('login and registration flip card', () => {
     await expect(page.getByTestId('self-registration-display-name')).toBeVisible()
     const registrationContent = page.getByTestId('self-registration-view').locator('.n-card__content').last()
     await expect.poll(() => registrationContent.evaluate((element) => getComputedStyle(element).paddingLeft)).toBe('24px')
+    await expectAuthViewportToStayFitted(page)
 
     await page.goBack()
     await expect(page).toHaveURL(/\/login$/)
     await expect(page.getByTestId('auth-login-face')).toHaveAttribute('aria-hidden', 'false')
     await expect(page.getByTestId('auth-register-face')).toHaveAttribute('aria-hidden', 'true')
+    await expectAuthViewportToFit(page)
 
     await page.goForward()
     await expect(page).toHaveURL(/\/register$/)
     await expectRegistrationFace(page)
+    await expectAuthViewportToFit(page)
 
     await page.goto('/register')
     await expectRegistrationFace(page)
@@ -82,6 +114,24 @@ test.describe('login and registration flip card', () => {
     await page.getByTestId('login-register').click()
     await expectRegistrationFace(page)
     await expect.poll(() => inner.evaluate((element) => getComputedStyle(element).transitionDuration)).toBe('0s')
+  })
+
+  test('keeps narrow auth layouts horizontally contained while allowing needed vertical scrolling', async ({ page }) => {
+    await ensureAdmin(page, adminCredentials)
+    await mockRegistrationConfig(page, enabledRegistrationConfig)
+    await page.setViewportSize({ width: 390, height: 480 })
+    await page.goto('/register')
+
+    await expectRegistrationFace(page)
+    await expect(page.getByTestId('self-registration-display-name')).toBeVisible()
+    await expectNoHorizontalAuthOverflow(page)
+
+    const viewport = await readAuthViewport(page)
+    expect(viewport.scrollHeight).toBeGreaterThan(viewport.clientHeight)
+
+    const backToLogin = page.getByTestId('self-registration-back-login')
+    await backToLogin.scrollIntoViewIfNeeded()
+    await expect(backToLogin).toBeInViewport()
   })
 
   test('keeps the account link hidden but direct registration available when disabled', async ({ browser }) => {

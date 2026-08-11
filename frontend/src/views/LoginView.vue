@@ -436,24 +436,25 @@ export default {
   display: flex;
   justify-content: center;
   align-items: center;
-  min-height: 100dvh;
+  height: 100dvh;
   padding: 24px;
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
   background:
     radial-gradient(circle at top, rgba(92, 117, 255, 0.16), transparent 32%),
     radial-gradient(circle at 80% 10%, rgba(63, 224, 214, 0.14), transparent 24%),
     linear-gradient(180deg, #0a1022 0%, #060816 45%, #03040c 100%);
 }
 
-.login-container::before,
-.login-container::after {
+.login-ambient::before,
+.login-ambient::after {
   content: "";
   position: absolute;
-  inset: -20%;
+  inset: 0;
   pointer-events: none;
 }
 
-.login-container::before {
+.login-ambient::before {
   background:
     radial-gradient(circle at 20% 30%, rgba(110, 161, 255, 0.2) 0, transparent 22%),
     radial-gradient(circle at 78% 22%, rgba(93, 255, 214, 0.12) 0, transparent 18%),
@@ -462,7 +463,7 @@ export default {
   animation: drift 36s ease-in-out infinite alternate;
 }
 
-.login-container::after {
+.login-ambient::after {
   background: radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.04), transparent 60%);
   opacity: 0.12;
 }
@@ -792,8 +793,8 @@ export default {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .login-container::before,
-  .login-container::after,
+  .login-ambient::before,
+  .login-ambient::after,
   .star.twinkle,
   .nebula,
   .mist-band,
