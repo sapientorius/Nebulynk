@@ -132,7 +132,12 @@ async function createChannelFromSidebar(page, { name, isVoice = false, type = 'p
   if (!channelId) {
     throw new Error('Could not resolve created channel id from API response')
   }
-  await page.waitForURL(new RegExp(`/channels/${channelId}$`))
+  if (!isVoice) {
+    await expect.poll(
+      () => extractActiveChannelId(page.url()),
+      { timeout: 10_000 }
+    ).toBe(channelId)
+  }
   return channelId
 }
 
