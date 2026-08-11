@@ -118,7 +118,22 @@ async function createChannelFromSidebar(page, { name, isVoice = false, type = 'p
   if (isVoice) {
     await page.getByTestId('create-channel-is-voice').click()
   }
+  const createChannelResponse = page.waitForResponse((response) => {
+    const request = response.request()
+    return request.method() === 'POST' && new URL(response.url()).pathname.replace(/\/$/, '') === '/channels'
+  })
   await page.getByTestId('create-channel-submit').click()
+
+  const response = await createChannelResponse
+  if (!response.ok()) {
+    throw new Error(`Channel creation failed (${response.status()}): ${await response.text()}`)
+  }
+  const channelId = (await response.json())?.id
+  if (!channelId) {
+    throw new Error('Could not resolve created channel id from API response')
+  }
+  await page.waitForURL(new RegExp(`/channels/${channelId}$`))
+  return channelId
 }
 
 async function joinFirstDiscoverChannel(page, preferredChannelId = null) {
@@ -1103,18 +1118,14 @@ test.describe('P2-02 core e2e paths', () => {
     }
   })
 
-  test('a member added after an ended meeting gets the default history access and is locked immediately after a retroactive policy change', async ({ page, browser }) => {
+  test('a member added after an ended meeting gets the default history access and is locked immediately after a retroactive policy change', async ({ page, browser, request }) => {
     await login(page, {
       email: adminEmail,
       password: adminPassword
     })
 
     const sourceChannelName = `history-src-${runId}`
-    await createChannelFromSidebar(page, { name: sourceChannelName, type: 'private' })
-    const sourceChannelId = extractActiveChannelId(page.url())
-    if (!sourceChannelId) {
-      throw new Error(`Could not resolve meeting history source channel id from URL: ${page.url()}`)
-    }
+    const sourceChannelId = await createChannelFromSidebar(page, { name: sourceChannelName, type: 'private' })
 
     await startOrJoinMeetingFromHeader(page)
     const meetingId = extractMeetingId(page.url())
@@ -1127,7 +1138,7 @@ test.describe('P2-02 core e2e paths', () => {
       email: adminEmail,
       password: adminPassword
     })
-    const memberAuth = await loginViaApi(page.request, {
+    const memberAuth = await loginViaApi(request, {
       email: inviteEmail,
       password: invitePassword
     })
@@ -1143,6 +1154,18 @@ test.describe('P2-02 core e2e paths', () => {
       userId: memberId
     })
 
+    const initialMeetingResponse = await request.get(resolveBackendUrl(`/meetings/${meetingId}`), {
+      headers: { Authorization: `Bearer ${memberToken}` }
+    })
+    if (!initialMeetingResponse.ok()) {
+      throw new Error(
+        `Initial meeting API failed (${initialMeetingResponse.status()}): ${await initialMeetingResponse.text()}`
+      )
+    }
+    const initialMeeting = await initialMeetingResponse.json()
+    expect(initialMeeting.content_access?.allowed).toBe(true)
+    expect(initialMeeting.chat_channel_id).toBeTruthy()
+
     const memberContext = await browser.newContext({
       baseURL: new URL(page.url()).origin
     })
@@ -1157,14 +1180,6 @@ test.describe('P2-02 core e2e paths', () => {
       await expect(memberPage.getByTestId('meeting-view')).toBeVisible()
       await expect(memberPage.getByTestId('meeting-access-restricted')).toHaveCount(0)
 
-      const initialMeetingResponse = await memberPage.request.get(resolveBackendUrl(`/meetings/${meetingId}`), {
-        headers: { Authorization: `Bearer ${memberToken}` }
-      })
-      expect(initialMeetingResponse.ok()).toBe(true)
-      const initialMeeting = await initialMeetingResponse.json()
-      expect(initialMeeting.content_access?.allowed).toBe(true)
-      expect(initialMeeting.chat_channel_id).toBeTruthy()
-
       const policyResponse = await page.request.patch(resolveBackendUrl(`/channels/${sourceChannelId}`), {
         headers: { Authorization: `Bearer ${adminToken}` },
         data: { meeting_history_access: 'meeting_start_members' }
@@ -1175,10 +1190,19 @@ test.describe('P2-02 core e2e paths', () => {
 
       await expect(memberPage.getByTestId('meeting-access-restricted')).toBeVisible()
 
-      const pastMeetingsResponse = await memberPage.request.get(resolveBackendUrl(
+      const updatedMemberAuth = await loginViaApi(request, {
+        email: inviteEmail,
+        password: invitePassword
+      })
+      const updatedMemberToken = updatedMemberAuth?.accessToken
+      if (!updatedMemberToken) {
+        throw new Error('Missing member access token after meeting history policy change')
+      }
+
+      const pastMeetingsResponse = await request.get(resolveBackendUrl(
         `/meetings?include_ended=true&source_channel_id=${encodeURIComponent(sourceChannelId)}&$limit=20`
       ), {
-        headers: { Authorization: `Bearer ${memberToken}` }
+        headers: { Authorization: `Bearer ${updatedMemberToken}` }
       })
       expect(pastMeetingsResponse.ok()).toBe(true)
       const pastPayload = await pastMeetingsResponse.json()
