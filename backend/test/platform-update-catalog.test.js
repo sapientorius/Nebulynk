@@ -84,6 +84,8 @@ function createSignedFeed(documents) {
   }
 }
 
+const DIRECT_FEED_BASE_URL = 'https://updates.nebulynk.net/v1/'
+
 function createMailDb(users) {
   const tables = { users, platform_update_email_deliveries: [] }
   const db = (tableName) => {
@@ -195,26 +197,38 @@ test('release digests reject manipulated files', () => {
 test('feed client reuses verified cache on 304 and never accepts 304 without cache', async () => {
   const signed = createSignedFeed([release('0.2.0')])
   const app = { get: () => null }
+  let endpointCalls = 0
   const manager = new PlatformUpdateManager(app, {
     publicKeys: signed.publicKeys,
-    feedBaseUrl: 'https://update.nebulynk.net',
+    feedBaseUrl: DIRECT_FEED_BASE_URL,
+    endpointFetchImpl: async () => {
+      endpointCalls += 1
+      return new Response(null, { status: 500 })
+    },
     fetchImpl: async () => new Response(null, { status: 304 })
   })
   const cached = { sequence: 1, releases: [release('0.2.0')] }
   const result = await manager.fetchCatalog({ cached_catalog: cached, feed_etag: '"one"', feed_sequence: 1 })
   assert.deepEqual(result.catalog, cached)
+  assert.equal(endpointCalls, 1)
   await assert.rejects(
     manager.fetchCatalog({ cached_catalog: null, feed_etag: '"one"', feed_sequence: 1 }),
     { message: 'update_feed_cache_missing' }
   )
+  assert.equal(endpointCalls, 2)
 })
 
 test('feed client validates each signed descriptor digest and enforces response limits', async () => {
   const document = release('0.2.0')
   const signed = createSignedFeed([document])
+  const endpointUrls = []
   const manager = new PlatformUpdateManager({ get: () => null }, {
     publicKeys: signed.publicKeys,
-    feedBaseUrl: 'https://update.nebulynk.net',
+    feedBaseUrl: DIRECT_FEED_BASE_URL,
+    endpointFetchImpl: async (url) => {
+      endpointUrls.push(String(url))
+      return new Response('ignored')
+    },
     fetchImpl: async (url) => {
       if (url.pathname.endsWith('/index.json')) {
         return Response.json(signed.envelope, { headers: { ETag: '"two"' } })
@@ -225,19 +239,47 @@ test('feed client validates each signed descriptor digest and enforces response 
   const result = await manager.fetchCatalog({ feed_sequence: 0 })
   assert.equal(result.sequence, 1)
   assert.equal(result.catalog.releases[0].version, '0.2.0')
+  assert.deepEqual(endpointUrls, ['https://update.nebulynk.net/'])
 
   const oversized = new PlatformUpdateManager({ get: () => null }, {
     publicKeys: signed.publicKeys,
-    feedBaseUrl: 'https://update.nebulynk.net',
+    feedBaseUrl: DIRECT_FEED_BASE_URL,
+    endpointFetchImpl: async () => { throw new Error('endpoint offline') },
     fetchImpl: async () => new Response('{}', { headers: { 'Content-Length': String(300 * 1024) } })
   })
   await assert.rejects(oversized.fetchCatalog({ feed_sequence: 0 }), { message: 'update_feed_response_too_large' })
 })
 
+test('production feed URL is the direct v1 source and endpoint failures do not affect the feed check', async () => {
+  const signed = createSignedFeed([release('0.2.0')])
+  const previousNodeEnv = process.env.NODE_ENV
+  process.env.NODE_ENV = 'production'
+  try {
+    const manager = new PlatformUpdateManager({ get: () => null }, {
+      publicKeys: signed.publicKeys,
+      endpointFetchImpl: async () => { throw new Error('endpoint offline') },
+      fetchImpl: async (url) => {
+        if (url.pathname.endsWith('/index.json')) {
+          assert.equal(url.href, 'https://updates.nebulynk.net/v1/index.json')
+          return Response.json(signed.envelope)
+        }
+        assert.equal(url.href, 'https://updates.nebulynk.net/v1/releases/v0.2.0.json')
+        return new Response(signed.files.get('releases/v0.2.0.json'))
+      }
+    })
+    const result = await manager.fetchCatalog({ feed_sequence: 0 })
+    assert.equal(result.sequence, 1)
+    assert.equal(manager.feedBaseUrl.href, DIRECT_FEED_BASE_URL)
+  } finally {
+    if (previousNodeEnv === undefined) delete process.env.NODE_ENV
+    else process.env.NODE_ENV = previousNodeEnv
+  }
+})
+
 test('concurrent checks keep one lease owner through security delivery', async () => {
   const manager = new PlatformUpdateManager({ get: () => null }, {
     publicKeys: { test: 'unused' },
-    feedBaseUrl: 'https://update.nebulynk.net'
+    feedBaseUrl: DIRECT_FEED_BASE_URL
   })
   let leaseHeld = false
   let deliveries = 0
@@ -277,7 +319,7 @@ test('security delivery selects active member admins, bundles releases, retries 
   const app = { get: (key) => key === 'postgresqlClient' ? db : null }
   const manager = new PlatformUpdateManager(app, {
     publicKeys: { test: 'unused' },
-    feedBaseUrl: 'https://update.nebulynk.net',
+    feedBaseUrl: DIRECT_FEED_BASE_URL,
     sendSecurityEmail: async (_app, payload) => {
       calls.push(payload)
       if (payload.user.id === 'owner' && failOwnerOnce) {
@@ -321,7 +363,7 @@ test('a detected downgrade invalidates old acknowledgements and security deliver
   })
   const manager = new PlatformUpdateManager({ get: (key) => key === 'postgresqlClient' ? db : null }, {
     publicKeys: { test: 'unused' },
-    feedBaseUrl: 'https://update.nebulynk.net',
+    feedBaseUrl: DIRECT_FEED_BASE_URL,
     now: () => new Date('2026-08-01T12:00:00.000Z')
   })
   const state = await manager.getState()
@@ -336,7 +378,7 @@ test('a failed fetch keeps the verified cache and still retries pending security
   const cachedCatalog = { releases: [release('0.2.0'), release('0.3.0', { security: [advisory('high')] })] }
   const manager = new PlatformUpdateManager({ get: () => null }, {
     publicKeys: { test: 'unused' },
-    feedBaseUrl: 'https://update.nebulynk.net',
+    feedBaseUrl: DIRECT_FEED_BASE_URL,
     log: { warn() {}, error() {} }
   })
   let retainedLease = false

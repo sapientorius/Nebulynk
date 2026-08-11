@@ -24,7 +24,9 @@ export const PLATFORM_UPDATE_MAX_INDEX_BYTES = 256 * 1024
 export const PLATFORM_UPDATE_MAX_RELEASE_BYTES = 128 * 1024
 const PLATFORM_UPDATE_MAX_BACKOFF_MS = 6 * 60 * 60 * 1000
 const PLATFORM_UPDATE_SCHEDULER_TICK_MS = 60_000
-const DEFAULT_FEED_BASE_URL = 'https://update.nebulynk.net'
+const DEFAULT_FEED_BASE_URL = 'https://updates.nebulynk.net/v1/'
+const UPDATE_ENDPOINT_URL = 'https://update.nebulynk.net/'
+const UPDATE_ENDPOINT_TIMEOUT_MS = 2_000
 
 function asIso(value) {
   if (!value) return null
@@ -151,6 +153,7 @@ export class PlatformUpdateManager {
     random = Math.random,
     feedBaseUrl = null,
     publicKeys = null,
+    endpointFetchImpl = fetchImpl,
     sendSecurityEmail = sendPlatformSecurityUpdateEmail,
     log = logger
   } = {}) {
@@ -161,6 +164,7 @@ export class PlatformUpdateManager {
     this.random = random
     this.feedBaseUrl = resolveFeedBaseUrl(process.env, feedBaseUrl)
     this.publicKeys = publicKeys || resolvePlatformUpdatePublicKeys(process.env)
+    this.endpointFetchImpl = endpointFetchImpl
     this.sendSecurityEmail = sendSecurityEmail
     this.log = log
     this.timer = null
@@ -211,6 +215,7 @@ export class PlatformUpdateManager {
   }
 
   async fetchCatalog(state) {
+    this.requestUpdateEndpoint()
     if (Object.keys(this.publicKeys).length === 0) {
       throw Object.assign(new Error('update_feed_keyring_empty'), { code: 'update_feed_keyring_empty' })
     }
@@ -264,6 +269,30 @@ export class PlatformUpdateManager {
     } finally {
       clearTimeout(timeout)
     }
+  }
+
+  requestUpdateEndpoint() {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), UPDATE_ENDPOINT_TIMEOUT_MS)
+    timeout.unref?.()
+
+    let request
+    try {
+      request = this.endpointFetchImpl(UPDATE_ENDPOINT_URL, {
+        method: 'GET',
+        headers: { Accept: 'application/json', 'User-Agent': 'Nebulynk-Update-Checker/1' },
+        redirect: 'error',
+        signal: controller.signal
+      })
+    } catch {
+      clearTimeout(timeout)
+      return
+    }
+
+    Promise.resolve(request)
+      .then((response) => response?.body?.cancel?.())
+      .catch(() => {})
+      .finally(() => clearTimeout(timeout))
   }
 
   async prepareInstalledVersion(leaseToken, state) {

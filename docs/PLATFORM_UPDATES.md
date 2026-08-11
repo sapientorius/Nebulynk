@@ -9,10 +9,11 @@ an update, trigger a deployment, or call Coolify. The implementation lives in
 
 The backend downloads the complete stable index from the fixed production URL
 `https://updates.nebulynk.net/v1/index.json`. Requests contain neither an
-instance identifier nor the installed version. The backend verifies the
-Ed25519 signature with the embedded keyring, rejects sequence rollback, then
-downloads only changed release documents and verifies their SHA-256 digests.
-The installed package SemVer is compared locally.
+instance identifier nor the installed version.
+The backend verifies the Ed25519 signature with the
+embedded keyring, rejects sequence rollback, then downloads only changed
+release documents and verifies their SHA-256 digests. The installed package
+SemVer is compared locally.
 
 The checker runs after startup and then hourly with jitter. ETags, a ten-second
 timeout, response-size limits, exponential backoff, and a database lease bound
