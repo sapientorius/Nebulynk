@@ -1,0 +1,91 @@
+{
+  "schema_version": 1,
+  "version": "0.3.0",
+  "revision": 1,
+  "channel": "stable",
+  "published_at": "2026-08-11T16:53:54.621Z",
+  "title": {
+    "en": "Nebulynk 0.3.0"
+  },
+  "summary": {
+    "en": "Adds secure self-service onboarding, granular meeting-history access controls, expanded administration tools, and refreshed platform dependencies."
+  },
+  "changes": [
+    {
+      "category": "feature",
+      "title": {
+        "en": "Self-service registration"
+      },
+      "description": {
+        "en": "Administrators can enable self-registration with domain allow-lists, email verification, optional approval, and configurable password policies."
+      }
+    },
+    {
+      "category": "security",
+      "title": {
+        "en": "Account deactivation and session invalidation"
+      },
+      "description": {
+        "en": "Deactivating a user now ends active sessions, while token-version checks protect API and realtime authentication."
+      }
+    },
+    {
+      "category": "feature",
+      "title": {
+        "en": "Meeting history access controls"
+      },
+      "description": {
+        "en": "Platform defaults and per-channel rules can limit access to past meetings based on channel membership or membership at meeting start."
+      }
+    },
+    {
+      "category": "improvement",
+      "title": {
+        "en": "Faster protected meeting history"
+      },
+      "description": {
+        "en": "Batched authorization checks and new database indexes improve access to meetings, search results, and related files."
+      }
+    },
+    {
+      "category": "improvement",
+      "title": {
+        "en": "Expanded administration controls"
+      },
+      "description": {
+        "en": "Dedicated meeting, registration, and SMTP settings add pending-registration alerts and protect administrator-managed mail configuration."
+      }
+    },
+    {
+      "category": "improvement",
+      "title": {
+        "en": "Refined sign-in and update experience"
+      },
+      "description": {
+        "en": "The login and registration flow is refreshed, and the update center uses the corrected official feed endpoint."
+      }
+    },
+    {
+      "category": "improvement",
+      "title": {
+        "en": "Dependency maintenance"
+      },
+      "description": {
+        "en": "Updated DOMPurify, Socket.IO parser, Feathers commons, Vite and esbuild, plus the desktop PTT helper dependency set."
+      }
+    }
+  ],
+  "security": [],
+  "upgrade": {
+    "backup_required": true,
+    "downtime_expected": true,
+    "breaking": false,
+    "manual_steps": {
+      "en": [
+        "Back up PostgreSQL and both Garage volumes and test a restore before updating.",
+        "Redeploy backend and frontend from the shared v0.3.0 release tag."
+      ]
+    },
+    "docs_url": "https://github.com/sapientorius/Nebulynk/blob/v0.3.0/docs/SELF_HOSTING.md"
+  }
+}

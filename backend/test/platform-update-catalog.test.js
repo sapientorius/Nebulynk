@@ -373,8 +373,8 @@ test('security delivery selects active member admins, bundles releases, retries 
     releases: [
       release('0.2.0'),
       release(PLATFORM_VERSION),
-      release('0.3.0', { security: [advisory('low', '<0.3.0')] }),
-      release('0.4.0', { security: [advisory('critical', '<0.4.0')] })
+      release('0.4.0', { security: [advisory('low', '<0.4.0')] }),
+      release('0.5.0', { security: [advisory('critical', '<0.5.0')] })
     ]
   }
 
