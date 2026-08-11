@@ -1,7 +1,7 @@
 import { createPrivateKey, sign } from 'node:crypto'
 import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
-import { loadReleaseCatalog, RELEASE_SCHEMA_VERSION, sha256Base64Url } from './release-catalog.mjs'
+import { loadReleaseCatalog, prepareReleaseForFeed, RELEASE_SCHEMA_VERSION, sha256Base64Url } from './release-catalog.mjs'
 
 const rootDir = process.cwd()
 const outputRoot = path.resolve(process.env.UPDATE_FEED_OUTPUT_DIR || path.join(rootDir, 'dist-update-feed'))
@@ -14,7 +14,10 @@ if (!privateKeyPem || !keyId) {
 }
 
 const catalog = await loadReleaseCatalog(rootDir)
-const releases = catalog.releases
+const releases = catalog.releases.map((release) => ({
+  ...release,
+  ...prepareReleaseForFeed(release.document, release.raw)
+}))
 const payload = {
   schema_version: RELEASE_SCHEMA_VERSION,
   sequence: catalog.sequence,

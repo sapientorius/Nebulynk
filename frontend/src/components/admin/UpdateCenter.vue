@@ -235,10 +235,10 @@ export default {
   },
   methods: {
     localized(value) {
-      return value?.[this.locale] || value?.en || ''
+      return value?.en || ''
     },
     localizedSteps(release) {
-      return release.upgrade?.manual_steps?.[this.locale] || release.upgrade?.manual_steps?.en || []
+      return release.upgrade?.manual_steps?.en || []
     },
     securityAlertType(severity) {
       if (severity === 'low') return 'info'

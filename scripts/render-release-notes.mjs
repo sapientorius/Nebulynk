@@ -5,38 +5,34 @@ import { loadReleaseCatalog } from './release-catalog.mjs'
 const { releases } = await loadReleaseCatalog(process.cwd())
 const outputDirectory = path.resolve(process.env.RELEASE_NOTES_OUTPUT_DIR || 'dist-release-notes')
 
-function renderRelease({ document }, locale, includeHeading = true) {
+function renderRelease({ document }, includeHeading = true) {
   const lines = []
-  if (includeHeading) lines.push(`## v${document.version} — ${document.title[locale]}`, '')
-  lines.push(document.summary[locale], '')
+  if (includeHeading) lines.push(`## v${document.version} — ${document.title.en}`, '')
+  lines.push(document.summary.en, '')
   for (const change of document.changes) {
-    lines.push(`- **${change.category}: ${change.title[locale]}** — ${change.description[locale]}`)
+    lines.push(`- **${change.category}: ${change.title.en}** — ${change.description.en}`)
   }
   if (document.security.length === 0) {
-    lines.push('', locale === 'de' ? 'Keine Security-Advisories.' : 'No security advisories.')
+    lines.push('', 'No security advisories.')
   } else {
-    lines.push('', locale === 'de' ? '### Security-Advisories' : '### Security advisories', '')
+    lines.push('', '### Security advisories', '')
     for (const advisory of document.security) {
-      lines.push(`- **${advisory.severity.toUpperCase()}** (${advisory.affected_versions}) — ${advisory.summary[locale]}`)
+      lines.push(`- **${advisory.severity.toUpperCase()}** (${advisory.affected_versions}) — ${advisory.summary.en}`)
     }
   }
-  lines.push('', `[${locale === 'de' ? 'Upgrade-Anleitung' : 'Upgrade guide'}](${document.upgrade.docs_url})`)
+  lines.push('', `[Upgrade guide](${document.upgrade.docs_url})`)
   return lines.join('\n')
 }
 
 const latest = releases.at(-1)
 const releaseNotes = [
-  renderRelease(latest, 'de', true),
-  '',
-  '---',
-  '',
-  renderRelease(latest, 'en', true),
+  renderRelease(latest, true),
   ''
 ].join('\n')
 const changelog = [
   '# Nebulynk Changelog',
   '',
-  ...releases.toReversed().flatMap((entry) => [renderRelease(entry, 'de', true), ''])
+  ...releases.toReversed().flatMap((entry) => [renderRelease(entry, true), ''])
 ].join('\n')
 
 await mkdir(outputDirectory, { recursive: true })

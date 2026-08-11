@@ -412,19 +412,19 @@ test.describe('P2-02 core e2e paths', () => {
       revision: 1,
       channel: 'stable',
       published_at: '2026-08-01T00:00:00.000Z',
-      title: { de: `Release ${version}`, en: `Release ${version}` },
-      summary: { de: 'Release-Zusammenfassung', en: 'Release summary' },
+      title: { en: `Release ${version}` },
+      summary: { en: 'Release summary' },
       changes: [{
         category: security.length ? 'security' : 'improvement',
-        title: { de: 'Aenderung', en: 'Change' },
-        description: { de: 'Details', en: 'Details' }
+        title: { en: 'Change' },
+        description: { en: 'Details' }
       }],
       security,
       upgrade: {
         backup_required: true,
         downtime_expected: false,
         breaking: false,
-        manual_steps: { de: ['Backup erstellen'], en: ['Create a backup'] },
+        manual_steps: { en: ['Create a backup'] },
         docs_url: 'https://docs.example.test/update'
       },
       security_applicable: security.length > 0,
@@ -452,7 +452,7 @@ test.describe('P2-02 core e2e paths', () => {
         release('0.4.0', [{
           severity: 'critical',
           affected_versions: '<0.4.0',
-          summary: { de: 'Kritischer Security-Fix', en: 'Critical security fix' }
+          summary: { en: 'Critical security fix' }
         }])
       ]
     })

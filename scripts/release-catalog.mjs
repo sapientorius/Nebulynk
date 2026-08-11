@@ -19,8 +19,54 @@ function assert(condition, message) {
 
 function assertLocalizedText(value, field) {
   assert(value && typeof value === 'object', `${field} must be an object`)
-  for (const locale of ['de', 'en']) {
-    assert(typeof value[locale] === 'string' && value[locale].trim(), `${field}.${locale} must be a non-empty string`)
+  assert(typeof value.en === 'string' && value.en.trim(), `${field}.en must be a non-empty string`)
+  if (value.de !== undefined) assert(typeof value.de === 'string' && value.de.trim(), `${field}.de must be a non-empty string`)
+}
+
+function assertManualSteps(value, field) {
+  assert(value && typeof value === 'object', `${field} must be an object`)
+  assert(Array.isArray(value.en), `${field}.en must be an array`)
+  assert(value.en.every((entry) => typeof entry === 'string' && entry.trim()), `${field}.en contains invalid entries`)
+  if (value.de !== undefined) {
+    assert(Array.isArray(value.de), `${field}.de must be an array`)
+    assert(value.de.every((entry) => typeof entry === 'string' && entry.trim()), `${field}.de contains invalid entries`)
+  }
+}
+
+function hasLegacyGermanFields(document) {
+  const localizedValues = [
+    document.title,
+    document.summary,
+    ...document.changes.flatMap((change) => [change.title, change.description]),
+    ...document.security.map((advisory) => advisory.summary)
+  ]
+  return localizedValues.every((value) => Object.hasOwn(value, 'de'))
+    && Object.hasOwn(document.upgrade.manual_steps, 'de')
+}
+
+export function normalizeReleaseDocumentForFeed(document) {
+  const normalized = structuredClone(document)
+  const localizedValues = [
+    normalized.title,
+    normalized.summary,
+    ...normalized.changes.flatMap((change) => [change.title, change.description]),
+    ...normalized.security.map((advisory) => advisory.summary)
+  ]
+  for (const value of localizedValues) {
+    if (!Object.hasOwn(value, 'de')) value.de = value.en
+  }
+  if (!Object.hasOwn(normalized.upgrade.manual_steps, 'de')) {
+    normalized.upgrade.manual_steps.de = [...normalized.upgrade.manual_steps.en]
+  }
+  return normalized
+}
+
+export function prepareReleaseForFeed(document, raw) {
+  if (hasLegacyGermanFields(document)) return { document, raw }
+  const normalized = normalizeReleaseDocumentForFeed(document)
+  return {
+    document: normalized,
+    raw: Buffer.from(`${JSON.stringify(normalized, null, 2)}\n`, 'utf8')
   }
 }
 
@@ -65,10 +111,7 @@ export function validateReleaseDocument(document, fileName = 'release') {
     assert(typeof document.upgrade[field] === 'boolean', `${fileName}.upgrade.${field} must be boolean`)
   }
   assert(document.upgrade.manual_steps && typeof document.upgrade.manual_steps === 'object', `${fileName}.upgrade.manual_steps must be an object`)
-  for (const locale of ['de', 'en']) {
-    assert(Array.isArray(document.upgrade.manual_steps[locale]), `${fileName}.upgrade.manual_steps.${locale} must be an array`)
-    assert(document.upgrade.manual_steps[locale].every((entry) => typeof entry === 'string' && entry.trim()), `${fileName}.upgrade.manual_steps.${locale} contains invalid entries`)
-  }
+  assertManualSteps(document.upgrade.manual_steps, `${fileName}.upgrade.manual_steps`)
   assertHttpsUrl(document.upgrade.docs_url, `${fileName}.upgrade.docs_url`)
   return document
 }

@@ -16,8 +16,17 @@ function assertCatalog(condition, code) {
 
 function assertLocalizedText(value) {
   assertCatalog(value && typeof value === 'object', 'update_feed_invalid_localized_text')
-  for (const locale of ['de', 'en']) {
-    assertCatalog(typeof value[locale] === 'string' && value[locale].trim(), 'update_feed_invalid_localized_text')
+  assertCatalog(typeof value.en === 'string' && value.en.trim(), 'update_feed_invalid_localized_text')
+  if (value.de !== undefined) assertCatalog(typeof value.de === 'string' && value.de.trim(), 'update_feed_invalid_localized_text')
+}
+
+function assertManualSteps(value) {
+  assertCatalog(value && typeof value === 'object', 'update_feed_release_upgrade_invalid')
+  assertCatalog(Array.isArray(value.en), 'update_feed_release_upgrade_invalid')
+  assertCatalog(value.en.every((entry) => typeof entry === 'string' && entry.trim()), 'update_feed_release_upgrade_invalid')
+  if (value.de !== undefined) {
+    assertCatalog(Array.isArray(value.de), 'update_feed_release_upgrade_invalid')
+    assertCatalog(value.de.every((entry) => typeof entry === 'string' && entry.trim()), 'update_feed_release_upgrade_invalid')
   }
 }
 
@@ -61,11 +70,7 @@ export function validateReleaseDocument(document, descriptor = null) {
   for (const field of ['backup_required', 'downtime_expected', 'breaking']) {
     assertCatalog(typeof document.upgrade[field] === 'boolean', 'update_feed_release_upgrade_invalid')
   }
-  assertCatalog(document.upgrade.manual_steps && typeof document.upgrade.manual_steps === 'object', 'update_feed_release_upgrade_invalid')
-  for (const locale of ['de', 'en']) {
-    assertCatalog(Array.isArray(document.upgrade.manual_steps[locale]), 'update_feed_release_upgrade_invalid')
-    assertCatalog(document.upgrade.manual_steps[locale].every((entry) => typeof entry === 'string' && entry.trim()), 'update_feed_release_upgrade_invalid')
-  }
+  assertManualSteps(document.upgrade.manual_steps)
   assertHttpsUrl(document.upgrade.docs_url)
   return document
 }

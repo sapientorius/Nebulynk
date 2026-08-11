@@ -63,7 +63,7 @@
         "manual_steps": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["de", "en"],
+          "required": ["en"],
           "properties": {
             "de": { "type": "array", "items": { "type": "string", "minLength": 1 } },
             "en": { "type": "array", "items": { "type": "string", "minLength": 1 } }
@@ -77,7 +77,7 @@
     "localizedText": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["de", "en"],
+      "required": ["en"],
       "properties": {
         "de": { "type": "string", "minLength": 1 },
         "en": { "type": "string", "minLength": 1 }

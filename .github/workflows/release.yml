@@ -82,7 +82,7 @@ jobs:
           UPDATE_FEED_PUBLIC_KEYS_JSON: ${{ vars.UPDATE_FEED_PUBLIC_KEYS_JSON }}
         run: npm run release:assert-feed-advance
 
-      - name: Render bilingual release notes and changelog
+      - name: Render English release notes and changelog
         run: npm run release:notes
 
       - name: Create immutable GitHub release

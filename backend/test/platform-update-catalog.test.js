@@ -11,9 +11,13 @@ import {
 import { PLATFORM_VERSION } from '../src/lib/build-info.js'
 import { PlatformUpdateManager } from '../src/lib/platform-updates.js'
 import { createMemoryDb } from './helpers/memory-db.js'
+import {
+  prepareReleaseForFeed,
+  validateReleaseDocument as validateSourceReleaseDocument
+} from '../../scripts/release-catalog.mjs'
 
 function localized(value) {
-  return { de: value, en: value }
+  return { en: value }
 }
 
 function release(version, {
@@ -35,7 +39,7 @@ function release(version, {
       backup_required: false,
       downtime_expected: false,
       breaking: false,
-      manual_steps: { de: [], en: [] },
+      manual_steps: { en: [] },
       docs_url: 'https://docs.nebulynk.net/update'
     }
   }
@@ -154,12 +158,45 @@ test('signed feed verification accepts a valid Ed25519 envelope and rejects tamp
   )
 })
 
-test('release validation requires explicit security metadata and validates stable SemVer', () => {
+test('release validation requires English metadata and validates stable SemVer', () => {
   assert.equal(validateReleaseDocument(release('0.2.0')).version, '0.2.0')
+  assert.equal(validateSourceReleaseDocument(release('0.2.0')).version, '0.2.0')
   const missingSecurity = release('0.2.0')
   delete missingSecurity.security
   assert.throws(() => validateReleaseDocument(missingSecurity), { message: 'update_feed_release_security_invalid' })
   assert.throws(() => validateReleaseDocument(release('0.3.0-beta.1')), { message: 'update_feed_release_channel_invalid' })
+
+  const missingEnglish = release('0.2.0')
+  delete missingEnglish.title.en
+  assert.throws(() => validateReleaseDocument(missingEnglish), { message: 'update_feed_invalid_localized_text' })
+  assert.throws(() => validateSourceReleaseDocument(missingEnglish), /release schema validation failed/)
+
+  const missingEnglishSteps = release('0.2.0')
+  delete missingEnglishSteps.upgrade.manual_steps.en
+  assert.throws(() => validateReleaseDocument(missingEnglishSteps), { message: 'update_feed_release_upgrade_invalid' })
+})
+
+test('feed preparation adds legacy German fallbacks without changing historical fields', () => {
+  const englishOnly = release('0.2.0', { security: [advisory('low')] })
+  const prepared = prepareReleaseForFeed(englishOnly, Buffer.from('english-only-source'))
+  assert.equal(prepared.document.title.de, prepared.document.title.en)
+  assert.equal(prepared.document.summary.de, prepared.document.summary.en)
+  assert.equal(prepared.document.changes[0].title.de, prepared.document.changes[0].title.en)
+  assert.equal(prepared.document.security[0].summary.de, prepared.document.security[0].summary.en)
+  assert.deepEqual(prepared.document.upgrade.manual_steps.de, prepared.document.upgrade.manual_steps.en)
+  assert.match(prepared.raw.toString('utf8'), /"de": "Release 0\.2\.0"/)
+
+  const historical = release('0.2.1')
+  historical.title.de = 'Historisches Release'
+  historical.summary.de = 'Historische Zusammenfassung'
+  historical.changes[0].title.de = 'Historische Änderung'
+  historical.changes[0].description.de = 'Historische Details'
+  historical.upgrade.manual_steps.de = ['Historischen Schritt prüfen']
+  const historicalRaw = Buffer.from('historical-source')
+  const preserved = prepareReleaseForFeed(historical, historicalRaw)
+  assert.strictEqual(preserved.raw, historicalRaw)
+  assert.equal(preserved.document.title.de, 'Historisches Release')
+  assert.deepEqual(preserved.document.upgrade.manual_steps.de, ['Historischen Schritt prüfen'])
 })
 
 test('SemVer comparison returns every release gap and only applicable security advisories', () => {

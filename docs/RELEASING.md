@@ -50,8 +50,10 @@ installation has received the new keyring.
    and also increments the catalog sequence.
 2. Classify every change explicitly. Security advisories are never inferred
    from commit messages. Every advisory must contain severity, affected SemVer
-   range, localized summary, and optionally a CVE and HTTPS advisory URL. Use
-   an explicit empty `security: []` when there is no security fix.
+   range, an English summary, and optionally a CVE and HTTPS advisory URL. Use
+   an explicit empty `security: []` when there is no security fix. English is
+   the only required release language; historical German fields remain
+   accepted but are not used for published notes or the update center.
 3. Update the root, backend, and frontend versions to exactly the same stable
    SemVer. Do not add a prerelease document to the stable catalog.
 4. Run:
@@ -67,8 +69,9 @@ installation has received the new keyring.
 The release workflow verifies that the tag is on `stable`, reruns CI, signs
 the exact catalog bytes in the protected environment, verifies the result
 against the configured public keyring, requires its sequence to advance the
-currently published signed feed, creates bilingual GitHub release notes and a
-changelog, and finally deploys the feed. Missing metadata, version drift,
+currently published signed feed, creates English GitHub release notes and a
+changelog, adds legacy German compatibility fields to new feed documents, and
+finally deploys the feed. Missing metadata, version drift,
 prereleases, a missing key, a rollback, or an unverifiable signature stop
 publication.
 
