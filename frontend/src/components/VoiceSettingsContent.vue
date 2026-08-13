@@ -115,6 +115,41 @@
             </div>
           </div>
         </n-form-item>
+
+        <n-form-item
+          v-if="showBrowserGlobalPttSettings"
+          :label="$t('ui.components.global_push_to_talk')"
+        >
+          <div class="global-ptt-card">
+            <div class="global-ptt-copy">
+              <strong>{{ $t('ui.components.global_ptt_install_helper') }}</strong>
+              <div class="setting-hint global-ptt-hint">
+                {{ $t('ui.components.global_ptt_helper_release_soon') }}
+                <a
+                  href="https://github.com/sapientorius/Nebulynk/releases"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  {{ $t('ui.components.global_ptt_open_github_releases') }}
+                </a>
+              </div>
+              <div class="setting-hint global-ptt-hint">
+                {{ $t('ui.components.global_ptt_permission_explanation') }}
+              </div>
+            </div>
+            <n-button
+              :type="browserPttHelperEnabled ? 'warning' : 'primary'"
+              @click="toggleBrowserGlobalPtt"
+            >
+              {{ browserPttHelperEnabled
+                ? $t('ui.components.global_ptt_disable')
+                : $t('ui.components.global_ptt_enable') }}
+            </n-button>
+            <div v-if="browserPttHelperEnabled" class="setting-hint global-ptt-hint">
+              {{ $t('ui.components.global_ptt_enabled_description') }}
+            </div>
+          </div>
+        </n-form-item>
       </template>
     </n-form>
   </div>
@@ -135,6 +170,11 @@ import {
   desktopWorkspaceState
 } from '../lib/desktop-workspace-bridge.js'
 import { nativePttState } from '../lib/native-ptt-state.js'
+import {
+  browserPttHelperState,
+  disableBrowserPttHelper,
+  enableBrowserPttHelper
+} from '../lib/browser-ptt-helper-bridge.js'
 import { isDesktopPttTextEntryKey } from '../lib/desktop-ptt-shortcut.js'
 import * as micActivation from '../lib/mic-activation.js'
 import { isDesktopWorkspaceWindow } from '../lib/runtime.js'
@@ -203,6 +243,12 @@ export default {
     },
     nativePttTargetSessionId() {
       return nativePttState.targetSessionId || null
+    },
+    browserPttHelperEnabled() {
+      return browserPttHelperState.enabled === true
+    },
+    showBrowserGlobalPttSettings() {
+      return this.micMode === 'ptt' && browserPttHelperState.available === true
     },
     hasNativePttSurface() {
       return isDesktopWorkspaceWindow() || this.nativePttTransport === 'browser-helper'
@@ -357,6 +403,13 @@ export default {
       micActivation.setVadThreshold(value)
       micActivation.saveSettings()
     },
+    toggleBrowserGlobalPtt() {
+      if (this.browserPttHelperEnabled) {
+        disableBrowserPttHelper()
+      } else {
+        enableBrowserPttHelper()
+      }
+    },
     startVadMeter() {
       this.stopVadMeter()
       this.vadMeterInterval = setInterval(() => {
@@ -421,6 +474,22 @@ export default {
 .ptt-status-badge {
   display: flex;
   align-items: center;
+  margin-top: 6px;
+}
+
+.global-ptt-card {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--app-border);
+  border-radius: 8px;
+  background: var(--app-surface-muted);
+}
+
+.global-ptt-copy {
+  margin-bottom: 10px;
+}
+
+.global-ptt-hint {
   margin-top: 6px;
 }
 

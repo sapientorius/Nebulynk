@@ -60,7 +60,7 @@ import {
   setupI18n
 } from './lib/i18n.js'
 import { initializePwaSupport } from './lib/pwa.js'
-import { startBrowserPttHelperBridge } from './lib/browser-ptt-helper-bridge.js'
+import { initializeBrowserPttHelperBridge } from './lib/browser-ptt-helper-bridge.js'
 import { initializeDesktopRuntime } from './lib/desktop-runtime.js'
 import { startDesktopBackgroundRelay } from './lib/desktop-background-relay.js'
 import { startDesktopManagerController } from './lib/desktop-manager-controller.js'
@@ -194,7 +194,7 @@ if (desktopManagerWindow) {
     router
   })
 } else {
-  startBrowserPttHelperBridge({
+  initializeBrowserPttHelperBridge({
     router
   })
 }

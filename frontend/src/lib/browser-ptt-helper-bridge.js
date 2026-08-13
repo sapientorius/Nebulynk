@@ -1,4 +1,5 @@
 import { createId } from '@paralleldrive/cuid2'
+import { reactive } from 'vue'
 import * as micActivation from './mic-activation.js'
 import {
   DEFAULT_DESKTOP_PTT_BINDING_STATUS,
@@ -16,19 +17,27 @@ const HELPER_URL = 'ws://127.0.0.1:47641/ws'
 const HELPER_PROTOCOL_VERSION = '1'
 const PAIRING_TOKEN_KEY = 'nebulynk:ptt-helper:pairing-token'
 const SESSION_ID_KEY = 'nebulynk:ptt-helper:session-id'
+const ENABLED_KEY = 'nebulynk:ptt-helper:enabled'
 const RECONNECT_BASE_MS = 750
 const RECONNECT_MAX_MS = 10000
 
 let socket = null
 let reconnectTimer = null
 let reconnectAttempt = 0
+let initialized = false
 let started = false
 let currentRoute = '/'
+let bridgeRouter = null
 let routerCleanup = null
 let settingsCleanup = null
 let browserEventCleanup = []
 let activeSocketSerial = 0
 let heartbeatTimer = null
+
+export const browserPttHelperState = reactive({
+  available: false,
+  enabled: false
+})
 
 function isWindowsBrowserHelperCandidate(targetWindow = typeof window !== 'undefined' ? window : null) {
   if (!targetWindow || isDesktopRuntime(targetWindow) || typeof WebSocket === 'undefined') {
@@ -38,6 +47,28 @@ function isWindowsBrowserHelperCandidate(targetWindow = typeof window !== 'undef
   const platform = targetWindow.navigator?.userAgentData?.platform || targetWindow.navigator?.platform || ''
   const userAgent = targetWindow.navigator?.userAgent || ''
   return /win/i.test(platform) || /windows/i.test(userAgent)
+}
+
+function getEnabledPreference() {
+  try {
+    return globalThis.localStorage?.getItem(ENABLED_KEY) === 'true'
+  } catch {
+    return false
+  }
+}
+
+function setEnabledPreference(enabled) {
+  try {
+    const storage = globalThis.localStorage
+    if (!storage) return
+    if (enabled) {
+      storage.setItem(ENABLED_KEY, 'true')
+    } else {
+      storage.removeItem(ENABLED_KEY)
+    }
+  } catch {
+    // Ignore storage issues and keep the current runtime choice alive.
+  }
 }
 
 function getPairingToken() {
@@ -303,21 +334,21 @@ function connect() {
   })
 }
 
-export function startBrowserPttHelperBridge({ router } = {}) {
-  if (!isWindowsBrowserHelperCandidate() || started) {
-    return () => {}
+function startBrowserPttHelperConnection() {
+  if (!initialized || !isWindowsBrowserHelperCandidate() || started) {
+    return
   }
 
   started = true
-  currentRoute = router?.currentRoute?.value?.fullPath || currentBrowserRoute()
+  currentRoute = bridgeRouter?.currentRoute?.value?.fullPath || currentBrowserRoute()
   resetNativePttState({
     transport: 'browser-helper',
     helperState: 'idle'
   })
 
-  if (router) {
+  if (bridgeRouter) {
     routerCleanup?.()
-    routerCleanup = router.afterEach((to) => {
+    routerCleanup = bridgeRouter.afterEach((to) => {
       currentRoute = to?.fullPath || currentBrowserRoute()
       sendSessionState()
     })
@@ -348,27 +379,85 @@ export function startBrowserPttHelperBridge({ router } = {}) {
   }, 2000)
 
   connect()
+}
+
+function stopBrowserPttHelperConnection() {
+  started = false
+  routerCleanup?.()
+  routerCleanup = null
+  settingsCleanup?.()
+  settingsCleanup = null
+  for (const cleanup of browserEventCleanup) cleanup()
+  browserEventCleanup = []
+  if (heartbeatTimer) {
+    globalThis.clearInterval(heartbeatTimer)
+    heartbeatTimer = null
+  }
+  if (reconnectTimer) {
+    window.clearTimeout(reconnectTimer)
+    reconnectTimer = null
+  }
+
+  micActivation.triggerExternalPttUp()
+  sendEnvelope('disconnect')
+  activeSocketSerial += 1
+  socket?.close()
+  socket = null
+  reconnectAttempt = 0
+  micActivation.setDesktopPttBindingStatus(DEFAULT_DESKTOP_PTT_BINDING_STATUS)
+  resetNativePttState()
+}
+
+export function initializeBrowserPttHelperBridge({ router } = {}) {
+  const available = isWindowsBrowserHelperCandidate()
+  browserPttHelperState.available = available
+
+  if (!available) {
+    browserPttHelperState.enabled = false
+    return () => {}
+  }
+
+  bridgeRouter = router || bridgeRouter
+  currentRoute = bridgeRouter?.currentRoute?.value?.fullPath || currentBrowserRoute()
+
+  if (!initialized) {
+    initialized = true
+    browserPttHelperState.enabled = getEnabledPreference()
+  }
+
+  if (browserPttHelperState.enabled) {
+    startBrowserPttHelperConnection()
+  }
 
   return () => {
-    started = false
-    routerCleanup?.()
-    routerCleanup = null
-    settingsCleanup?.()
-    settingsCleanup = null
-    for (const cleanup of browserEventCleanup) cleanup()
-    browserEventCleanup = []
-    if (heartbeatTimer) {
-      globalThis.clearInterval(heartbeatTimer)
-      heartbeatTimer = null
-    }
-    if (reconnectTimer) {
-      window.clearTimeout(reconnectTimer)
-      reconnectTimer = null
-    }
-    sendEnvelope('disconnect')
-    activeSocketSerial += 1
-    socket?.close()
-    socket = null
-    resetNativePttState()
+    stopBrowserPttHelperConnection()
+    initialized = false
+    bridgeRouter = null
+    browserPttHelperState.available = false
+    browserPttHelperState.enabled = false
   }
+}
+
+export function enableBrowserPttHelper() {
+  if (!isWindowsBrowserHelperCandidate()) {
+    browserPttHelperState.available = false
+    browserPttHelperState.enabled = false
+    return false
+  }
+
+  if (!initialized) {
+    initializeBrowserPttHelperBridge()
+  }
+
+  browserPttHelperState.available = true
+  browserPttHelperState.enabled = true
+  setEnabledPreference(true)
+  startBrowserPttHelperConnection()
+  return true
+}
+
+export function disableBrowserPttHelper() {
+  browserPttHelperState.enabled = false
+  setEnabledPreference(false)
+  stopBrowserPttHelperConnection()
 }

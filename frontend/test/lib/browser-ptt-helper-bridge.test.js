@@ -134,10 +134,85 @@ describe('browser ptt helper bridge', () => {
     delete globalThis.sessionStorage
   })
 
-  it('sends hello, session_state, and ptt_config after authorization', async () => {
-    const { startBrowserPttHelperBridge } = await import('../../src/lib/browser-ptt-helper-bridge.js')
+  it('does not open a helper socket for a fresh user during initialization', async () => {
+    const { initializeBrowserPttHelperBridge, browserPttHelperState } = await import('../../src/lib/browser-ptt-helper-bridge.js')
 
-    startBrowserPttHelperBridge({
+    initializeBrowserPttHelperBridge()
+
+    expect(browserPttHelperState.available).toBe(true)
+    expect(browserPttHelperState.enabled).toBe(false)
+    expect(MockWebSocket.instances).toHaveLength(0)
+  })
+
+  it('does not expose the browser helper on non-Windows platforms', async () => {
+    globalThis.window.navigator.userAgent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0)'
+
+    const { initializeBrowserPttHelperBridge, browserPttHelperState } = await import('../../src/lib/browser-ptt-helper-bridge.js')
+
+    initializeBrowserPttHelperBridge()
+
+    expect(browserPttHelperState.available).toBe(false)
+    expect(MockWebSocket.instances).toHaveLength(0)
+  })
+
+  it('opens a helper socket only after global push-to-talk is enabled', async () => {
+    const { initializeBrowserPttHelperBridge, enableBrowserPttHelper, browserPttHelperState } = await import('../../src/lib/browser-ptt-helper-bridge.js')
+
+    initializeBrowserPttHelperBridge()
+    expect(MockWebSocket.instances).toHaveLength(0)
+
+    expect(enableBrowserPttHelper()).toBe(true)
+
+    expect(browserPttHelperState.enabled).toBe(true)
+    expect(globalThis.localStorage.getItem('nebulynk:ptt-helper:enabled')).toBe('true')
+    expect(MockWebSocket.instances).toHaveLength(1)
+    expect(MockWebSocket.instances[0].url).toBe('ws://127.0.0.1:47641/ws')
+  })
+
+  it('reconnects on startup when global push-to-talk was already enabled', async () => {
+    globalThis.localStorage.setItem('nebulynk:ptt-helper:enabled', 'true')
+
+    const { initializeBrowserPttHelperBridge, browserPttHelperState } = await import('../../src/lib/browser-ptt-helper-bridge.js')
+
+    initializeBrowserPttHelperBridge()
+
+    expect(browserPttHelperState.enabled).toBe(true)
+    expect(MockWebSocket.instances).toHaveLength(1)
+  })
+
+  it('stops the helper connection and prevents reconnects when global push-to-talk is disabled', async () => {
+    const {
+      initializeBrowserPttHelperBridge,
+      enableBrowserPttHelper,
+      disableBrowserPttHelper,
+      browserPttHelperState
+    } = await import('../../src/lib/browser-ptt-helper-bridge.js')
+
+    initializeBrowserPttHelperBridge()
+    enableBrowserPttHelper()
+    const socket = MockWebSocket.instances[0]
+    socket.emit('open')
+    globalThis.localStorage.setItem('nebulynk:ptt-helper:pairing-token', 'token-123')
+
+    disableBrowserPttHelper()
+    socket.emit('close')
+    vi.advanceTimersByTime(20_000)
+
+    expect(browserPttHelperState.enabled).toBe(false)
+    expect(globalThis.localStorage.getItem('nebulynk:ptt-helper:enabled')).toBeNull()
+    expect(globalThis.localStorage.getItem('nebulynk:ptt-helper:pairing-token')).toBe('token-123')
+    expect(socket.readyState).toBe(3)
+    expect(triggerExternalPttUpMock).toHaveBeenCalledTimes(1)
+    expect(setDesktopPttBindingStatusMock).toHaveBeenCalledWith(expect.objectContaining({
+      mode: 'focused-only'
+    }))
+    expect(MockWebSocket.instances).toHaveLength(1)
+  })
+
+  it('sends hello, session_state, and ptt_config after authorization', async () => {
+    const { initializeBrowserPttHelperBridge, enableBrowserPttHelper } = await import('../../src/lib/browser-ptt-helper-bridge.js')
+
+    initializeBrowserPttHelperBridge({
       router: {
         currentRoute: {
           value: {
@@ -149,6 +224,7 @@ describe('browser ptt helper bridge', () => {
         }
       }
     })
+    enableBrowserPttHelper()
 
     const socket = MockWebSocket.instances[0]
     expect(socket.url).toBe('ws://127.0.0.1:47641/ws')
@@ -209,10 +285,11 @@ describe('browser ptt helper bridge', () => {
   })
 
   it('stores the pairing token after approval and updates the helper state', async () => {
-    const { startBrowserPttHelperBridge } = await import('../../src/lib/browser-ptt-helper-bridge.js')
+    const { initializeBrowserPttHelperBridge, enableBrowserPttHelper } = await import('../../src/lib/browser-ptt-helper-bridge.js')
     const { nativePttState } = await import('../../src/lib/native-ptt-state.js')
 
-    startBrowserPttHelperBridge()
+    initializeBrowserPttHelperBridge()
+    enableBrowserPttHelper()
     const socket = MockWebSocket.instances[0]
     socket.emit('open')
     socket.emit('message', {
@@ -238,9 +315,10 @@ describe('browser ptt helper bridge', () => {
   })
 
   it('forwards external push-to-talk events from the helper socket', async () => {
-    const { startBrowserPttHelperBridge } = await import('../../src/lib/browser-ptt-helper-bridge.js')
+    const { initializeBrowserPttHelperBridge, enableBrowserPttHelper } = await import('../../src/lib/browser-ptt-helper-bridge.js')
 
-    startBrowserPttHelperBridge()
+    initializeBrowserPttHelperBridge()
+    enableBrowserPttHelper()
     const socket = MockWebSocket.instances[0]
     socket.emit('open')
     socket.emit('message', {
@@ -255,10 +333,11 @@ describe('browser ptt helper bridge', () => {
   })
 
   it('ignores stale close events after a replacement socket is connected', async () => {
-    const { startBrowserPttHelperBridge } = await import('../../src/lib/browser-ptt-helper-bridge.js')
+    const { initializeBrowserPttHelperBridge, enableBrowserPttHelper } = await import('../../src/lib/browser-ptt-helper-bridge.js')
     const { nativePttState } = await import('../../src/lib/native-ptt-state.js')
 
-    startBrowserPttHelperBridge()
+    initializeBrowserPttHelperBridge()
+    enableBrowserPttHelper()
     const firstSocket = MockWebSocket.instances[0]
     firstSocket.emit('open')
     firstSocket.emit('close')

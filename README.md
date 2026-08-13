@@ -65,6 +65,13 @@ The optional Windows push-to-talk helper requires a Rust and Cargo toolchain:
 npm run dev:desktop:ptt-helper
 ```
 
+Browser and PWA users opt in to the local helper from **Voice settings** after
+selecting **Push-to-Talk**. Nebulynk does not contact the helper when the site
+first opens. Enabling global Push-to-Talk starts the local connection and may
+prompt Windows or the browser for access to other apps and services; that
+access is needed only for the optional global shortcut. The official helper
+will be published on [GitHub Releases](https://github.com/sapientorius/Nebulynk/releases).
+
 > **Update notice for existing installations:** `v0.2.0` is the first release
 > with signed in-app update and security notices for platform administrators.
 > Installations on `v0.1.0` must update once manually. The standard production

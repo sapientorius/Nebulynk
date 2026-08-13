@@ -3,7 +3,7 @@ import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 describe('VoiceSettingsContent', () => {
-  it('shows desktop ptt guidance for native pass-through and focused-only fallbacks', () => {
+  it('shows opt-in global PTT guidance only for Windows browser helper candidates', () => {
     const source = readFileSync(resolve('src/components/VoiceSettingsContent.vue'), 'utf8')
 
     expect(source).toContain("desktop_ptt_passthrough_hint")
@@ -19,6 +19,17 @@ describe('VoiceSettingsContent', () => {
     expect(source).toContain("this.desktopPttBindingStatus?.mode === 'unsupported'")
     expect(source).toContain('isDesktopPttTextEntryKey(this.pttKeyLocal)')
     expect(source).toContain("isDesktopWorkspaceWindow() || this.nativePttTransport === 'browser-helper'")
+    expect(source).toContain('v-if="showBrowserGlobalPttSettings"')
+    expect(source).toContain('class="global-ptt-card"')
+    expect(source).toContain('browserPttHelperState.available === true')
+    expect(source).toContain('browserPttHelperState.enabled === true')
+    expect(source).toContain('enableBrowserPttHelper()')
+    expect(source).toContain('disableBrowserPttHelper()')
+    expect(source).toContain('https://github.com/sapientorius/Nebulynk/releases')
+    expect(source).toContain("$t('ui.components.global_ptt_install_helper')")
+    expect(source).toContain("$t('ui.components.global_ptt_permission_explanation')")
+    expect(source).toContain("$t('ui.components.global_ptt_enable')")
+    expect(source).toContain("$t('ui.components.global_ptt_disable')")
     expect(source).not.toContain('syncDesktopWorkspacePttConfig')
     expect(source).not.toContain('[voice-settings:ptt-key-sync]')
   })
