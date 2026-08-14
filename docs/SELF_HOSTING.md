@@ -75,12 +75,14 @@ Compose files.
 For example, generate strong values with:
 
 ```bash
-openssl rand -base64 48    # JWT_SECRET, AI_SECRET_KEY, passwords
+openssl rand -base64 48    # JWT_SECRET, AI_SECRET_KEY, AUTH_2FA_SECRET_KEY, passwords
 openssl rand -hex 32       # GARAGE_RPC_SECRET: 32 bytes = 64 hex characters
 ```
 
-Use different values for `JWT_SECRET`, `AI_SECRET_KEY`, `POSTGRES_PASSWORD`,
-`STORAGE_S3_SECRET_KEY`, and `LIVEKIT_API_SECRET`. Placeholders such as
+Use different values for `JWT_SECRET`, `AI_SECRET_KEY`, `AUTH_2FA_SECRET_KEY`,
+`POSTGRES_PASSWORD`, `STORAGE_S3_SECRET_KEY`, and `LIVEKIT_API_SECRET`.
+`AUTH_2FA_SECRET_KEY` is recommended but optional for existing installations;
+without it, stored two-factor secrets use `JWT_SECRET` as a fallback. Placeholders such as
 `change_me`, default passwords, and development values are not allowed with
 `NODE_ENV=production`.
 
@@ -139,7 +141,8 @@ included `livekit-egress.yaml` uses `nebulynk-files`.
 
 | Group | Variables | When to set them |
 | --- | --- | --- |
-| Sessions and operation | `AUTH_BROWSER_ACCESS_TOKEN_TTL`, `AUTH_REFRESH_TOKEN_TTL`, `AUTH_REMEMBER_REFRESH_TOKEN_TTL`, `AUTH_COOKIE_DOMAIN`, `AUTH_REFRESH_COOKIE_NAME`, `AUTH_CSRF_COOKIE_NAME`, `LOG_LEVEL`, `BACKEND_PORT` | Use for a non-default session policy, cookie domain, logging level, or port. Defaults are in `.env.example`. |
+| Sessions and operation | `AUTH_BROWSER_ACCESS_TOKEN_TTL`, `AUTH_REFRESH_TOKEN_TTL`, `AUTH_REMEMBER_REFRESH_TOKEN_TTL`, `AUTH_COOKIE_DOMAIN`, `AUTH_REFRESH_COOKIE_NAME`, `AUTH_CSRF_COOKIE_NAME`, `LOG_LEVEL`, `BACKEND_PORT` | Use for a non-default session policy, cookie domain, logging level, or port. The self-hosted Compose file passes `AUTH_CSRF_COOKIE_NAME` to both the backend and frontend build. Defaults are in `.env.example`. |
+| Two-factor encryption | `AUTH_2FA_SECRET_KEY` | Recommended stable, dedicated secret for stored two-factor secrets. Existing installations may leave it unset and use `JWT_SECRET` as a fallback. |
 | Abuse protection | `RATE_LIMIT_DRIVER=redis`, `AUTHENTICATION_RATE_LIMIT_IP_LIMIT`, `AI_PROVIDER_BASE_URL_ALLOWLIST` | Redis is the recommended rate-limit store in production. Set an AI allowlist only for intentionally trusted HTTPS endpoints. |
 | Docker host ports | `POSTGRES_PORT`, `REDIS_PORT`, `STORAGE_S3_PORT`, `LIVEKIT_PORT`, `BACKEND_PORT`, `FRONTEND_PORT` | In the supplied self-hosted stack these bind to `127.0.0.1` for the host reverse proxy. LiveKit TCP `7881` and UDP `7882` remain public media ports. Change host ports only when the proxy configuration changes too. |
 | Container image pins | `NEBULYNK_NODE_IMAGE`, `NEBULYNK_NGINX_IMAGE`, `NEBULYNK_POSTGRES_IMAGE`, `NEBULYNK_REDIS_IMAGE`, `NEBULYNK_GARAGE_IMAGE`, `NEBULYNK_LIVEKIT_SERVER_IMAGE`, `NEBULYNK_LIVEKIT_EGRESS_IMAGE` | Defaults are reviewed image versions. Override only after separately reviewing the upstream image release and testing it in a staging instance. |
@@ -183,8 +186,8 @@ build contexts. Do not start the base file alone for a production instance.
 2. Edit `.env.production`. Replace every `CHANGE_ME` value, set the four public
    domains, and leave `NODE_ENV=production`, `TRUST_PROXY=true`, and
    `FRONTEND_PORT=8080`. `VITE_API_URL` is a required build value, while the
-   supplied Compose file reuses `LIVEKIT_PUBLIC_URL` and `VAPID_PUBLIC_KEY` for
-   their corresponding frontend values.
+   supplied Compose file reuses `LIVEKIT_PUBLIC_URL`, `VAPID_PUBLIC_KEY`, and
+   `AUTH_CSRF_COOKIE_NAME` for their corresponding frontend values.
 
 3. Render the Compose configuration before changing server state. This catches
    missing required variables and shows the final service definitions:

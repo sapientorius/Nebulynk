@@ -123,6 +123,8 @@ services:
       # dedicated encryption key instead of falling back to auth.
       JWT_SECRET: ${JWT_SECRET:-${SERVICE_PASSWORD_64_JWT}}
       AI_SECRET_KEY: ${AI_SECRET_KEY:-${SERVICE_PASSWORD_64_AI}}
+      # Optional dedicated key for encrypting stored two-factor secrets.
+      AUTH_2FA_SECRET_KEY: ${AUTH_2FA_SECRET_KEY:-}
       BACKEND_PORT: ${BACKEND_PORT:-3030}
       LOG_LEVEL: ${LOG_LEVEL:-info}
       MAX_FILE_SIZE: ${MAX_FILE_SIZE:-26214400}

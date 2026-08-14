@@ -122,6 +122,10 @@ Configure only the features you intend to use:
 - Email: set `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_IGNORE_TLS`,
   `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`, and optionally `SMTP_FROM_NAME`.
 - GIF search: set `KLIPY_API_KEY` only when using the Klipy integration.
+- Two-factor encryption: optionally set a strong, stable
+  `AUTH_2FA_SECRET_KEY` to keep stored two-factor secrets separate from the
+  JWT signing key. Existing installations can leave it unset and use the
+  backwards-compatible `JWT_SECRET` fallback.
 - Advanced limits, session settings, image pins, and logging values can keep
   their Compose defaults unless a reviewed deployment requirement says
   otherwise.

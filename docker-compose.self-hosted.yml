@@ -44,7 +44,7 @@ services:
         VITE_API_URL: ${VITE_API_URL:?VITE_API_URL must be set}
         VITE_LIVEKIT_URL: ${LIVEKIT_PUBLIC_URL:?LIVEKIT_PUBLIC_URL must be set}
         VITE_VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
-        VITE_AUTH_CSRF_COOKIE_NAME: ${VITE_AUTH_CSRF_COOKIE_NAME:-nebulynk_csrf_token}
+        VITE_AUTH_CSRF_COOKIE_NAME: ${AUTH_CSRF_COOKIE_NAME:-nebulynk_csrf_token}
     restart: unless-stopped
     depends_on:
       - backend

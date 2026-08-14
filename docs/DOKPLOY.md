@@ -81,6 +81,9 @@ deployments:
   `SMTP_IGNORE_TLS`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`, and
   `SMTP_FROM_NAME`.
 - GIF search: `KLIPY_API_KEY`.
+- Two-factor encryption: optionally set a strong, stable
+  `AUTH_2FA_SECRET_KEY`. Existing installations can leave it unset and use
+  the backwards-compatible `JWT_SECRET` fallback.
 
 `VITE_API_URL`, `LIVEKIT_PUBLIC_URL`, the optional VAPID public key, and
 the CSRF cookie name affect the frontend build. Redeploy after changing any of

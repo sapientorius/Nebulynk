@@ -196,6 +196,8 @@ test('validateRuntimeSecurity rejects public S3 endpoint values that target the 
 const repositoryRoot = fileURLToPath(new URL('../..', import.meta.url))
 const coolifyComposePath = fileURLToPath(new URL('../../docker-compose.coolify.yml', import.meta.url))
 const dokployComposePath = fileURLToPath(new URL('../../docker-compose.dokploy.yml', import.meta.url))
+const selfHostedComposePath = fileURLToPath(new URL('../../docker-compose.self-hosted.yml', import.meta.url))
+const productionEnvExamplePath = fileURLToPath(new URL('../../.env.production.example', import.meta.url))
 const explicitCoolifyOverrideKeys = [
   'POSTGRES_PASSWORD',
   'GARAGE_RPC_SECRET',
@@ -225,7 +227,8 @@ const generatedCoolifyEnvironment = {
   SERVICE_URL_LIVEKIT: 'https://livekit.example.com',
   SERVICE_URL_GARAGE: 'https://files.example.com',
   SOURCE_COMMIT: '0123456789abcdef',
-  VAPID_PUBLIC_KEY: 'generated-vapid-public-key'
+  VAPID_PUBLIC_KEY: 'generated-vapid-public-key',
+  AUTH_2FA_SECRET_KEY: 'generated-two-factor-secret'
 }
 const generatedDokployEnvironment = {
   POSTGRES_DB: 'nebulynk',
@@ -238,6 +241,7 @@ const generatedDokployEnvironment = {
   STORAGE_S3_REGION: 'us-east-1',
   JWT_SECRET: 'generated-jwt-secret',
   AI_SECRET_KEY: 'generated-ai-secret',
+  AUTH_2FA_SECRET_KEY: 'generated-two-factor-secret',
   LIVEKIT_API_KEY: 'generated-livekit-key',
   LIVEKIT_API_SECRET: 'generated-livekit-secret',
   FRONTEND_URL: 'https://app.example.com',
@@ -351,6 +355,7 @@ test('Coolify compose passes generated production configuration to every consume
   assert.equal(services.livekit.environment.LIVEKIT_KEYS, 'generated-livekit-key: generated-livekit-secret')
   assert.equal(services['livekit-egress'].environment.LIVEKIT_API_KEY, 'generated-livekit-key')
   assert.equal(services.backend.environment.LIVEKIT_API_SECRET, 'generated-livekit-secret')
+  assert.equal(services.backend.environment.AUTH_2FA_SECRET_KEY, 'generated-two-factor-secret')
 
   assert.equal(services.backend.environment.FRONTEND_URL, 'https://app.example.com')
   assert.equal(services.backend.environment.PASSKEY_RP_ID, 'app.example.com')
@@ -372,6 +377,7 @@ test('Coolify compose preserves explicit secrets for existing installations', {
     STORAGE_S3_SECRET_KEY: 'existing-s3-secret',
     JWT_SECRET: 'existing-jwt-secret',
     AI_SECRET_KEY: 'existing-ai-secret',
+    AUTH_2FA_SECRET_KEY: 'existing-two-factor-secret',
     LIVEKIT_API_KEY: 'existing-livekit-key',
     LIVEKIT_API_SECRET: 'existing-livekit-secret'
   })
@@ -383,6 +389,7 @@ test('Coolify compose preserves explicit secrets for existing installations', {
   assert.equal(services['livekit-egress'].environment.AWS_SECRET_ACCESS_KEY, 'existing-s3-secret')
   assert.equal(services.backend.environment.JWT_SECRET, 'existing-jwt-secret')
   assert.equal(services.backend.environment.AI_SECRET_KEY, 'existing-ai-secret')
+  assert.equal(services.backend.environment.AUTH_2FA_SECRET_KEY, 'existing-two-factor-secret')
   assert.equal(services.livekit.environment.LIVEKIT_KEYS, 'existing-livekit-key: existing-livekit-secret')
 })
 
@@ -420,6 +427,7 @@ test('Dokploy compose passes explicit production configuration to every consumer
 
   assert.equal(services.backend.environment.JWT_SECRET, 'generated-jwt-secret')
   assert.equal(services.backend.environment.AI_SECRET_KEY, 'generated-ai-secret')
+  assert.equal(services.backend.environment.AUTH_2FA_SECRET_KEY, 'generated-two-factor-secret')
   assert.equal(services.backend.environment.FRONTEND_URL, 'https://app.example.com')
   assert.equal(services.backend.environment.PASSKEY_RP_ID, 'app.example.com')
   assert.equal(services.backend.environment.STORAGE_S3_ENDPOINT, 'http://garage:3900')
@@ -462,6 +470,19 @@ test('Dokploy compose rejects a missing required production secret', {
   assert.notEqual(result.status, 0)
 })
 
+test('self-hosted production configuration uses one CSRF cookie setting for backend and frontend', async () => {
+  const [environmentTemplate, compose] = await Promise.all([
+    readFile(productionEnvExamplePath, 'utf8'),
+    readFile(selfHostedComposePath, 'utf8')
+  ])
+
+  assert.match(environmentTemplate, /^AUTH_CSRF_COOKIE_NAME=nebulynk_csrf_token$/m)
+  assert.doesNotMatch(environmentTemplate, /^VITE_AUTH_CSRF_COOKIE_NAME=/m)
+  assert.match(compose, /VITE_AUTH_CSRF_COOKIE_NAME:\s*\$\{AUTH_CSRF_COOKIE_NAME:-nebulynk_csrf_token\}/)
+  assert.match(environmentTemplate, /^AUTH_2FA_SECRET_KEY=CHANGE_ME_STRONG_UNIQUE_2FA_ENCRYPTION_KEY$/m)
+  assert.match(environmentTemplate, /^KLIPY_API_KEY=$/m)
+})
+
 test('Dokploy compose exposes only the supported deployment variable and network contract', async () => {
   const contents = await readFile(dokployComposePath, 'utf8')
   const requiredVariables = [
@@ -485,6 +506,8 @@ test('Dokploy compose exposes only the supported deployment variable and network
       `${variable}:\\s*"\\$\\{${variable}:\\?${variable} must be set\\}"`
     ))
   }
+
+  assert.match(contents, /AUTH_2FA_SECRET_KEY:\s*"\$\{AUTH_2FA_SECRET_KEY:-\}"/)
 
   assert.match(contents, /dockerfile:\s*garage\.Dockerfile/)
   assert.match(contents, /dockerfile:\s*livekit\.Dockerfile/)
@@ -511,7 +534,6 @@ test('Dokploy compose exposes only the supported deployment variable and network
 test('Coolify compose exposes only the supported deployment variable contract', async () => {
   const composePath = new URL('../../docker-compose.coolify.yml', import.meta.url)
   const baseComposePath = new URL('../../docker-compose.yml', import.meta.url)
-  const selfHostedComposePath = new URL('../../docker-compose.self-hosted.yml', import.meta.url)
   const [contents, baseContents, selfHostedContents] = await Promise.all([
     readFile(composePath, 'utf8'),
     readFile(baseComposePath, 'utf8'),
@@ -520,6 +542,7 @@ test('Coolify compose exposes only the supported deployment variable contract', 
 
   assert.match(contents, /JWT_SECRET:\s*\$\{JWT_SECRET:-\$\{SERVICE_PASSWORD_64_JWT\}\}/)
   assert.match(contents, /AI_SECRET_KEY:\s*\$\{AI_SECRET_KEY:-\$\{SERVICE_PASSWORD_64_AI\}\}/)
+  assert.match(contents, /AUTH_2FA_SECRET_KEY:\s*\$\{AUTH_2FA_SECRET_KEY:-\}/)
   assert.doesNotMatch(contents, /AI_CONFIG_MASTER_KEY/)
   assert.match(contents, /RATE_LIMIT_DRIVER:\s*\$\{RATE_LIMIT_DRIVER:-redis\}/)
   assert.match(contents, /PASSKEY_RP_ID:\s*\$\{PASSKEY_RP_ID:-\$\{SERVICE_FQDN_FRONTEND\}\}/)
