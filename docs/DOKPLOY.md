@@ -11,6 +11,23 @@ HTTPS-capable DNS names. Use the `stable` branch for the reviewed update
 channel or an immutable `vX.Y.Z` tag for a pinned release; do not use
 `main` in production.
 
+## Import the packaged template
+
+For a self-contained Compose service that does not need a connected Git source,
+use the complete [`dokploy-template`](../dokploy-template/README.md) package.
+Its [`import.base64`](../dokploy-template/import.base64) file can be pasted into
+**Compose → Advanced → Import**. Dokploy then creates the Compose file, its
+environment, and the four native domain entries. The template generates unique
+deployment secrets at import time and builds from the reviewed `stable` branch
+by default. Set `NEBULYNK_SOURCE_REF` to an immutable release tag before the
+first deployment when pinning is required.
+
+Generated domains are import defaults, not production HTTPS configuration.
+Replace them with four DNS names you control, enable HTTPS with Let's Encrypt,
+and update the dependent URL variables described in the template README before
+deployment. The rest of this guide documents the alternative repository-backed
+Compose workflow.
+
 ## Before you begin
 
 Point these DNS names at the Dokploy server:

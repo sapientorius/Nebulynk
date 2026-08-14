@@ -196,6 +196,12 @@ test('validateRuntimeSecurity rejects public S3 endpoint values that target the 
 const repositoryRoot = fileURLToPath(new URL('../..', import.meta.url))
 const coolifyComposePath = fileURLToPath(new URL('../../docker-compose.coolify.yml', import.meta.url))
 const dokployComposePath = fileURLToPath(new URL('../../docker-compose.dokploy.yml', import.meta.url))
+const dokployTemplateComposePath = fileURLToPath(new URL('../../dokploy-template/docker-compose.yml', import.meta.url))
+const dokployTemplateConfigPath = fileURLToPath(new URL('../../dokploy-template/template.toml', import.meta.url))
+const dokployTemplateMetadataPath = fileURLToPath(new URL('../../dokploy-template/meta.json', import.meta.url))
+const dokployTemplateImportPath = fileURLToPath(new URL('../../dokploy-template/import.base64', import.meta.url))
+const dokployTemplateIconPath = fileURLToPath(new URL('../../dokploy-template/nebulynk.png', import.meta.url))
+const dokployTemplateBuildScriptPath = fileURLToPath(new URL('../../scripts/build-dokploy-template.mjs', import.meta.url))
 const selfHostedComposePath = fileURLToPath(new URL('../../docker-compose.self-hosted.yml', import.meta.url))
 const productionEnvExamplePath = fileURLToPath(new URL('../../.env.production.example', import.meta.url))
 const explicitCoolifyOverrideKeys = [
@@ -319,6 +325,35 @@ function renderDokployCompose(overrides = {}) {
       ...dockerComposeCommand.prefix,
       '--file',
       dokployComposePath,
+      'config',
+      '--format',
+      'json'
+    ],
+    {
+      cwd: repositoryRoot,
+      env,
+      encoding: 'utf8'
+    }
+  )
+
+  assert.equal(result.status, 0, result.stderr || result.error?.message)
+  return JSON.parse(result.stdout)
+}
+
+function renderDokployTemplateCompose(overrides = {}) {
+  const env = {
+    ...process.env,
+    ...generatedDokployEnvironment,
+    NEBULYNK_SOURCE_REF: 'stable',
+    ...overrides
+  }
+
+  const result = spawnSync(
+    dockerComposeCommand.command,
+    [
+      ...dockerComposeCommand.prefix,
+      '--file',
+      dokployTemplateComposePath,
       'config',
       '--format',
       'json'
@@ -468,6 +503,107 @@ test('Dokploy compose rejects a missing required production secret', {
   )
 
   assert.notEqual(result.status, 0)
+})
+
+test('Dokploy template packages a reproducible native-domain import', async () => {
+  const [compose, config, metadataContents, encoded, icon] = await Promise.all([
+    readFile(dokployTemplateComposePath, 'utf8'),
+    readFile(dokployTemplateConfigPath, 'utf8'),
+    readFile(dokployTemplateMetadataPath, 'utf8'),
+    readFile(dokployTemplateImportPath, 'utf8'),
+    readFile(dokployTemplateIconPath)
+  ])
+  const generator = spawnSync(process.execPath, [dokployTemplateBuildScriptPath, '--check'], {
+    cwd: repositoryRoot,
+    encoding: 'utf8'
+  })
+
+  assert.equal(generator.status, 0, generator.stderr || generator.error?.message)
+
+  const payload = JSON.parse(Buffer.from(encoded.trim(), 'base64').toString('utf8'))
+  assert.deepEqual(Object.keys(payload), ['compose', 'config'])
+  assert.deepEqual(payload, { compose, config })
+
+  const metadata = JSON.parse(metadataContents)
+  assert.equal(metadata.id, 'nebulynk')
+  assert.equal(metadata.name, 'Nebulynk')
+  assert.equal(metadata.version, '0.3.0')
+  assert.equal(metadata.logo, 'nebulynk.png')
+  assert.equal(metadata.links.github, 'https://github.com/sapientorius/Nebulynk')
+  assert.ok(metadata.tags.includes('self-hosted'))
+  assert.deepEqual([...icon.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10])
+
+  const remoteBuildContext = 'context: "https://github.com/sapientorius/Nebulynk.git#${NEBULYNK_SOURCE_REF:-stable}"'
+  assert.equal(compose.split(remoteBuildContext).length - 1, 5)
+  assert.match(compose, /^\s+- "7881:7881"$/m)
+  assert.match(compose, /^\s+- "7882:7882\/udp"$/m)
+  assert.doesNotMatch(compose, /^\s*(?:container_name|networks|labels):/m)
+  assert.doesNotMatch(compose, /traefik\./)
+
+  assert.match(config, /^isolated = true$/m)
+  assert.match(config, /^postgres_password = "\$\{password:64\}"$/m)
+  assert.match(config, /^garage_rpc_secret = "\$\{hash:64\}"$/m)
+  assert.match(config, /^storage_s3_secret_key = "\$\{password:64\}"$/m)
+  assert.match(config, /^jwt_secret = "\$\{password:64\}"$/m)
+  assert.match(config, /^ai_secret_key = "\$\{password:64\}"$/m)
+  assert.match(config, /^auth_2fa_secret_key = "\$\{password:64\}"$/m)
+  assert.match(config, /^livekit_api_secret = "\$\{password:64\}"$/m)
+  assert.doesNotMatch(config, /CHANGE_ME|example\.com/i)
+
+  const domains = [
+    ['frontend', 8080, 'frontend_domain'],
+    ['backend', 3030, 'backend_domain'],
+    ['livekit', 7880, 'livekit_domain'],
+    ['garage', 3900, 'garage_domain']
+  ]
+
+  for (const [serviceName, port, domainVariable] of domains) {
+    assert.match(config, new RegExp(
+      `\\[\\[config\\.domains\\]\\]\\r?\\nserviceName = "${serviceName}"\\r?\\nport = ${port}\\r?\\nhost = "\\$\\{${domainVariable}\\}"\\r?\\npath = "/"`
+    ))
+  }
+
+  assert.match(config, /^frontend_url = "https:\/\/\$\{frontend_domain\}"$/m)
+  assert.match(config, /^backend_url = "https:\/\/\$\{backend_domain\}"$/m)
+  assert.match(config, /^livekit_public_url = "https:\/\/\$\{livekit_domain\}"$/m)
+  assert.match(config, /^garage_public_url = "https:\/\/\$\{garage_domain\}"$/m)
+  assert.match(config, /^NEBULYNK_SOURCE_REF = "\$\{source_ref\}"$/m)
+  assert.match(config, /^FRONTEND_URL = "\$\{frontend_url\}"$/m)
+  assert.match(config, /^PASSKEY_RP_ID = "\$\{frontend_domain\}"$/m)
+  assert.match(config, /^VITE_API_URL = "\$\{backend_url\}"$/m)
+  assert.match(config, /^LIVEKIT_PUBLIC_URL = "\$\{livekit_public_url\}"$/m)
+  assert.match(config, /^STORAGE_S3_PUBLIC_ENDPOINT = "\$\{garage_public_url\}"$/m)
+})
+
+test('Dokploy template renders its generated production contract when Docker Compose is available', {
+  skip: !dockerComposeCommand
+}, () => {
+  const rendered = renderDokployTemplateCompose()
+  const { services } = rendered
+
+  assert.deepEqual(Object.keys(services).sort(), [
+    'backend',
+    'frontend',
+    'garage',
+    'garage-volume-init',
+    'livekit',
+    'livekit-egress',
+    'postgres',
+    'redis'
+  ])
+  assert.equal(
+    services.frontend.build.context,
+    'https://github.com/sapientorius/Nebulynk.git#stable'
+  )
+  assert.equal(services.backend.environment.FRONTEND_URL, 'https://app.example.com')
+  assert.equal(services.backend.environment.PASSKEY_RP_ID, 'app.example.com')
+  assert.equal(services.backend.environment.STORAGE_S3_PUBLIC_ENDPOINT, 'https://files.example.com')
+  assert.equal(services.backend.environment.LIVEKIT_PUBLIC_URL, 'https://livekit.example.com')
+  assert.equal(services.frontend.build.args.VITE_API_URL, 'https://api.example.com')
+
+  for (const service of Object.values(services)) {
+    assert.equal(service.container_name, undefined)
+  }
 })
 
 test('self-hosted production configuration uses one CSRF cookie setting for backend and frontend', async () => {
