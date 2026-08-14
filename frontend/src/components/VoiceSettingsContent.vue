@@ -124,13 +124,13 @@
             <div class="global-ptt-copy">
               <strong>{{ $t('ui.components.global_ptt_install_helper') }}</strong>
               <div class="setting-hint global-ptt-hint">
-                {{ $t('ui.components.global_ptt_helper_release_soon') }}
+                {{ $t('ui.components.global_ptt_helper_download_available') }}
                 <a
-                  href="https://github.com/sapientorius/Nebulynk/releases"
+                  href="https://github.com/sapientorius/Nebulynk/releases/tag/ptt-helper-v0.1.0"
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  {{ $t('ui.components.global_ptt_open_github_releases') }}
+                  {{ $t('ui.components.global_ptt_download_windows_helper') }}
                 </a>
               </div>
               <div class="setting-hint global-ptt-hint">
