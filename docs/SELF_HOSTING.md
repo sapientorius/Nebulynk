@@ -248,6 +248,13 @@ configuration. Follow [Deploying Nebulynk with Coolify](COOLIFY.md) for the
 complete supported step-by-step procedure. Do not apply the manual Docker
 environment checklist above unchanged to a Coolify resource.
 
+## Deploying with Dokploy
+
+Dokploy uses a dedicated Compose file, its own environment-variable UI, and
+native domain management. Follow [Deploying Nebulynk with Dokploy](DOKPLOY.md)
+instead of applying the manual Docker environment checklist directly to a
+Dokploy service.
+
 ## Acceptance checks, troubleshooting, and updates
 
 After the first deployment and after infrastructure changes, check that:
