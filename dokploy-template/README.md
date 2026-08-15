@@ -17,7 +17,7 @@ Dokploy templates repository. `import.base64` is the directly importable form.
 
 The template builds Nebulynk directly from the public repository. It defaults
 to the reviewed `stable` branch. Set `NEBULYNK_SOURCE_REF` to an immutable tag
-such as `v0.3.0` before deployment when a pinned release is required.
+such as `v0.4.0` before deployment when a pinned release is required.
 
 ## Domains and TLS
 

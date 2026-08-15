@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "version": "0.4.0",
+  "revision": 1,
+  "channel": "stable",
+  "published_at": "2026-08-15T14:34:03.127Z",
+  "title": {
+    "en": "Nebulynk 0.4.0"
+  },
+  "summary": {
+    "en": "Adds first-class Dokploy deployment support, dedicated two-factor encryption configuration, and global browser Push-to-Talk integration improvements."
+  },
+  "changes": [
+    {
+      "category": "feature",
+      "title": {
+        "en": "Dokploy deployment template"
+      },
+      "description": {
+        "en": "A dedicated Compose deployment, self-contained import package, generated template payload, and operator documentation simplify deployments with Dokploy's native domain management."
+      }
+    },
+    {
+      "category": "feature",
+      "title": {
+        "en": "Global browser Push-to-Talk"
+      },
+      "description": {
+        "en": "Windows browser users can opt in to the local PTT helper from voice settings, with persistent enablement, status feedback, and lifecycle-aware connection handling."
+      }
+    },
+    {
+      "category": "improvement",
+      "title": {
+        "en": "Dedicated two-factor encryption key"
+      },
+      "description": {
+        "en": "AUTH_2FA_SECRET_KEY enables a stable, separate key for encrypting stored two-factor secrets while retaining the JWT_SECRET fallback for existing deployments."
+      }
+    }
+  ],
+  "security": [],
+  "upgrade": {
+    "backup_required": true,
+    "downtime_expected": true,
+    "breaking": false,
+    "manual_steps": {
+      "en": [
+        "Back up PostgreSQL and both Garage volumes and test a restore before updating.",
+        "Redeploy backend and frontend from the shared v0.4.0 release tag without removing persistent volumes.",
+        "For Dokploy, use docker-compose.dokploy.yml or the packaged template, replace generated domains and secrets, and set NEBULYNK_SOURCE_REF to v0.4.0 when a tag-pinned deployment is required.",
+        "Keep AUTH_2FA_SECRET_KEY unchanged when it is already configured; existing installations may leave it unset and use the JWT_SECRET fallback."
+      ]
+    },
+    "docs_url": "https://github.com/sapientorius/Nebulynk/blob/v0.4.0/docs/SELF_HOSTING.md"
+  }
+}
