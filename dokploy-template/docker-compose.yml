@@ -1,3 +1,5 @@
+# dokploy: allow-host-ports
+# LiveKit requires public TCP/UDP media ports 7881 and 7882 for WebRTC.
 # Nebulynk Dokploy template. Import the generated import.base64 file through
 # Compose -> Advanced -> Import. Dokploy owns routing and the isolated network.
 version: "3.8"
@@ -149,7 +151,7 @@ services:
       MEETING_RECORDINGS_S3_ENDPOINT: http://garage:3900
       MEETING_RECORDINGS_EGRESS_S3_ENDPOINT: http://garage:3900
       MEETING_RECORDINGS_S3_REGION: "${MEETING_RECORDINGS_S3_REGION:-${STORAGE_S3_REGION:-us-east-1}}"
-      MEETING_TRANSCRIPT_WAIT_TIMEOUT_MS: "${MEETING_TRANSCRIPT_WAIT_TIMEOUT_MS:-120000}"
+      MEETING_TRANSCRIPT_WAIT_TIMEOUT_MS: "${MEETING_TRANSCRIPT_WAIT_TIMEOUT_MS:-1200000}"
       LIVEKIT_HOST: http://livekit:7880
       LIVEKIT_PUBLIC_URL: "${LIVEKIT_PUBLIC_URL:?LIVEKIT_PUBLIC_URL must be set}"
       LIVEKIT_API_KEY: "${LIVEKIT_API_KEY:?LIVEKIT_API_KEY must be set}"
