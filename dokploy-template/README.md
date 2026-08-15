@@ -64,9 +64,12 @@ LiveKit in the Compose environment. `GARAGE_RPC_SECRET` is generated as exactly
 64 hexadecimal characters. Keep these values unchanged when restoring volumes
 or updating an existing instance.
 
-Web Push, SMTP, and Klipy are deliberately not configured by the template.
-Add the corresponding `VAPID_*`, `SMTP_*`, or `KLIPY_API_KEY` variables only
-when those integrations are needed. Do not create a fake VAPID key pair.
+The imported environment lists the optional integration and operational
+variables so they are visible in Dokploy. Instance-specific values such as
+Klipy, VAPID, SMTP credentials, sender addresses, and AI allowlists are empty
+by default; configure them only when needed. Safe defaults for ports, cookie
+names, session lifetimes, Redis rate limiting, logging, and proxy handling are
+preserved. Do not create a fake VAPID key pair.
 
 ## Networking and backups
 

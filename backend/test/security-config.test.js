@@ -583,6 +583,39 @@ test('Dokploy template packages a reproducible native-domain import', async () =
   assert.match(config, /^VITE_API_URL = "\$\{backend_url\}"$/m)
   assert.match(config, /^LIVEKIT_PUBLIC_URL = "\$\{livekit_public_url\}"$/m)
   assert.match(config, /^STORAGE_S3_PUBLIC_ENDPOINT = "\$\{garage_public_url\}"$/m)
+
+  const optionalTemplateEnvironment = {
+    KLIPY_API_KEY: '',
+    VAPID_PUBLIC_KEY: '',
+    VAPID_PRIVATE_KEY: '',
+    VAPID_SUBJECT: '',
+    SMTP_HOST: '',
+    SMTP_PORT: '587',
+    SMTP_SECURE: 'false',
+    SMTP_IGNORE_TLS: 'false',
+    SMTP_USER: '',
+    SMTP_PASS: '',
+    SMTP_FROM: '',
+    SMTP_FROM_NAME: 'Nebulynk',
+    AUTHENTICATION_RATE_LIMIT_IP_LIMIT: '',
+    AUTH_BROWSER_ACCESS_TOKEN_TTL: '15m',
+    AUTH_REFRESH_TOKEN_TTL: '1d',
+    AUTH_REMEMBER_REFRESH_TOKEN_TTL: '30d',
+    AUTH_REFRESH_COOKIE_NAME: 'nebulynk_refresh_session',
+    AUTH_CSRF_COOKIE_NAME: 'nebulynk_csrf_token',
+    AUTH_COOKIE_DOMAIN: '',
+    RATE_LIMIT_DRIVER: 'redis',
+    AI_PROVIDER_BASE_URL_ALLOWLIST: '',
+    LOG_LEVEL: 'info',
+    MAX_FILE_SIZE: '26214400',
+    MEETING_TRANSCRIPT_WAIT_TIMEOUT_MS: '120000',
+    TRUST_PROXY: 'true',
+    NEBULYNK_BUILD_SHA: ''
+  }
+
+  for (const [variable, value] of Object.entries(optionalTemplateEnvironment)) {
+    assert.match(config, new RegExp(`^${variable} = "${value}"$`, 'm'))
+  }
 })
 
 test('Dokploy template renders its generated development contract when Docker Compose is available', {
