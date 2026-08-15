@@ -238,6 +238,7 @@ const generatedCoolifyEnvironment = {
   AUTH_2FA_SECRET_KEY: 'generated-two-factor-secret'
 }
 const generatedDokployEnvironment = {
+  NODE_ENV: 'development',
   POSTGRES_DB: 'nebulynk',
   POSTGRES_USER: 'nebulynk',
   POSTGRES_PASSWORD: 'generated-postgres-secret',
@@ -345,6 +346,11 @@ function renderDokployTemplateCompose(overrides = {}) {
   const env = {
     ...process.env,
     ...generatedDokployEnvironment,
+    NODE_ENV: 'development',
+    FRONTEND_URL: 'http://app.example.com',
+    VITE_API_URL: 'http://api.example.com',
+    LIVEKIT_PUBLIC_URL: 'http://livekit.example.com',
+    STORAGE_S3_PUBLIC_ENDPOINT: 'http://files.example.com',
     NEBULYNK_SOURCE_REF: 'stable',
     ...overrides
   }
@@ -566,10 +572,11 @@ test('Dokploy template packages a reproducible native-domain import', async () =
     ))
   }
 
-  assert.match(config, /^frontend_url = "https:\/\/\$\{frontend_domain\}"$/m)
-  assert.match(config, /^backend_url = "https:\/\/\$\{backend_domain\}"$/m)
-  assert.match(config, /^livekit_public_url = "https:\/\/\$\{livekit_domain\}"$/m)
-  assert.match(config, /^garage_public_url = "https:\/\/\$\{garage_domain\}"$/m)
+  assert.match(config, /^NODE_ENV = "development"$/m)
+  assert.match(config, /^frontend_url = "http:\/\/\$\{frontend_domain\}"$/m)
+  assert.match(config, /^backend_url = "http:\/\/\$\{backend_domain\}"$/m)
+  assert.match(config, /^livekit_public_url = "http:\/\/\$\{livekit_domain\}"$/m)
+  assert.match(config, /^garage_public_url = "http:\/\/\$\{garage_domain\}"$/m)
   assert.match(config, /^NEBULYNK_SOURCE_REF = "\$\{source_ref\}"$/m)
   assert.match(config, /^FRONTEND_URL = "\$\{frontend_url\}"$/m)
   assert.match(config, /^PASSKEY_RP_ID = "\$\{frontend_domain\}"$/m)
@@ -578,7 +585,7 @@ test('Dokploy template packages a reproducible native-domain import', async () =
   assert.match(config, /^STORAGE_S3_PUBLIC_ENDPOINT = "\$\{garage_public_url\}"$/m)
 })
 
-test('Dokploy template renders its generated production contract when Docker Compose is available', {
+test('Dokploy template renders its generated development contract when Docker Compose is available', {
   skip: !dockerComposeCommand
 }, () => {
   const rendered = renderDokployTemplateCompose()
@@ -598,11 +605,15 @@ test('Dokploy template renders its generated production contract when Docker Com
     services.frontend.build.context,
     'https://github.com/sapientorius/Nebulynk.git#stable'
   )
-  assert.equal(services.backend.environment.FRONTEND_URL, 'https://app.example.com')
+  assert.equal(services.backend.environment.NODE_ENV, 'development')
+  assert.equal(services.backend.environment.FRONTEND_URL, 'http://app.example.com')
   assert.equal(services.backend.environment.PASSKEY_RP_ID, 'app.example.com')
-  assert.equal(services.backend.environment.STORAGE_S3_PUBLIC_ENDPOINT, 'https://files.example.com')
-  assert.equal(services.backend.environment.LIVEKIT_PUBLIC_URL, 'https://livekit.example.com')
-  assert.equal(services.frontend.build.args.VITE_API_URL, 'https://api.example.com')
+  assert.equal(services.backend.environment.STORAGE_S3_PUBLIC_ENDPOINT, 'http://files.example.com')
+  assert.equal(services.backend.environment.LIVEKIT_PUBLIC_URL, 'http://livekit.example.com')
+  assert.equal(services.frontend.build.args.VITE_API_URL, 'http://api.example.com')
+
+  const productionRendered = renderDokployTemplateCompose({ NODE_ENV: 'production' })
+  assert.equal(productionRendered.services.backend.environment.NODE_ENV, 'production')
 
   for (const service of Object.values(services)) {
     assert.equal(service.container_name, undefined)

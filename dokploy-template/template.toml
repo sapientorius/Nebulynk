@@ -16,10 +16,11 @@ auth_2fa_secret_key = "${password:64}"
 livekit_api_key = "${password:24}"
 livekit_api_secret = "${password:64}"
 
-frontend_url = "https://${frontend_domain}"
-backend_url = "https://${backend_domain}"
-livekit_public_url = "https://${livekit_domain}"
-garage_public_url = "https://${garage_domain}"
+# Generated sslip.io domains are HTTP-only until Dokploy TLS is configured.
+frontend_url = "http://${frontend_domain}"
+backend_url = "http://${backend_domain}"
+livekit_public_url = "http://${livekit_domain}"
+garage_public_url = "http://${garage_domain}"
 source_ref = "stable"
 
 [config]
@@ -50,6 +51,7 @@ host = "${garage_domain}"
 path = "/"
 
 [config.env]
+NODE_ENV = "development"
 NEBULYNK_SOURCE_REF = "${source_ref}"
 POSTGRES_DB = "nebulynk"
 POSTGRES_USER = "nebulynk"

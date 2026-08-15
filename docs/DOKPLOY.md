@@ -6,10 +6,10 @@ with Dokploy. It uses the dedicated
 management. Read [Secure Self-Hosting](security-hardening.md) before exposing
 an instance.
 
-The guide assumes a current Dokploy installation, a public server, and four
-HTTPS-capable DNS names. Use the `stable` branch for the reviewed update
-channel or an immutable `vX.Y.Z` tag for a pinned release; do not use
-`main` in production.
+The production workflow assumes a current Dokploy installation, a public
+server, and four HTTPS-capable DNS names. Use the `stable` branch for the
+reviewed update channel or an immutable `vX.Y.Z` tag for a pinned release; do
+not use `main` in production.
 
 ## Import the packaged template
 
@@ -22,11 +22,27 @@ deployment secrets at import time and builds from the reviewed `stable` branch
 by default. Set `NEBULYNK_SOURCE_REF` to an immutable release tag before the
 first deployment when pinning is required.
 
-Generated domains are import defaults, not production HTTPS configuration.
-Replace them with four DNS names you control, enable HTTPS with Let's Encrypt,
-and update the dependent URL variables described in the template README before
-deployment. The rest of this guide documents the alternative repository-backed
-Compose workflow.
+The packaged template intentionally imports with `NODE_ENV=development` and
+`http://` endpoint values. Dokploy's generated `sslip.io` domains can therefore
+be used for an initial smoke test without certificates, but this is not a
+production configuration.
+
+Before using the instance publicly:
+
+1. Replace the generated domains with four DNS names you control.
+2. Enable HTTPS and a Let's Encrypt certificate for all four domains in
+   Dokploy's **Domains** tab.
+3. Change `NODE_ENV` in the imported environment to `production`.
+4. Change every dependent endpoint variable from `http://` to the matching
+   `https://` URL: `FRONTEND_URL`, `VITE_API_URL`, `LIVEKIT_PUBLIC_URL`, and
+   `STORAGE_S3_PUBLIC_ENDPOINT`.
+
+`PASSKEY_RP_ID` contains only the frontend hostname and does not receive an
+`http://` or `https://` prefix. Dokploy does not update these environment
+variables when a domain is changed in the **Domains** tab, so update them
+manually and redeploy after every domain or HTTPS change. The template README
+contains the same mapping; the rest of this guide documents the alternative
+repository-backed Compose workflow.
 
 ## Before you begin
 
@@ -69,8 +85,15 @@ variables. Dokploy writes these values to its deployment `.env` file; the
 Compose file explicitly passes each needed value to the appropriate build or
 container environment.
 
+For the packaged template, leave `NODE_ENV=development` while testing the
+generated HTTP domains. After HTTPS is configured, change it to
+`NODE_ENV=production` and update all public URL variables to `https://` before
+redeploying. The repository-backed `docker-compose.dokploy.yml` workflow
+already sets `NODE_ENV=production` in its backend service.
+
 | Variable | Example / requirement |
 | --- | --- |
+| `NODE_ENV` | `development` for the generated HTTP test; `production` after HTTPS is enabled |
 | `POSTGRES_PASSWORD` | Unique database password |
 | `GARAGE_RPC_SECRET` | Exactly 64 hexadecimal characters; for example, `openssl rand -hex 32` |
 | `STORAGE_S3_ACCESS_KEY` | Dedicated S3 access-key name |

@@ -21,9 +21,14 @@ such as `v0.4.0` before deployment when a pinned release is required.
 
 ## Domains and TLS
 
-Dokploy generates four initial domain entries. They are useful only as import
-defaults; use four DNS names you control before a production deployment and
-enable HTTPS with Let's Encrypt in Dokploy's **Domains** tab.
+Dokploy generates four initial `sslip.io` domain entries. The imported
+template intentionally starts with `NODE_ENV=development` and `http://` URLs,
+so the first deployment works without certificates. This is suitable for an
+initial smoke test only.
+
+Before exposing the instance beyond a controlled test, use four DNS names you
+control, enable HTTPS with Let's Encrypt in Dokploy's **Domains** tab, and set
+`NODE_ENV=production` in the imported environment.
 
 | Service | Port | Environment values to update after changing the domain |
 | --- | --- | --- |
@@ -32,13 +37,23 @@ enable HTTPS with Let's Encrypt in Dokploy's **Domains** tab.
 | `livekit` | `7880` | `LIVEKIT_PUBLIC_URL` |
 | `garage` | `3900` | `STORAGE_S3_PUBLIC_ENDPOINT` |
 
-Use `https://` URLs for all four public endpoints. Redeploy after changing a
-domain or any of the listed values because the frontend receives API and
+For the initial generated-domain test, keep `http://` on all four public
+endpoint values. For production, change all four values to their actual
+`https://` URLs:
+
+- `FRONTEND_URL`
+- `VITE_API_URL`
+- `LIVEKIT_PUBLIC_URL`
+- `STORAGE_S3_PUBLIC_ENDPOINT`
+
+Dokploy does not synchronize the **Domains** tab back into environment
+variables. After changing a domain or enabling HTTPS, update the matching
+environment values manually and redeploy. The frontend receives the API and
 LiveKit URLs during its image build.
 
 The template cannot encode Dokploy certificate settings. Confirm HTTPS and a
 Let's Encrypt certificate for every custom domain in the Domains tab. Do not
-rely on a generated free domain for production: browser cookies, passkeys, and
+rely on generated free domains for production: browser cookies, passkeys, and
 media require HTTPS.
 
 ## Generated and optional configuration
