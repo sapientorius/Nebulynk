@@ -204,6 +204,7 @@ const dokployTemplateIconPath = fileURLToPath(new URL('../../dokploy-template/ne
 const dokployTemplateBuildScriptPath = fileURLToPath(new URL('../../scripts/build-dokploy-template.mjs', import.meta.url))
 const selfHostedComposePath = fileURLToPath(new URL('../../docker-compose.self-hosted.yml', import.meta.url))
 const productionEnvExamplePath = fileURLToPath(new URL('../../.env.production.example', import.meta.url))
+const normalizeLineEndings = (value) => value.replace(/\r\n?/g, '\n')
 const explicitCoolifyOverrideKeys = [
   'POSTGRES_PASSWORD',
   'GARAGE_RPC_SECRET',
@@ -528,7 +529,10 @@ test('Dokploy template packages a reproducible native-domain import', async () =
 
   const payload = JSON.parse(Buffer.from(encoded.trim(), 'base64').toString('utf8'))
   assert.deepEqual(Object.keys(payload), ['compose', 'config'])
-  assert.deepEqual(payload, { compose, config })
+  assert.deepEqual(payload, {
+    compose: normalizeLineEndings(compose),
+    config: normalizeLineEndings(config)
+  })
 
   const metadata = JSON.parse(metadataContents)
   assert.equal(metadata.id, 'nebulynk')

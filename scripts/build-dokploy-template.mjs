@@ -33,7 +33,11 @@ if (meta.version !== 'stable' && meta.version !== rootPackage.version) {
   throw new Error(`dokploy-template/meta.json version ${meta.version} must be stable or match package.json version ${rootPackage.version}.`)
 }
 
-const encoded = Buffer.from(JSON.stringify({ compose, config }), 'utf8').toString('base64')
+const normalizeLineEndings = (value) => value.replace(/\r\n?/g, '\n')
+const encoded = Buffer.from(JSON.stringify({
+  compose: normalizeLineEndings(compose),
+  config: normalizeLineEndings(config)
+}), 'utf8').toString('base64')
 const output = `${encoded}\n`
 
 if (check) {
