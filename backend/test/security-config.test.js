@@ -608,7 +608,7 @@ test('Dokploy template packages a reproducible native-domain import', async () =
     AI_PROVIDER_BASE_URL_ALLOWLIST: '',
     LOG_LEVEL: 'info',
     MAX_FILE_SIZE: '26214400',
-    MEETING_TRANSCRIPT_WAIT_TIMEOUT_MS: '120000',
+    MEETING_TRANSCRIPT_WAIT_TIMEOUT_MS: '1800000',
     TRUST_PROXY: 'true',
     NEBULYNK_BUILD_SHA: ''
   }
