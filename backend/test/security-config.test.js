@@ -199,7 +199,6 @@ const dokployComposePath = fileURLToPath(new URL('../../docker-compose.dokploy.y
 const dokployTemplateComposePath = fileURLToPath(new URL('../../dokploy-template/docker-compose.yml', import.meta.url))
 const dokployTemplateConfigPath = fileURLToPath(new URL('../../dokploy-template/template.toml', import.meta.url))
 const dokployTemplateMetadataPath = fileURLToPath(new URL('../../dokploy-template/meta.json', import.meta.url))
-const packageJsonPath = fileURLToPath(new URL('../../package.json', import.meta.url))
 const dokployTemplateImportPath = fileURLToPath(new URL('../../dokploy-template/import.base64', import.meta.url))
 const dokployTemplateIconPath = fileURLToPath(new URL('../../dokploy-template/nebulynk.png', import.meta.url))
 const dokployTemplateBuildScriptPath = fileURLToPath(new URL('../../scripts/build-dokploy-template.mjs', import.meta.url))
@@ -513,13 +512,12 @@ test('Dokploy compose rejects a missing required production secret', {
 })
 
 test('Dokploy template packages a reproducible native-domain import', async () => {
-  const [compose, config, metadataContents, encoded, icon, packageContents] = await Promise.all([
+  const [compose, config, metadataContents, encoded, icon] = await Promise.all([
     readFile(dokployTemplateComposePath, 'utf8'),
     readFile(dokployTemplateConfigPath, 'utf8'),
     readFile(dokployTemplateMetadataPath, 'utf8'),
     readFile(dokployTemplateImportPath, 'utf8'),
-    readFile(dokployTemplateIconPath),
-    readFile(packageJsonPath, 'utf8')
+    readFile(dokployTemplateIconPath)
   ])
   const generator = spawnSync(process.execPath, [dokployTemplateBuildScriptPath, '--check'], {
     cwd: repositoryRoot,
@@ -533,10 +531,9 @@ test('Dokploy template packages a reproducible native-domain import', async () =
   assert.deepEqual(payload, { compose, config })
 
   const metadata = JSON.parse(metadataContents)
-  const packageMetadata = JSON.parse(packageContents)
   assert.equal(metadata.id, 'nebulynk')
   assert.equal(metadata.name, 'Nebulynk')
-  assert.equal(metadata.version, packageMetadata.version)
+  assert.equal(metadata.version, 'stable')
   assert.equal(metadata.logo, 'nebulynk.png')
   assert.equal(metadata.links.github, 'https://github.com/sapientorius/Nebulynk')
   assert.ok(metadata.tags.includes('self-hosted'))

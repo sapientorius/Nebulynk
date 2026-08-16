@@ -29,8 +29,8 @@ const [compose, config, metaRaw, packageRaw] = await Promise.all([
 
 const meta = JSON.parse(metaRaw)
 const rootPackage = JSON.parse(packageRaw)
-if (meta.version !== rootPackage.version) {
-  throw new Error(`dokploy-template/meta.json version ${meta.version} does not match package.json version ${rootPackage.version}. Update meta.json for the new release.`)
+if (meta.version !== 'stable' && meta.version !== rootPackage.version) {
+  throw new Error(`dokploy-template/meta.json version ${meta.version} must be stable or match package.json version ${rootPackage.version}.`)
 }
 
 const encoded = Buffer.from(JSON.stringify({ compose, config }), 'utf8').toString('base64')
