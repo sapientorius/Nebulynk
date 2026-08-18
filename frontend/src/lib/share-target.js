@@ -1,7 +1,3 @@
-const STORAGE_MODULE_URL = '/share-target-storage.js'
-
-let storagePromise = null
-
 function normalizeText(value) {
   return typeof value === 'string' ? value.trim() : ''
 }
@@ -11,25 +7,11 @@ function getStorageFromGlobal() {
 }
 
 async function getStorage() {
-  const existing = getStorageFromGlobal()
-  if (existing) return existing
-
-  if (!storagePromise) {
-    storagePromise = import(/* @vite-ignore */ STORAGE_MODULE_URL)
-      .then(() => {
-        const storage = getStorageFromGlobal()
-        if (!storage) {
-          throw new Error('Share target storage failed to initialize')
-        }
-        return storage
-      })
-      .catch((error) => {
-        storagePromise = null
-        throw error
-      })
+  const storage = getStorageFromGlobal()
+  if (!storage) {
+    throw new Error('Share target storage failed to initialize')
   }
-
-  return storagePromise
+  return storage
 }
 
 function appendUniquePart(parts, value) {
@@ -38,9 +20,20 @@ function appendUniquePart(parts, value) {
   parts.push(normalized)
 }
 
+function titleMatchesSharedFile(title, files) {
+  const normalizedTitle = normalizeText(title).toLowerCase()
+  if (!normalizedTitle) return false
+
+  return (Array.isArray(files) ? files : []).some((file) => (
+    normalizeText(file?.name).toLowerCase() === normalizedTitle
+  ))
+}
+
 export function buildSharedMessageText(payload) {
   const parts = []
-  appendUniquePart(parts, payload?.title)
+  if (!titleMatchesSharedFile(payload?.title, payload?.files)) {
+    appendUniquePart(parts, payload?.title)
+  }
   appendUniquePart(parts, payload?.text)
   appendUniquePart(parts, payload?.url)
   return parts.join('\n\n')
@@ -52,7 +45,7 @@ export function createSharePayloadFileEntries(payload) {
     .map((entry) => ({
       ...entry,
       file: entry.blob
-        ? new File([entry.blob], entry.name || 'shared-image', {
+        ? new File([entry.blob], entry.name || 'shared-file', {
           type: entry.type || entry.blob.type || '',
           lastModified: entry.last_modified || Date.now()
         })
@@ -89,5 +82,5 @@ export async function removeSharePayloadsForUser(userId) {
 }
 
 export function __resetShareTargetStateForTests() {
-  storagePromise = null
+  // Storage is loaded by index.html and supplied directly by tests.
 }

@@ -847,7 +847,7 @@ test.describe('P2-02 core e2e paths', () => {
         title: 'share_title',
         text: 'share_text',
         url: 'share_url',
-        files: [{ name: 'share_files', accept: ['image/*'] }]
+        files: [{ name: 'share_files', accept: ['*/*'] }]
       }
     })
 

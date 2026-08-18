@@ -11,7 +11,7 @@ over their infrastructure, data, and AI-provider choices.
   collaboration features.
 - Optional AI-assisted transcription, summaries, and meeting follow-up through
   bring-your-own-key provider configuration.
-- Browser and PWA access, including Android sharing of text, links, and images
+- Browser and PWA access, including Android sharing of text, links, and files
   into a selected Nebulynk chat, with an optional Windows helper for global
   push-to-talk.
 

@@ -124,15 +124,11 @@
       && typeof value.arrayBuffer === 'function'
   }
 
-  function isImageFile(value) {
-    return isFileLike(value) && typeof value.type === 'string' && value.type.toLowerCase().startsWith('image/')
-  }
-
   function toStoredFile(value) {
-    if (!isImageFile(value)) return null
+    if (!isFileLike(value)) return null
     return {
       id: createOpaqueId(),
-      name: typeof value.name === 'string' && value.name.trim() ? value.name : 'shared-image',
+      name: typeof value.name === 'string' && value.name.trim() ? value.name : 'shared-file',
       type: typeof value.type === 'string' ? value.type : '',
       size: Number(value.size) || 0,
       last_modified: Number.isFinite(Number(value.lastModified)) ? Number(value.lastModified) : null,

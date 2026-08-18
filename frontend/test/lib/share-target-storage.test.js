@@ -230,25 +230,48 @@ describe('share target IndexedDB storage', () => {
       lastModified: 123,
       arrayBuffer: async () => new ArrayBuffer(42)
     }
+    const pdf = {
+      name: 'document.pdf',
+      type: 'application/pdf',
+      size: 12,
+      arrayBuffer: async () => new ArrayBuffer(12)
+    }
+    const archive = {
+      name: 'archive.zip',
+      type: 'application/zip',
+      size: 8,
+      arrayBuffer: async () => new ArrayBuffer(8)
+    }
+    const unknownType = {
+      name: 'untitled-file',
+      type: '',
+      size: 0,
+      arrayBuffer: async () => new ArrayBuffer(0)
+    }
 
     await storage.setActiveUser('user-a')
     const payload = await storage.storeFormData(createFormData({
       title: 'A title',
       text: 'A text',
       url: 'https://example.test',
-      files: [image, { name: 'document.pdf', type: 'application/pdf', size: 1, arrayBuffer: async () => new ArrayBuffer(1) }]
+      files: [image, pdf, archive, unknownType]
     }))
 
     expect(payload.owner_user_id).toBe('user-a')
     expect(payload.expires_at - payload.created_at).toBe(storage.PAYLOAD_TTL_MS)
-    expect(payload.files).toHaveLength(1)
-    expect(payload.files[0]).toMatchObject({ name: 'shared.png', type: 'image/png', size: 42 })
+    expect(payload.files).toMatchObject([
+      { name: 'shared.png', type: 'image/png', size: 42 },
+      { name: 'document.pdf', type: 'application/pdf', size: 12 },
+      { name: 'archive.zip', type: 'application/zip', size: 8 },
+      { name: 'untitled-file', type: '', size: 0 }
+    ])
     await expect(storage.claimPayload(payload.id, 'user-b')).resolves.toEqual({ payload: null, reason: 'owner_mismatch' })
 
     const claimed = await storage.claimPayload(payload.id, 'user-a')
     expect(claimed.payload?.id).toBe(payload.id)
-    const updated = await storage.markFileUploaded(payload.id, payload.files[0].id, { id: 'upload-1', name: 'shared.png' })
-    expect(updated.files[0].uploaded_file).toEqual({ id: 'upload-1', name: 'shared.png' })
+    const pdfEntry = payload.files.find((file) => file.name === 'document.pdf')
+    const updated = await storage.markFileUploaded(payload.id, pdfEntry.id, { id: 'upload-1', name: 'document.pdf' })
+    expect(updated.files.find((file) => file.id === pdfEntry.id)?.uploaded_file).toEqual({ id: 'upload-1', name: 'document.pdf' })
 
     expect(await storage.removePayload(payload.id)).toBe(true)
     await expect(storage.getPayload(payload.id)).resolves.toBeNull()

@@ -28,7 +28,7 @@
 
         <section v-if="payloadFiles.length > 0" class="share-target-preview" data-testid="share-target-files-preview">
           <div class="share-target-section-title">
-            {{ $t('share.images', { count: payloadFiles.length }) }}
+            {{ $t('share.files', { count: payloadFiles.length }) }}
           </div>
           <ul class="share-target-files">
             <li v-for="file in payloadFiles" :key="file.id">

@@ -20,7 +20,7 @@
         {
           "name": "share_files",
           "accept": [
-            "image/*"
+            "*/*"
           ]
         }
       ]

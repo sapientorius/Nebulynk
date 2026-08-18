@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import {
   __resetShareTargetStateForTests,
   buildSharedMessageText,
@@ -31,9 +33,28 @@ describe('share target helpers', () => {
     })).toBe('Hello')
   })
 
-  it('recognizes text or images as compatible shared content', () => {
+  it('omits a title that only repeats an attached file name', () => {
+    expect(buildSharedMessageText({
+      title: 'PHOTO.PNG',
+      text: 'A caption',
+      files: [{ name: 'photo.png' }]
+    })).toBe('A caption')
+
+    expect(buildSharedMessageText({
+      title: 'Holiday photos',
+      text: 'A caption',
+      files: [{ name: 'photo.png' }]
+    })).toBe('Holiday photos\n\nA caption')
+  })
+
+  it('loads the public storage script through the HTML entry point', () => {
+    const indexHtml = readFileSync(resolve('index.html'), 'utf8')
+    expect(indexHtml).toContain('<script src="/share-target-storage.js"></script>')
+  })
+
+  it('recognizes text or files as compatible shared content', () => {
     expect(hasCompatibleShareContent({ text: 'hello' })).toBe(true)
-    expect(hasCompatibleShareContent({ files: [{ id: 'image-1' }] })).toBe(true)
+    expect(hasCompatibleShareContent({ files: [{ id: 'file-1' }] })).toBe(true)
     expect(hasCompatibleShareContent({ title: '   ', text: '', url: '', files: [] })).toBe(false)
   })
 
