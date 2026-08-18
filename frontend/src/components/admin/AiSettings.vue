@@ -88,6 +88,7 @@
                     :options="getModelOptions(functionKey)"
                     :placeholder="$t('ui.components.admin.select_model')"
                     :disabled="!functionForms[functionKey].provider_instance_id"
+                    filterable
                     @update:value="functionForms[functionKey].model = $event"
                   />
                   <n-space align="center" justify="space-between" style="width: 100%">
