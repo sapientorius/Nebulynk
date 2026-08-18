@@ -1,5 +1,6 @@
 <template>
-  <div class="login-container" data-testid="login-view">
+  <n-config-provider :theme="authTheme" :theme-overrides="authThemeOverrides">
+    <div class="login-container" data-testid="login-view">
     <div class="login-ambient" aria-hidden="true">
       <span class="star" style="top: 9%; left: 11%; width: 2px; height: 2px;"></span>
       <span class="star twinkle" style="top: 14%; left: 22%; width: 4px; height: 4px; animation-duration: 8s; animation-delay: -1.2s;"></span>
@@ -180,13 +181,16 @@
         </div>
       </template>
     </AuthFlipCard>
-  </div>
+    </div>
+  </n-config-provider>
 </template>
 
 <script>
+import { darkTheme } from 'naive-ui'
 import { startAuthentication } from '@simplewebauthn/browser'
 import AuthFlipCard from '../components/AuthFlipCard.vue'
-import { useSelfRegistrationStore, useSessionStore } from '../stores/index.js'
+import { buildNaiveThemeOverrides } from '../lib/theme-settings.js'
+import { useSelfRegistrationStore, useSessionStore, useThemeStore } from '../stores/index.js'
 import { translateApiError } from '../lib/api-error.js'
 import {
   addDesktopProfile,
@@ -226,6 +230,12 @@ export default {
     }
   },
   computed: {
+    authTheme() {
+      return darkTheme
+    },
+    authThemeOverrides() {
+      return buildNaiveThemeOverrides(this.themeStore.platformThemeSettings, 'dark')
+    },
     brandName() {
       return 'Nebulynk'
     },
@@ -240,6 +250,9 @@ export default {
     },
     sessionStore() {
       return useSessionStore()
+    },
+    themeStore() {
+      return useThemeStore()
     },
     selfRegistrationStore() {
       return useSelfRegistrationStore()

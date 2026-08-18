@@ -24,6 +24,16 @@ describe('self-registration views', () => {
     expect(router.match(/component: \(\) => import\('\.\.\/views\/AuthView\.vue'\)/g)).toHaveLength(2)
   })
 
+  it('keeps the auth controls on the dark theme regardless of the platform theme', () => {
+    const login = source('src/views/LoginView.vue')
+
+    expect(login).toContain('<n-config-provider :theme="authTheme" :theme-overrides="authThemeOverrides">')
+    expect(login).toContain("import { darkTheme } from 'naive-ui'")
+    expect(login).toContain("return buildNaiveThemeOverrides(this.themeStore.platformThemeSettings, 'dark')")
+    expect(login.indexOf('<n-config-provider')).toBeLessThan(login.indexOf('<AuthFlipCard'))
+    expect(login.lastIndexOf('</n-config-provider>')).toBeGreaterThan(login.lastIndexOf('</AuthFlipCard>'))
+  })
+
   it('only renders the registration entry point when the public setting enables it', () => {
     const login = source('src/views/LoginView.vue')
 

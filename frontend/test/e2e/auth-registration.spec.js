@@ -33,12 +33,41 @@ async function mockRegistrationConfig(page, config) {
   })
 }
 
+async function mockPlatformTheme(page, initialThemeMode = 'light') {
+  let themeMode = initialThemeMode
+
+  await page.route('**/platform**', async (route) => {
+    const response = await route.fetch()
+    const body = await response.json()
+
+    await route.fulfill({
+      response,
+      body: JSON.stringify({
+        ...body,
+        theme_mode_default: themeMode
+      })
+    })
+  })
+
+  return {
+    setMode(mode) {
+      themeMode = mode
+    }
+  }
+}
+
 async function expectRegistrationFace(page) {
   const inner = page.getByTestId('auth-flip-card').locator('.auth-flip-card__inner')
   await expect(inner).toHaveClass(/is-flipped/)
   await expect(page.getByTestId('auth-login-face')).toHaveAttribute('aria-hidden', 'true')
   await expect(page.getByTestId('auth-register-face')).toHaveAttribute('aria-hidden', 'false')
   return inner
+}
+
+async function readAuthLabelColors(page, faceTestId) {
+  return page.getByTestId(faceTestId).locator('.n-form-item-label').evaluateAll((elements) => (
+    elements.map((element) => getComputedStyle(element).color)
+  ))
 }
 
 async function readAuthViewport(page) {
@@ -114,6 +143,35 @@ test.describe('login and registration flip card', () => {
     await page.getByTestId('login-register').click()
     await expectRegistrationFace(page)
     await expect.poll(() => inner.evaluate((element) => getComputedStyle(element).transitionDuration)).toBe('0s')
+  })
+
+  test('keeps auth form labels consistent across light and dark platform themes', async ({ page }) => {
+    await ensureAdmin(page, adminCredentials)
+    await mockRegistrationConfig(page, enabledRegistrationConfig)
+    const platformTheme = await mockPlatformTheme(page, 'light')
+
+    await page.goto('/login')
+    await expect(page.getByTestId('login-email')).toBeVisible()
+    await expect.poll(() => page.locator('html').getAttribute('data-theme')).toBe('light')
+    const lightLoginLabelColors = await readAuthLabelColors(page, 'auth-login-face')
+
+    await page.getByTestId('login-register').click()
+    await expectRegistrationFace(page)
+    const lightRegistrationLabelColors = await readAuthLabelColors(page, 'auth-register-face')
+
+    platformTheme.setMode('dark')
+    await page.goto('/login')
+    await expect(page.getByTestId('login-email')).toBeVisible()
+    await expect.poll(() => page.locator('html').getAttribute('data-theme')).toBe('dark')
+    const darkLoginLabelColors = await readAuthLabelColors(page, 'auth-login-face')
+
+    await page.getByTestId('login-register').click()
+    await expectRegistrationFace(page)
+    const darkRegistrationLabelColors = await readAuthLabelColors(page, 'auth-register-face')
+
+    expect(darkLoginLabelColors).toEqual(lightLoginLabelColors)
+    expect(darkRegistrationLabelColors).toEqual(lightRegistrationLabelColors)
+    expect(lightRegistrationLabelColors[0]).toBe(lightLoginLabelColors[0])
   })
 
   test('keeps narrow auth layouts horizontally contained while allowing needed vertical scrolling', async ({ page }) => {
