@@ -42,7 +42,7 @@ export const PROVIDER_METADATA = {
     defaultBaseUrl: 'https://openrouter.ai/api/v1',
     requiresBaseUrl: false,
     capabilities: {
-      transcription: false,
+      transcription: true,
       meeting_summary: true,
       image_generation: false
     }

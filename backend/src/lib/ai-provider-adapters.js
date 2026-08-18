@@ -41,6 +41,13 @@ function isOpenAiImageModel(modelId) {
   return /^(gpt-image-|dall-e-)/i.test(String(modelId || '').trim())
 }
 
+function modelHasOutputModality(entry, modality) {
+  const outputModalities = entry?.architecture?.output_modalities || entry?.output_modalities
+  return Array.isArray(outputModalities) && outputModalities.some((value) => (
+    String(value || '').trim().toLowerCase() === modality
+  ))
+}
+
 function normalizeModelEntry(providerType, entry) {
   const id = String(
     entry?.id
@@ -68,6 +75,10 @@ function normalizeModelEntry(providerType, entry) {
     supportsTimestamps = true
     supportsSpeakerMerge = true
     supportsContextBias = true
+  }
+
+  if (providerType === 'openrouter' && modelHasOutputModality(entry, 'transcription')) {
+    capabilities.add('transcription')
   }
 
   if (isLikelyTextModel(id)) {
@@ -134,7 +145,11 @@ function buildHeaders(providerType, apiKey) {
   }
 }
 
-function getModelsEndpoint(baseUrl) {
+function getModelsEndpoint(baseUrl, providerType, capability) {
+  if (providerType === 'openrouter' && capability === 'transcription') {
+    return `${baseUrl}/models?output_modalities=transcription`
+  }
+
   return `${baseUrl}/models`
 }
 
@@ -254,7 +269,7 @@ export async function listProviderModels({
     env,
     lookupFn
   })
-  const endpoint = getModelsEndpoint(resolvedBaseUrl)
+  const endpoint = getModelsEndpoint(resolvedBaseUrl, providerType, capability)
 
   const response = await fetchFn(endpoint, {
     headers: {

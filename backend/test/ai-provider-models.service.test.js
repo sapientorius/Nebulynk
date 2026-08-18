@@ -296,6 +296,59 @@ test('ai-provider-models service: mistral transcription only exposes voxtral mod
   assert.equal(result.data[0].supports_timestamps, true)
 })
 
+test('ai-provider-models service: OpenRouter transcription queries and exposes only STT models', async () => {
+  let requestedUrl = null
+  let requestedHeaders = null
+  const { service } = createService({
+    seed: {
+      ai_provider_instances: [{
+        id: 'instance-1',
+        provider_type: 'openrouter',
+        display_name: 'OpenRouter',
+        enabled: true,
+        base_url: 'https://openrouter.ai/api/v1',
+        created_at: '2026-03-21T10:00:00.000Z',
+        updated_at: '2026-03-21T10:00:00.000Z'
+      }],
+      ai_provider_secrets: [{
+        provider_instance_id: 'instance-1',
+        encrypted_secret: encryptSecret(createApp(), 'secret-key'),
+        created_at: '2026-03-21T10:00:00.000Z',
+        updated_at: '2026-03-21T10:00:00.000Z'
+      }]
+    },
+    fetchFn: async (url, options) => {
+      requestedUrl = url
+      requestedHeaders = options.headers
+      return {
+        ok: true,
+        async json() {
+          return {
+            data: [{
+              id: 'openai/whisper-1',
+              name: 'Whisper 1',
+              architecture: { output_modalities: ['transcription'] }
+            }, {
+              id: 'openai/gpt-4.1-mini',
+              name: 'GPT-4.1 mini',
+              architecture: { output_modalities: ['text'] }
+            }]
+          }
+        }
+      }
+    }
+  })
+
+  const result = await service.find({
+    query: { provider_instance_id: 'instance-1', capability: 'transcription' }
+  })
+
+  assert.equal(requestedUrl, 'https://openrouter.ai/api/v1/models?output_modalities=transcription')
+  assert.equal(requestedHeaders.Authorization, 'Bearer secret-key')
+  assert.deepEqual(result.data.map((model) => model.id), ['openai/whisper-1'])
+  assert.deepEqual(result.data[0].capabilities, ['transcription'])
+})
+
 test('ai-provider-models service: legacy unsafe stored base_url is rejected before outbound fetch', async () => {
   let fetchCalls = 0
   const { service } = createService({

@@ -114,6 +114,47 @@ test('transcribeAudio keeps browser webm uploads as .webm files', async () => {
   assert.equal(uploadedFilename, 'meeting-recording.webm')
 })
 
+test('transcribeAudio sends OpenRouter transcription requests as OpenAI-compatible multipart form data', async () => {
+  let requestedUrl = null
+  let requestedHeaders = null
+  const formEntries = []
+
+  const result = await transcribeAudio({
+    providerType: 'openrouter',
+    apiKey: 'test-key',
+    baseUrl: 'https://openrouter.ai/api/v1',
+    model: 'openai/whisper-1',
+    file: {
+      buffer: Buffer.from([1, 2, 3]),
+      mime: 'audio/webm;codecs=opus'
+    },
+    language: 'de',
+    fetchFn: async (url, options) => {
+      requestedUrl = url
+      requestedHeaders = options.headers
+      for (const [name, value] of options.body.entries()) {
+        formEntries.push([name, typeof value === 'string' ? value : value.name])
+      }
+
+      return {
+        ok: true,
+        async json() {
+          return { text: 'Hallo Welt', language: 'de' }
+        }
+      }
+    }
+  })
+
+  assert.equal(requestedUrl, 'https://openrouter.ai/api/v1/audio/transcriptions')
+  assert.equal(requestedHeaders.Authorization, 'Bearer test-key')
+  assert.ok(formEntries.some(([name, value]) => name === 'file' && value === 'meeting-recording.webm'))
+  assert.ok(formEntries.some(([name, value]) => name === 'model' && value === 'openai/whisper-1'))
+  assert.ok(formEntries.some(([name, value]) => name === 'language' && value === 'de'))
+  assert.ok(formEntries.some(([name, value]) => name === 'response_format' && value === 'json'))
+  assert.equal(result.text, 'Hallo Welt')
+  assert.equal(result.language, 'de')
+})
+
 test('transcribeAudio requests whisper timestamps via verbose_json', async () => {
   const formEntries = []
 

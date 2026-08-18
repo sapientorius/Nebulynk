@@ -97,6 +97,38 @@ test('ai-function-configs service: enabling requires complete config and matchin
   )
 })
 
+test('ai-function-configs service: enables transcription with an active OpenRouter instance', async () => {
+  const db = createMemoryDb({
+    ai_provider_instances: [{
+      id: 'openrouter-1',
+      provider_type: 'openrouter',
+      display_name: 'OpenRouter',
+      enabled: true,
+      base_url: 'https://openrouter.ai/api/v1',
+      created_at: '2026-03-21T10:00:00.000Z',
+      updated_at: '2026-03-21T10:00:00.000Z'
+    }],
+    ai_function_configs: [{
+      function_key: 'transcription',
+      enabled: false,
+      provider_instance_id: null,
+      model: null,
+      updated_at: '2026-03-21T10:00:00.000Z'
+    }]
+  })
+  const service = new AiFunctionConfigsService({ Model: db })
+
+  const result = await service.patch('transcription', {
+    enabled: true,
+    provider_instance_id: 'openrouter-1',
+    model: 'openai/whisper-1'
+  })
+
+  assert.equal(result.enabled, true)
+  assert.equal(result.provider_instance_id, 'openrouter-1')
+  assert.equal(result.model, 'openai/whisper-1')
+})
+
 test('ai-function-configs service: queued meeting artifact types reflect enabled and complete AI configs', async () => {
   const db = createMemoryDb({
     ai_function_configs: [{
