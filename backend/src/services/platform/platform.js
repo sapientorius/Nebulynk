@@ -4,6 +4,7 @@ import { checkPermission } from '../../hooks/check-permission.js'
 import { createSchema, patchSchema } from './platform.schema.js'
 import { PlatformRepository } from '../../domains/platform/repository.js'
 import { PlatformDomainService } from '../../domains/platform/service.js'
+import { KlipySettings } from '../../lib/klipy-settings.js'
 
 class PlatformService {
   constructor(options) {
@@ -24,9 +25,19 @@ class PlatformService {
 }
 
 export const platform = (app) => {
+  const repository = new PlatformRepository(app.get('postgresqlClient'))
+  const configuredEnv = app.get('env')
+  const klipySettings = new KlipySettings({
+    repository,
+    app,
+    env: configuredEnv && typeof configuredEnv === 'object' ? configuredEnv : process.env
+  })
+  app.set('klipySettings', klipySettings)
+
   const domainService = new PlatformDomainService({
-    repository: new PlatformRepository(app.get('postgresqlClient')),
-    usersService: app.service('users')
+    repository,
+    usersService: app.service('users'),
+    klipySettings
   })
 
   app.use('platform', new PlatformService({ domainService }), {

@@ -127,7 +127,7 @@
           >
             <template #icon><n-icon><happy-icon /></n-icon></template>
           </n-button>
-          <n-button quaternary size="small" :title="$t('ui.components.gif')" @click="showGifPicker = true">
+          <n-button v-if="klipyConfigured" quaternary size="small" data-testid="message-gif-button" :title="$t('ui.components.gif')" @click="showGifPicker = true">
             GIF
           </n-button>
           <FileUpload
@@ -226,7 +226,7 @@ import {
 import MentionAutocomplete from './MentionAutocomplete.vue'
 import FileUpload from './FileUpload.vue'
 import VoiceRecorder from './VoiceRecorder.vue'
-import { useChannelsStore, useMessagesStore, useUploadsStore } from '../stores/index.js'
+import { useChannelsStore, useGifSearchStore, useMessagesStore, useUploadsStore } from '../stores/index.js'
 import { optimizeImageForUpload } from '../lib/image-upload-optimizer.js'
 import { isOptimizableImageFile } from '../lib/upload-settings.js'
 import { extractInternalMessageReference } from '../lib/message-links.js'
@@ -294,6 +294,12 @@ export default {
     },
     uploadsStore() {
       return useUploadsStore()
+    },
+    gifSearchStore() {
+      return useGifSearchStore()
+    },
+    klipyConfigured() {
+      return this.gifSearchStore.klipyConfigured
     },
     activeChannelId() {
       return this.channelsStore.activeChannelId
@@ -374,6 +380,7 @@ export default {
     })
     this.attachPasteHandler()
     this.messagesStore.hydrateDraftFiles(this.activeChannelId).catch(() => {})
+    this.gifSearchStore.loadConfiguration().catch(() => {})
     this.focusTextarea()
   },
   beforeUnmount() {

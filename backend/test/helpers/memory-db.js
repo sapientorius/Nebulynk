@@ -254,6 +254,7 @@ export function createMemoryDb(seed = {}) {
     invites: [],
     push_subscriptions: [],
     platform_settings: [],
+    platform_secrets: [],
     user_sponsorship_prompt_preferences: [],
     search_documents: [],
     notifications: [],

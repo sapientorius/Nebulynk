@@ -44,6 +44,8 @@ export const patchSchema = {
     uploadMaxFileSizeMb: { type: 'integer', minimum: 1, maximum: 1024 },
     imageUploadMaxDimensionPx: { type: 'integer', minimum: 256, maximum: 8192 },
     imageUploadQuality: { type: 'integer', minimum: 1, maximum: 100 },
+    klipyApiKey: { type: 'string', maxLength: 5000 },
+    clearKlipyApiKey: { type: 'boolean' },
     themeModeDefault: { type: 'string', enum: THEME_MODE_VALUES },
     themePrimaryColor: hexColorSchema,
     themeSecondaryColor: hexColorSchema,

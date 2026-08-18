@@ -94,6 +94,14 @@ export function normalizeSettingsPatch(data = {}) {
       DEFAULT_PLATFORM_MEETING_HISTORY_ACCESS
     )
   }
+  if (data.clearKlipyApiKey === true) {
+    patch.clearKlipyApiKey = true
+  } else if (Object.prototype.hasOwnProperty.call(data, 'klipyApiKey')) {
+    const klipyApiKey = typeof data.klipyApiKey === 'string' ? data.klipyApiKey.trim() : ''
+    if (klipyApiKey) {
+      patch.klipyApiKey = klipyApiKey
+    }
+  }
   return {
     ...patch,
     ...normalizeUploadSettingsPatch(data),

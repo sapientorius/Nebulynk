@@ -68,4 +68,12 @@ describe('MessageInput inline image upload source contract', () => {
     expect(source).toContain('calc(12px + env(safe-area-inset-bottom, 0px))')
     expect(source).toContain('max-height: calc(100dvh - 16px);')
   })
+
+  it('shows the GIF button only after the Klipy configuration check succeeds', () => {
+    const source = readFileSync(resolve('src/components/MessageInput.vue'), 'utf8')
+
+    expect(source).toContain('useGifSearchStore')
+    expect(source).toContain('v-if="klipyConfigured"')
+    expect(source).toContain('this.gifSearchStore.loadConfiguration().catch(() => {})')
+  })
 })

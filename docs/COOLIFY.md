@@ -121,7 +121,7 @@ Configure only the features you intend to use:
   build automatically. Changing it requires a full frontend rebuild.
 - Email: set `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_IGNORE_TLS`,
   `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`, and optionally `SMTP_FROM_NAME`.
-- GIF search: set `KLIPY_API_KEY` only when using the Klipy integration.
+- GIF search: optionally set `KLIPY_API_KEY` as an environment fallback. You can also add the key later under Admin → Platform Settings; the encrypted platform value takes precedence.
 - Two-factor encryption: optionally set a strong, stable
   `AUTH_2FA_SECRET_KEY` to keep stored two-factor secrets separate from the
   JWT signing key. Existing installations can leave it unset and use the

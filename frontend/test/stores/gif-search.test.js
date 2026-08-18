@@ -3,6 +3,7 @@ import { useGifSearchStore } from '../../src/stores/gif-search.js'
 
 const apiMock = vi.hoisted(() => ({
   get: vi.fn(),
+  getPlatformStatus: vi.fn(),
   post: vi.fn(),
   patch: vi.fn(),
   delete: vi.fn()
@@ -10,11 +11,13 @@ const apiMock = vi.hoisted(() => ({
 
 vi.mock('../../src/lib/api.js', () => ({
   default: apiMock,
+  getPlatformStatus: apiMock.getPlatformStatus,
   getCurrentUser: vi.fn(() => null)
 }))
 
 function resetApiMock() {
   apiMock.get.mockReset()
+  apiMock.getPlatformStatus.mockReset()
   apiMock.post.mockReset()
   apiMock.patch.mockReset()
   apiMock.delete.mockReset()
@@ -43,5 +46,15 @@ describe('gif-search store', () => {
 
     expect(apiMock.get).toHaveBeenCalledWith('/gifs', { params: { q: 'cat', limit: 25 } })
     expect(result).toEqual([{ id: 'gif-2' }])
+  })
+
+  it('loads Klipy availability from platform status', async () => {
+    const store = useGifSearchStore()
+    apiMock.getPlatformStatus.mockResolvedValue({ klipy_configured: true })
+
+    await expect(store.loadConfiguration()).resolves.toBe(true)
+
+    expect(store.klipyConfigured).toBe(true)
+    expect(apiMock.getPlatformStatus).toHaveBeenCalledWith({})
   })
 })

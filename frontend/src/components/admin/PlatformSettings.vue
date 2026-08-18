@@ -67,6 +67,37 @@
               <span class="platform-settings-hint">{{ $t('ui.components.admin.image_upload_quality_help') }}</span>
             </div>
           </n-form-item>
+          <n-divider />
+          <h4 class="platform-settings-subtitle">{{ $t('ui.components.admin.klipy_settings') }}</h4>
+          <n-form-item :label="$t('ui.components.admin.klipy_api_key')">
+            <div class="platform-settings-field">
+              <n-input
+                v-model:value="klipyApiKey"
+                type="password"
+                show-password-on="click"
+                :placeholder="klipyConfigured ? $t('ui.components.admin.klipy_api_key_replace_optional') : ''"
+                data-testid="platform-klipy-api-key"
+              />
+              <n-space align="center">
+                <n-tag :type="klipyConfigured ? 'success' : 'warning'" data-testid="platform-klipy-status">
+                  {{ klipyConfigured ? $t('ui.components.admin.klipy_configured') : $t('ui.components.admin.klipy_not_configured') }}
+                </n-tag>
+                <n-button
+                  v-if="klipyConfigured"
+                  size="small"
+                  type="error"
+                  secondary
+                  :loading="clearingKlipyApiKey"
+                  :disabled="saving"
+                  data-testid="platform-klipy-clear"
+                  @click="clearKlipyApiKey"
+                >
+                  {{ $t('ui.components.admin.klipy_api_key_clear') }}
+                </n-button>
+              </n-space>
+              <span class="platform-settings-hint">{{ $t('ui.components.admin.klipy_api_key_help') }}</span>
+            </div>
+          </n-form-item>
           <template v-if="isPrimaryAdmin">
             <n-divider />
             <h4 class="platform-settings-subtitle">{{ $t('sponsorship.settings_title') }}</h4>
@@ -124,6 +155,9 @@ export default {
       uploadMaxFileSizeMb: DEFAULT_UPLOAD_MAX_FILE_SIZE_MB,
       imageUploadMaxDimensionPx: DEFAULT_IMAGE_UPLOAD_MAX_DIMENSION_PX,
       imageUploadQuality: DEFAULT_IMAGE_UPLOAD_QUALITY,
+      klipyApiKey: '',
+      klipyConfigured: false,
+      clearingKlipyApiKey: false,
       sponsorshipPromptsEnabled: true,
       updatingSponsorshipPromptPreference: false
     }
@@ -179,6 +213,7 @@ export default {
           1,
           100
         )
+        this.klipyConfigured = settings?.klipy_configured === true || settings?.klipy_configured === 'true'
       } catch (error) {
         console.error('Failed to load platform settings:', error)
       }
@@ -195,13 +230,17 @@ export default {
           8192
         )
         const imageUploadQuality = this.normalizeNumber(this.imageUploadQuality, DEFAULT_IMAGE_UPLOAD_QUALITY, 1, 100)
-        const settings = await this.adminStore.updatePlatformSettings({
+        const payload = {
           defaultLanguage: this.defaultLanguage,
           autoAwayMinutes,
           uploadMaxFileSizeMb,
           imageUploadMaxDimensionPx,
           imageUploadQuality
-        })
+        }
+        const klipyApiKey = typeof this.klipyApiKey === 'string' ? this.klipyApiKey.trim() : ''
+        if (klipyApiKey) payload.klipyApiKey = klipyApiKey
+
+        const settings = await this.adminStore.updatePlatformSettings(payload)
         setPlatformDefaultLocale(settings?.default_locale || this.defaultLanguage)
         this.autoAwayMinutes = Number.parseInt(settings?.auto_away_minutes, 10) || autoAwayMinutes
         this.uploadMaxFileSizeMb = this.normalizeNumber(
@@ -222,6 +261,8 @@ export default {
           1,
           100
         )
+        this.klipyConfigured = settings?.klipy_configured === true || settings?.klipy_configured === 'true'
+        this.klipyApiKey = ''
         await this.uploadsStore.loadUploadSettings({ refresh: true })
         window.$message?.success(this.$t('ui.components.admin.platform_settings_updated'))
       } catch (error) {
@@ -229,6 +270,24 @@ export default {
         window.$message?.error(this.$t('ui.components.admin.saving_failed'))
       } finally {
         this.saving = false
+      }
+    },
+    async clearKlipyApiKey() {
+      if (!this.klipyConfigured || this.clearingKlipyApiKey || this.saving) return
+
+      this.clearingKlipyApiKey = true
+      try {
+        const settings = await this.adminStore.updatePlatformSettings({
+          clearKlipyApiKey: true
+        })
+        this.klipyConfigured = settings?.klipy_configured === true || settings?.klipy_configured === 'true'
+        this.klipyApiKey = ''
+        window.$message?.success(this.$t('ui.components.admin.klipy_api_key_cleared'))
+      } catch (error) {
+        console.error('Failed to clear Klipy API key:', error)
+        window.$message?.error(this.$t('ui.components.admin.saving_failed'))
+      } finally {
+        this.clearingKlipyApiKey = false
       }
     },
     async loadSponsorshipPromptPreference() {

@@ -26,6 +26,30 @@ export class PlatformRepository {
     }
   }
 
+  async findSecret(key) {
+    return this.db('platform_secrets').where('key', key).first()
+  }
+
+  async updateSecret(key, encryptedValue) {
+    const now = new Date().toISOString()
+    const updated = await this.db('platform_secrets')
+      .where('key', key)
+      .update({ encrypted_value: encryptedValue, updated_at: now })
+
+    if (!updated) {
+      await this.db('platform_secrets').insert({
+        key,
+        encrypted_value: encryptedValue,
+        created_at: now,
+        updated_at: now
+      })
+    }
+  }
+
+  async deleteSecret(key) {
+    await this.db('platform_secrets').where('key', key).delete()
+  }
+
   async deleteUserById(userId) {
     await this.db('users').where('id', userId).delete()
   }

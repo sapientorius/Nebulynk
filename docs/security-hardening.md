@@ -32,7 +32,7 @@ Nebulynk instance.
 
 ## Integrations
 
-- Keep AI-provider, SMTP, storage, push, and media credentials backend-only.
+- Keep AI-provider, SMTP, Klipy, storage, push, and media credentials backend-only. Platform-stored Klipy secrets are encrypted with the application secret.
 - Use trusted HTTPS endpoints for external providers and review any custom
   endpoint before allowing the application to connect to it.
 - Review logs and error reporting for accidental credential or signed-URL

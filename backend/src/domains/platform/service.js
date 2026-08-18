@@ -37,15 +37,20 @@ const THEME_PATCH_SETTING_MAP = {
 }
 
 export class PlatformDomainService {
-  constructor({ repository, usersService, createIdFn = createId }) {
+  constructor({ repository, usersService, klipySettings, createIdFn = createId }) {
     this.repository = repository
     this.usersService = usersService
+    this.klipySettings = klipySettings
     this.createIdFn = createIdFn
   }
 
   async findSettings() {
     const settings = await this.repository.listSettings()
-    return mapSettingsRows(settings)
+    const result = mapSettingsRows(settings)
+    if (this.klipySettings) {
+      Object.assign(result, await this.klipySettings.getStatus())
+    }
+    return result
   }
 
   async setupPlatform(data) {
@@ -131,6 +136,11 @@ export class PlatformDomainService {
     }
     if (Object.prototype.hasOwnProperty.call(patch, 'imageUploadQuality')) {
       await this.repository.updateSetting(UPLOAD_SETTING_KEYS.imageQuality, String(patch.imageUploadQuality))
+    }
+    if (patch.clearKlipyApiKey === true && this.klipySettings) {
+      await this.klipySettings.clearApiKey()
+    } else if (Object.prototype.hasOwnProperty.call(patch, 'klipyApiKey') && this.klipySettings) {
+      await this.klipySettings.setApiKey(patch.klipyApiKey)
     }
     if (Object.prototype.hasOwnProperty.call(patch, 'themeModeDefault')) {
       await this.repository.updateSetting(THEME_SETTING_KEYS.modeDefault, patch.themeModeDefault)

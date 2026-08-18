@@ -5,7 +5,8 @@ import { PlatformDomainService } from '../src/domains/platform/service.js'
 
 function createDomainService({
   repositoryOverrides = {},
-  usersServiceOverrides = {}
+  usersServiceOverrides = {},
+  klipySettings = null
 } = {}) {
   let nextId = 0
   const calls = {
@@ -76,6 +77,7 @@ function createDomainService({
   const service = new PlatformDomainService({
     repository,
     usersService,
+    klipySettings,
     createIdFn: () => `id-${++nextId}`
   })
 
@@ -276,6 +278,45 @@ test('platform domain behavior: update settings patches upload settings', async 
     { key: 'image_upload_max_dimension_px', value: '2560' },
     { key: 'image_upload_quality', value: '76' }
   ])
+})
+
+test('platform domain behavior: stores Klipy keys and exposes only configuration status', async () => {
+  const klipyCalls = []
+  const { service } = createDomainService({
+    klipySettings: {
+      async getStatus() {
+        return { klipy_configured: true }
+      },
+      async setApiKey(apiKey) {
+        klipyCalls.push(apiKey)
+      }
+    }
+  })
+
+  const result = await service.updateSettings({ klipyApiKey: '  platform-key  ' })
+
+  assert.deepEqual(klipyCalls, ['platform-key'])
+  assert.equal(result.klipy_configured, true)
+  assert.equal(result.klipyApiKey, undefined)
+})
+
+test('platform domain behavior: clears the stored Klipy key', async () => {
+  let clearCalls = 0
+  const { service } = createDomainService({
+    klipySettings: {
+      async getStatus() {
+        return { klipy_configured: clearCalls === 0 }
+      },
+      async clearApiKey() {
+        clearCalls += 1
+      }
+    }
+  })
+
+  const result = await service.updateSettings({ clearKlipyApiKey: true })
+
+  assert.equal(clearCalls, 1)
+  assert.equal(result.klipy_configured, false)
 })
 
 test('platform domain behavior: update settings patches theme settings', async () => {

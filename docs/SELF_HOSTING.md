@@ -152,7 +152,7 @@ included `livekit-egress.yaml` uses `nebulynk-files`.
 | Build provenance | `NEBULYNK_BUILD_SHA`, `NEBULYNK_BUILD_TIME` | Optional immutable commit and build timestamp shown to administrators. Only the package SemVer determines update availability. |
 | Update trust override | `NEBULYNK_UPDATE_PUBLIC_KEYS_JSON` | Official release tags embed their public verification keys. Use this additive public keyring only for controlled development or an overlapping emergency rotation; never place private key material here. |
 | Web Push | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | Both server-side VAPID keys are required for push; the supplied Compose files reuse the public key for the frontend build. |
-| GIF search | `KLIPY_API_KEY` | Only set when using the Klipy integration. |
+| GIF search | `KLIPY_API_KEY` | Optional environment fallback. The key can also be added later under Admin → Platform Settings; the encrypted platform value takes precedence. |
 
 The backend can still read legacy `MINIO_*` names during migration, but the
 Compose files and environment examples use only `STORAGE_S3_*`. Before

@@ -120,7 +120,7 @@ deployments:
 - Email: `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`,
   `SMTP_IGNORE_TLS`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`, and
   `SMTP_FROM_NAME`.
-- GIF search: `KLIPY_API_KEY`.
+- GIF search: optionally set `KLIPY_API_KEY` as an environment fallback. You can also add the key later under Admin → Platform Settings; the encrypted platform value takes precedence.
 - Two-factor encryption: optionally set a strong, stable
   `AUTH_2FA_SECRET_KEY`. Existing installations can leave it unset and use
   the backwards-compatible `JWT_SECRET` fallback.

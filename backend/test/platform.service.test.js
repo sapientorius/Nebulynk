@@ -7,7 +7,8 @@ import { platform } from '../src/services/platform/platform.js'
 function createDbStub({
   initialized = 'false',
   failTransaction = false,
-  initialSettings = {}
+  initialSettings = {},
+  initialSecrets = {}
 } = {}) {
   const calls = {
     deletedUserIds: [],
@@ -36,6 +37,7 @@ function createDbStub({
     theme_error_color: '#ff4d4f',
     ...initialSettings
   }))
+  const secretsMap = new Map(Object.entries(initialSecrets))
 
   function buildQuery(table, whereClauses, { inTransaction = false } = {}) {
     return {
@@ -44,15 +46,24 @@ function createDbStub({
         return this
       },
       async first() {
-        if (table !== 'platform_settings') return null
         const keyFilter = whereClauses.find((entry) => entry.column === 'key')
         if (!keyFilter) return null
+        if (table === 'platform_secrets') {
+          const encryptedValue = secretsMap.get(keyFilter.value)
+          return encryptedValue
+            ? { key: keyFilter.value, encrypted_value: encryptedValue }
+            : null
+        }
+        if (table !== 'platform_settings') return null
         return {
           key: keyFilter.value,
           value: settingsMap.get(keyFilter.value)
         }
       },
       async select() {
+        if (table === 'platform_secrets') {
+          return [...secretsMap.entries()].map(([key, encrypted_value]) => ({ key, encrypted_value }))
+        }
         if (table !== 'platform_settings') return []
         return [...settingsMap.entries()].map(([key, value]) => ({ key, value }))
       },
@@ -61,6 +72,12 @@ function createDbStub({
           const idFilter = whereClauses.find((entry) => entry.column === 'id')
           if (idFilter?.value) {
             calls.deletedUserIds.push(idFilter.value)
+          }
+        }
+        if (table === 'platform_secrets') {
+          const keyFilter = whereClauses.find((entry) => entry.column === 'key')
+          if (keyFilter?.value) {
+            secretsMap.delete(keyFilter.value)
           }
         }
         return 1
@@ -75,9 +92,19 @@ function createDbStub({
         if (table === 'platform_settings') {
           settingsMap.set(payload.key, payload.value)
         }
+        if (table === 'platform_secrets') {
+          secretsMap.set(payload.key, payload.encrypted_value)
+        }
         return 1
       },
       async update(patchData) {
+        if (table === 'platform_secrets') {
+          const keyFilter = whereClauses.find((entry) => entry.column === 'key')
+          if (keyFilter?.value && typeof patchData?.encrypted_value === 'string') {
+            secretsMap.set(keyFilter.value, patchData.encrypted_value)
+          }
+          return 1
+        }
         if (table === 'platform_settings') {
           const keyFilter = whereClauses.find((entry) => entry.column === 'key')
           if (keyFilter?.value && typeof patchData?.value === 'string') {
@@ -100,11 +127,11 @@ function createDbStub({
     await runInTransaction(trx)
   }
 
-  return { db, calls, settingsMap }
+  return { db, calls, settingsMap, secretsMap }
 }
 
 function createHarness(dbOptions = {}) {
-  const { db, calls, settingsMap } = createDbStub(dbOptions)
+  const { db, calls, settingsMap, secretsMap } = createDbStub(dbOptions)
   const app = feathers()
   app.defaultAuthentication = () => ({
     async authenticate() {
@@ -112,6 +139,8 @@ function createHarness(dbOptions = {}) {
     }
   })
   app.set('postgresqlClient', db)
+  app.set('authentication', { secret: 'test-auth-secret' })
+  app.set('env', dbOptions.env || { KLIPY_API_KEY: '' })
   app.use('users', {
     async create(data) {
       calls.createdUsers.push(data)
@@ -119,7 +148,7 @@ function createHarness(dbOptions = {}) {
     }
   })
   platform(app)
-  return { app, calls, settingsMap }
+  return { app, calls, settingsMap, secretsMap }
 }
 
 test('platform.find hook-chain: returns current platform settings map', async () => {
@@ -163,7 +192,8 @@ test('platform.find hook-chain: returns current platform settings map', async ()
     theme_font_family: 'lato',
     theme_custom_css_global: '',
     theme_dark_custom_css: '',
-    theme_light_custom_css: ''
+    theme_light_custom_css: '',
+    klipy_configured: false
   })
 })
 
@@ -445,4 +475,57 @@ test('platform.patch hook-chain: updates default locale and auto-away timeout fo
   assert.equal(result.theme_custom_css_global, ':root { --brand-test: 1; }')
   assert.equal(result.theme_dark_custom_css, 'body { color: white; }')
   assert.equal(result.theme_light_custom_css, 'body { color: black; }')
+})
+
+test('platform.patch hook-chain: stores Klipy key encrypted and returns only status', async () => {
+  const { app, secretsMap } = createHarness({
+    env: { KLIPY_API_KEY: 'env-key' }
+  })
+
+  const result = await app.service('platform').patch(
+    null,
+    { klipyApiKey: 'platform-key' },
+    {
+      provider: 'rest',
+      authenticated: true,
+      user: { id: 'admin-1', is_admin: true },
+      resolvedPermissions: new Set(['*'])
+    }
+  )
+
+  assert.equal(result.klipy_configured, true)
+  assert.equal(result.klipyApiKey, undefined)
+  assert.equal(result.klipy_api_key, undefined)
+  assert.notEqual(secretsMap.get('klipy_api_key'), 'platform-key')
+})
+
+test('platform.patch hook-chain: clears the stored Klipy key', async () => {
+  const { app, secretsMap } = createHarness()
+
+  await app.service('platform').patch(
+    null,
+    { klipyApiKey: 'platform-key' },
+    {
+      provider: 'rest',
+      authenticated: true,
+      user: { id: 'admin-1', is_admin: true },
+      resolvedPermissions: new Set(['*'])
+    }
+  )
+
+  const result = await app.service('platform').patch(
+    null,
+    { clearKlipyApiKey: true },
+    {
+      provider: 'rest',
+      authenticated: true,
+      user: { id: 'admin-1', is_admin: true },
+      resolvedPermissions: new Set(['*'])
+    }
+  )
+
+  assert.equal(secretsMap.has('klipy_api_key'), false)
+  assert.equal(result.klipy_configured, false)
+  assert.equal(result.klipyApiKey, undefined)
+  assert.equal(result.klipy_api_key, undefined)
 })

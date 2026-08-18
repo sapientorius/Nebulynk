@@ -29,8 +29,15 @@ export class GifsService {
     return this.options.logger || logger
   }
 
-  async find(params) {
-    const apiKey = this.env.KLIPY_API_KEY
+  async resolveApiKey() {
+    if (this.options.klipySettings?.resolveApiKey) {
+      return this.options.klipySettings.resolveApiKey()
+    }
+    return typeof this.env.KLIPY_API_KEY === 'string' ? this.env.KLIPY_API_KEY.trim() : ''
+  }
+
+  async find(params = {}) {
+    const apiKey = await this.resolveApiKey()
     if (!apiKey) {
       return { data: [] }
     }
@@ -55,7 +62,7 @@ export class GifsService {
   }
 
   async get(id) {
-    const apiKey = this.env.KLIPY_API_KEY
+    const apiKey = await this.resolveApiKey()
     if (!apiKey) return null
 
     const response = await this.fetchFn(
@@ -72,7 +79,9 @@ export class GifsService {
 }
 
 export const gifs = (app) => {
-  app.use('gifs', new GifsService(), {
+  app.use('gifs', new GifsService({
+    klipySettings: app.get('klipySettings')
+  }), {
     methods: ['find', 'get'],
     events: []
   })

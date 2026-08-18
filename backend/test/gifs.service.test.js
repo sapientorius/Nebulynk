@@ -1,6 +1,10 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { feathers } from '@feathersjs/feathers'
 import { GifsService } from '../src/services/gifs/gifs.js'
+import { PlatformRepository } from '../src/domains/platform/repository.js'
+import { KlipySettings } from '../src/lib/klipy-settings.js'
+import { createMemoryDb } from './helpers/memory-db.js'
 
 function createGifResult({ id = 'gif-1', url = 'https://cdn.example.com/gif-1.gif', previewUrl = 'https://cdn.example.com/gif-1-tiny.gif' } = {}) {
   return {
@@ -104,4 +108,36 @@ test('gifs service: missing KLIPY_API_KEY returns empty results and null lookups
 
   assert.deepEqual(featured, { data: [] })
   assert.equal(item, null)
+})
+
+test('gifs service: resolves a stored platform key dynamically before the environment fallback', async () => {
+  const db = createMemoryDb()
+  const app = feathers()
+  app.set('authentication', { secret: 'test-auth-secret' })
+  const klipySettings = new KlipySettings({
+    repository: new PlatformRepository(db),
+    app,
+    env: { KLIPY_API_KEY: 'env-key' }
+  })
+  const calls = []
+  const service = new GifsService({
+    klipySettings,
+    fetchFn: async (url) => {
+      calls.push(url)
+      return {
+        ok: true,
+        async json() {
+          return { results: [] }
+        }
+      }
+    },
+    logger: { debug() {} }
+  })
+
+  await service.find({ query: {} })
+  await klipySettings.setApiKey('platform-key')
+  await service.find({ query: {} })
+
+  assert.match(calls[0], /key=env-key/)
+  assert.match(calls[1], /key=platform-key/)
 })
