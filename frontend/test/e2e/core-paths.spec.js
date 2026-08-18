@@ -834,6 +834,23 @@ test.describe('P2-02 core e2e paths', () => {
     await expect(page).toHaveURL(/\/settings$/)
     await expect(page.locator('link[rel="manifest"][href="/manifest.webmanifest"]')).toHaveCount(1)
 
+    const shareTarget = await page.evaluate(async () => {
+      const response = await fetch('/manifest.webmanifest')
+      const manifest = await response.json()
+      return manifest.share_target
+    })
+    expect(shareTarget).toMatchObject({
+      action: '/share-target',
+      method: 'POST',
+      enctype: 'multipart/form-data',
+      params: {
+        title: 'share_title',
+        text: 'share_text',
+        url: 'share_url',
+        files: [{ name: 'share_files', accept: ['image/*'] }]
+      }
+    })
+
     await expect.poll(async () => {
       return page.evaluate(async () => {
         if (!('serviceWorker' in navigator)) return false

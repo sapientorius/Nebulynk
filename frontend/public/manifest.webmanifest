@@ -8,6 +8,24 @@
   "background_color": "#18181c",
   "theme_color": "#18181c",
   "lang": "en",
+  "share_target": {
+    "action": "/share-target",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "title": "share_title",
+      "text": "share_text",
+      "url": "share_url",
+      "files": [
+        {
+          "name": "share_files",
+          "accept": [
+            "image/*"
+          ]
+        }
+      ]
+    }
+  },
   "icons": [
     {
       "src": "/pwa-icon-192.png",

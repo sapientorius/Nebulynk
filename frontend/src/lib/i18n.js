@@ -674,13 +674,40 @@ const baseMessages = {
     pwa: {
       install_title: 'Install app',
       install_heading: 'Add Nebulynk to your device',
-      install_description: 'Install Nebulynk for faster access and a standalone app experience.',
+      install_description: 'Install Nebulynk for faster access and a standalone app experience. On Android, it can also receive shared text, links, and images.',
       install_action: 'Install',
       install_success: 'Install prompt opened',
       install_dismissed: 'Install prompt dismissed',
       install_manual_action: 'Show steps',
       install_manual_description: 'This browser supports adding Nebulynk to the home screen, but the install step must be completed manually.',
       install_manual_instructions: 'Open the browser share menu and choose "Add to Home Screen" to install Nebulynk.'
+    },
+    share: {
+      title: 'Share to Nebulynk',
+      description: 'Choose where to continue with this shared content. Nothing is sent yet.',
+      shared_text: 'Shared text and link',
+      images: '{count, plural, one {# image} other {# images}}',
+      target_label: 'Share to',
+      target_placeholder: 'Search chats, channels, and meetings',
+      open_chat: 'Open chat',
+      open_workspace: 'Open workspace',
+      discard: 'Discard',
+      target_groups: {
+        direct: 'Direct messages',
+        groups: 'Group chats',
+        channels: 'Channels',
+        meetings: 'Meetings'
+      },
+      errors: {
+        storage: 'Nebulynk could not save the shared content on this device.',
+        unavailable: 'This shared content is no longer available.',
+        account_mismatch: 'This shared content belongs to a different signed-in account.',
+        no_content: 'No compatible text, link, or image was shared.',
+        target_unavailable: 'This chat is no longer available. Choose a different target.',
+        not_writable: 'You do not have permission to send messages there.',
+        file_too_large: '{file_name} is too large (max. {max_size_mb} MB).',
+        handoff_failed: 'Could not prepare the shared content. You can try again.'
+      }
     },
     search: {
       actions: {
@@ -1510,13 +1537,40 @@ const baseMessages = {
     pwa: {
       install_title: 'App installieren',
       install_heading: 'Nebulynk auf dein Geraet legen',
-      install_description: 'Installiere Nebulynk fuer schnelleren Zugriff und ein app-aehnliches Erlebnis.',
+      install_description: 'Installiere Nebulynk fuer schnelleren Zugriff und ein app-aehnliches Erlebnis. Auf Android kann die installierte App ausserdem geteilten Text, Links und Bilder empfangen.',
       install_action: 'Installieren',
       install_success: 'Installationsdialog geoeffnet',
       install_dismissed: 'Installationsdialog geschlossen',
       install_manual_action: 'Schritte anzeigen',
       install_manual_description: 'Dieser Browser kann Nebulynk zum Home-Bildschirm hinzufuegen, aber der Installationsschritt muss manuell erfolgen.',
       install_manual_instructions: 'Oeffne das Teilen-Menue im Browser und waehle "Zum Home-Bildschirm", um Nebulynk zu installieren.'
+    },
+    share: {
+      title: 'Mit Nebulynk teilen',
+      description: 'Waehle aus, in welchem Chat du mit diesem geteilten Inhalt fortfahren moechtest. Es wird noch nichts gesendet.',
+      shared_text: 'Geteilter Text und Link',
+      images: '{count, plural, one {# Bild} other {# Bilder}}',
+      target_label: 'Teilen mit',
+      target_placeholder: 'Chats, Channels und Meetings durchsuchen',
+      open_chat: 'Chat oeffnen',
+      open_workspace: 'Workspace oeffnen',
+      discard: 'Verwerfen',
+      target_groups: {
+        direct: 'Direktnachrichten',
+        groups: 'Gruppenchats',
+        channels: 'Channels',
+        meetings: 'Meetings'
+      },
+      errors: {
+        storage: 'Nebulynk konnte den geteilten Inhalt nicht auf diesem Geraet speichern.',
+        unavailable: 'Dieser geteilte Inhalt ist nicht mehr verfuegbar.',
+        account_mismatch: 'Dieser geteilte Inhalt gehoert zu einem anderen angemeldeten Konto.',
+        no_content: 'Es wurden kein kompatibler Text, Link oder Bild geteilt.',
+        target_unavailable: 'Dieser Chat ist nicht mehr verfuegbar. Waehle ein anderes Ziel.',
+        not_writable: 'Du hast keine Berechtigung, dort Nachrichten zu senden.',
+        file_too_large: '{file_name} ist zu gross (max. {max_size_mb} MB).',
+        handoff_failed: 'Der geteilte Inhalt konnte nicht vorbereitet werden. Du kannst es erneut versuchen.'
+      }
     },
     search: {
       actions: {

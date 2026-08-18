@@ -62,6 +62,11 @@ const routes = [
         path: 'meetings/:meetingId',
         name: 'Meeting',
         component: () => import('../views/MeetingView.vue')
+      },
+      {
+        path: 'share/:shareId?',
+        name: 'ShareTarget',
+        component: () => import('../views/ShareTargetView.vue')
       }
     ]
   },
@@ -146,9 +151,21 @@ router.beforeEach(async (to) => {
     try {
       const restored = await restoreBrowserSession()
       if (!restored?.accessToken) {
+        if (to.name === 'ShareTarget') {
+          return {
+            name: 'Login',
+            query: { returnTo: to.fullPath }
+          }
+        }
         return { name: 'Login' }
       }
     } catch {
+      if (to.name === 'ShareTarget') {
+        return {
+          name: 'Login',
+          query: { returnTo: to.fullPath }
+        }
+      }
       return { name: 'Login' }
     }
   }

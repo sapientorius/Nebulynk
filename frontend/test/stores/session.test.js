@@ -36,6 +36,8 @@ const verifyPasskeyAuthenticationRequestMock = vi.hoisted(() => vi.fn())
 const verifyPasskeyRegistrationRequestMock = vi.hoisted(() => vi.fn())
 const verifyTwoFactorLoginRequestMock = vi.hoisted(() => vi.fn())
 const applyLocaleForUserMock = vi.hoisted(() => vi.fn())
+const removeSharePayloadsForUserMock = vi.hoisted(() => vi.fn(async () => 0))
+const setActiveShareTargetUserMock = vi.hoisted(() => vi.fn(async () => null))
 
 const disconnectSocketMock = vi.hoisted(() => vi.fn())
 const connectSocketMock = vi.hoisted(() => vi.fn(() => ({})))
@@ -116,6 +118,11 @@ vi.mock('../../src/lib/api.js', () => ({
 
 vi.mock('../../src/lib/i18n.js', () => ({
   applyLocaleForUser: applyLocaleForUserMock
+}))
+
+vi.mock('../../src/lib/share-target.js', () => ({
+  removeSharePayloadsForUser: removeSharePayloadsForUserMock,
+  setActiveShareTargetUser: setActiveShareTargetUserMock
 }))
 
 vi.mock('../../src/lib/socket.js', () => ({
@@ -212,6 +219,10 @@ function resetMocks() {
   verifyPasskeyRegistrationRequestMock.mockReset()
   verifyTwoFactorLoginRequestMock.mockReset()
   applyLocaleForUserMock.mockReset()
+  removeSharePayloadsForUserMock.mockReset()
+  removeSharePayloadsForUserMock.mockResolvedValue(0)
+  setActiveShareTargetUserMock.mockReset()
+  setActiveShareTargetUserMock.mockResolvedValue(null)
   disconnectSocketMock.mockReset()
   connectSocketMock.mockReset()
   subscribeToSocketAuthenticatedMock.mockReset()
@@ -280,6 +291,7 @@ describe('session store api actions', () => {
       email: 'admin@example.com',
       meeting_video_preferences: DEFAULT_MEETING_VIDEO_PREFERENCES
     })
+    expect(setActiveShareTargetUserMock).toHaveBeenCalledWith('user-1')
     expect(result).toEqual({
       accessToken: 'token',
       user: { id: 'user-1', email: 'admin@example.com' }
@@ -589,6 +601,8 @@ describe('session store api actions', () => {
     expect(uiStoreMock.reset).toHaveBeenCalledTimes(1)
     expect(meetingsStoreMock.reset).toHaveBeenCalledTimes(1)
     expect(logoutRequestMock).toHaveBeenCalledTimes(1)
+    expect(setActiveShareTargetUserMock).toHaveBeenCalledWith(null)
+    expect(removeSharePayloadsForUserMock).toHaveBeenCalledWith('user-1')
     expect(store.user).toBe(null)
   })
 
@@ -601,6 +615,8 @@ describe('session store api actions', () => {
     expect(clearStoredAuthMock).toHaveBeenCalledTimes(1)
     expect(disconnectSocketMock).toHaveBeenCalledTimes(1)
     expect(channelsStoreMock.reset).toHaveBeenCalledTimes(1)
+    expect(setActiveShareTargetUserMock).toHaveBeenCalledWith(null)
+    expect(removeSharePayloadsForUserMock).toHaveBeenCalledWith('user-1')
     expect(store.user).toBe(null)
   })
 

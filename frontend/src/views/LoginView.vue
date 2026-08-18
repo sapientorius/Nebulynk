@@ -310,6 +310,18 @@ export default {
     }
   },
   methods: {
+    resolvePostLoginRoute() {
+      const returnTo = this.$route?.query?.returnTo
+      if (typeof returnTo !== 'string' || !returnTo.startsWith('/share') || returnTo.startsWith('//')) {
+        return '/'
+      }
+
+      const resolved = this.$router.resolve(returnTo)
+      return resolved.name === 'ShareTarget' ? returnTo : '/'
+    },
+    async navigateAfterLogin() {
+      await this.$router.push(this.resolvePostLoginRoute()).catch(() => {})
+    },
     async addDesktopServer() {
       try {
         const profile = await addDesktopProfile({
@@ -376,7 +388,7 @@ export default {
           this.twoFactorCode = ''
           return
         }
-        this.$router.push('/')
+        await this.navigateAfterLogin()
       } catch (err) {
         console.error('Desktop login flow failed:', err)
         this.error = translateApiError(err, 'login.errors.loginFailed')
@@ -399,7 +411,7 @@ export default {
           authenticationResponse,
           remember: this.form.remember
         })
-        this.$router.push('/')
+        await this.navigateAfterLogin()
       } catch (err) {
         console.error('Desktop passkey login flow failed:', err)
         this.error = translateApiError(err, err?.message || 'login.errors.loginFailed')
@@ -417,7 +429,7 @@ export default {
           code: this.twoFactorCode,
           remember: this.twoFactorChallenge.remember === true
         })
-        this.$router.push('/')
+        await this.navigateAfterLogin()
       } catch (err) {
         console.error('Desktop two-factor login flow failed:', err)
         this.error = translateApiError(err, 'login.errors.loginFailed')

@@ -28,6 +28,7 @@ import { startForegroundResumeSync } from '../lib/foreground-resume-sync.js'
 import { applyLocaleForUser } from '../lib/i18n.js'
 import { startForegroundChannelTracking } from '../lib/foreground-channel.js'
 import { mergeMeetingVideoPreferences, normalizeMeetingVideoPreferences } from '../lib/meeting-video-preferences.js'
+import { removeSharePayloadsForUser, setActiveShareTargetUser } from '../lib/share-target.js'
 import { resolveUserPresenceState } from '../lib/user-presence.js'
 import {
   signalDesktopWorkspaceLogout,
@@ -394,6 +395,7 @@ export const useSessionStore = defineStore('session', () => {
       primeUsers(user.value ? [user.value] : [])
       applyLocaleForUser(user.value)
       presenceSyncPending.value = Boolean(user.value)
+      await setActiveShareTargetUser(user.value?.id || null).catch(() => {})
       await syncActiveDesktopSession({
         accessToken: data?.accessToken || null,
         refreshToken: data?.refreshToken,
@@ -414,6 +416,7 @@ export const useSessionStore = defineStore('session', () => {
     primeUsers(user.value ? [user.value] : [])
     applyLocaleForUser(user.value)
     presenceSyncPending.value = Boolean(user.value)
+    await setActiveShareTargetUser(user.value?.id || null).catch(() => {})
     await syncActiveDesktopSession({
       accessToken: data?.accessToken || null,
       refreshToken: data?.refreshToken,
@@ -437,6 +440,7 @@ export const useSessionStore = defineStore('session', () => {
     primeUsers(user.value ? [user.value] : [])
     applyLocaleForUser(user.value)
     presenceSyncPending.value = Boolean(user.value)
+    await setActiveShareTargetUser(user.value?.id || null).catch(() => {})
     await syncActiveDesktopSession({
       accessToken: data?.accessToken || null,
       refreshToken: data?.refreshToken,
@@ -464,6 +468,7 @@ export const useSessionStore = defineStore('session', () => {
     user.value = normalizeUserPayload(currentUser)
     primeUsers(user.value ? [user.value] : [])
     applyLocaleForUser(user.value)
+    await setActiveShareTargetUser(user.value?.id || null).catch(() => {})
     if (user.value && !presenceLoaded.value) {
       presenceSyncPending.value = true
     }
@@ -839,6 +844,11 @@ export const useSessionStore = defineStore('session', () => {
   }
 
   async function logout() {
+    const userId = user.value?.id || getCurrentUser()?.id || null
+    await setActiveShareTargetUser(null).catch(() => {})
+    if (userId) {
+      await removeSharePayloadsForUser(userId).catch(() => {})
+    }
     useMessagesStore().clearStoredDrafts()
     await destroy()
     await logoutRequest()
@@ -847,6 +857,11 @@ export const useSessionStore = defineStore('session', () => {
   }
 
   async function clearLocalAuthentication() {
+    const userId = user.value?.id || getCurrentUser()?.id || null
+    await setActiveShareTargetUser(null).catch(() => {})
+    if (userId) {
+      await removeSharePayloadsForUser(userId).catch(() => {})
+    }
     await destroy()
     clearStoredAuth()
     await clearActiveDesktopSession()
@@ -861,6 +876,7 @@ export const useSessionStore = defineStore('session', () => {
     primeUsers(user.value ? [user.value] : [])
     applyLocaleForUser(user.value)
     presenceSyncPending.value = Boolean(user.value)
+    await setActiveShareTargetUser(user.value?.id || null).catch(() => {})
     await syncActiveDesktopSession({
       accessToken: data?.accessToken || null,
       csrfToken: data?.csrfToken || null,

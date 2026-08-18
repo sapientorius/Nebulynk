@@ -462,6 +462,41 @@ describe('messages store', () => {
     }])
   })
 
+  it('appends shared content to an existing draft without replacing its files', () => {
+    currentUserMock.mockReturnValue({ id: 'user-1' })
+    const store = useMessagesStore()
+
+    store.setDraftText('channel-1', 'Existing draft')
+    store.addDraftFile('channel-1', {
+      id: 'file-existing',
+      original_name: 'existing.png',
+      mime_type: 'image/png',
+      size: 1
+    })
+
+    store.appendDraftContent('channel-1', {
+      text: 'Shared text',
+      files: [
+        {
+          id: 'file-shared',
+          original_name: 'shared.png',
+          mime_type: 'image/png',
+          size: 2,
+          url: '/shared-url'
+        },
+        {
+          id: 'file-existing',
+          original_name: 'existing.png',
+          mime_type: 'image/png',
+          size: 1
+        }
+      ]
+    })
+
+    expect(store.getDraft('channel-1').text).toBe('Existing draft\n\nShared text')
+    expect(store.getDraft('channel-1').files.map((file) => file.id)).toEqual(['file-existing', 'file-shared'])
+  })
+
   it('hydrates persisted drafts and removes empty drafts from storage', () => {
     currentUserMock.mockReturnValue({ id: 'user-1' })
     localStorage.setItem('nebulynk:message-drafts:v1:user-1', JSON.stringify({

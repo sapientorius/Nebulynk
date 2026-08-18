@@ -220,6 +220,30 @@ export const useMessagesStore = defineStore('messages', () => {
     return updateDraft(channelId, { files: nextFiles })
   }
 
+  function appendDraftContent(channelId, { text = '', files = [] } = {}) {
+    if (!channelId) return null
+
+    const draft = getDraft(channelId)
+    const nextText = sanitizeDraftText(text).trim()
+    const existingText = sanitizeDraftText(draft.text)
+    const hasExistingText = existingText.trim().length > 0
+    const joinedText = hasExistingText && nextText
+      ? `${existingText.replace(/\s+$/, '')}\n\n${nextText}`
+      : hasExistingText ? existingText : nextText
+    const nextFiles = [...draft.files]
+
+    for (const file of files || []) {
+      const normalized = buildRuntimeDraftFile(file)
+      if (!normalized || nextFiles.some((entry) => entry.id === normalized.id)) continue
+      nextFiles.push(normalized)
+    }
+
+    return updateDraft(channelId, {
+      text: joinedText,
+      files: nextFiles
+    })
+  }
+
   function removeDraftFile(channelId, fileId) {
     if (!channelId || !fileId) return null
     const draft = getDraft(channelId)
@@ -744,6 +768,7 @@ export const useMessagesStore = defineStore('messages', () => {
     getDraft,
     setDraftText,
     addDraftFile,
+    appendDraftContent,
     removeDraftFile,
     clearDraft,
     hydrateDraftFiles,
