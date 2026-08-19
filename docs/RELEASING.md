@@ -54,12 +54,14 @@ installation has received the new keyring.
    an explicit empty `security: []` when there is no security fix. English is
    the only required release language; historical German fields remain
    accepted but are not used for published notes or the update center.
-3. Update the root, backend, frontend, and `dokploy-template/meta.json` versions
-   to exactly the same stable SemVer. After changing the Dokploy metadata or
-   its Compose/template sources, run `npm run dokploy:template` to regenerate
-   `dokploy-template/import.base64`; `npm run dokploy:template:check` also
-   rejects a Dokploy metadata version that drifts from `package.json`. Do not
-   add a prerelease document to the stable catalog.
+3. Update the root, backend, and frontend package versions to exactly the same
+   stable SemVer. Keep `dokploy-template/meta.json` set to `stable`; this field
+   identifies the template channel and must not be changed to the application
+   release version. After changing the Dokploy metadata or its Compose/template
+   sources, run `npm run dokploy:template` to regenerate
+   `dokploy-template/import.base64`; `npm run dokploy:template:check` rejects
+   any other Dokploy metadata version. Do not add a prerelease document to the
+   stable catalog.
 4. Run:
 
    ```bash
@@ -82,8 +84,9 @@ publication.
 ## Release checklist for automation agents
 
 Before declaring a release prepared, compare the stable SemVer in the release
-document with `package.json`, `backend/package.json`, `frontend/package.json`,
-and `dokploy-template/meta.json`. Then run `npm run dokploy:template` and
+document with `package.json`, `backend/package.json`, and `frontend/package.json`;
+verify separately that `dokploy-template/meta.json` remains `stable`. Then run
+`npm run dokploy:template` and
 `npm run release:validate`; the CI Dokploy check must pass before committing or
 tagging. This explicit metadata step is required even when the Compose files
 did not change.

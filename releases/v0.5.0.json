@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "version": "0.5.0",
+  "revision": 1,
+  "channel": "stable",
+  "published_at": "2026-08-19T20:18:49.764Z",
+  "title": {
+    "en": "Nebulynk 0.5.0"
+  },
+  "summary": {
+    "en": "Adds PWA sharing for arbitrary files, admin-managed Klipy integration settings, broader AI provider and transcription support, and safer deployment defaults."
+  },
+  "changes": [
+    {
+      "category": "feature",
+      "title": {
+        "en": "PWA share target for arbitrary files"
+      },
+      "description": {
+        "en": "The browser and PWA share target accepts text, links, and arbitrary files, stores pending payloads locally, and lets users send them in Nebulynk."
+      }
+    },
+    {
+      "category": "feature",
+      "title": {
+        "en": "Admin-managed Klipy API key"
+      },
+      "description": {
+        "en": "Platform administrators can save or clear an encrypted Klipy API key, while the stored platform value takes precedence over the environment fallback."
+      }
+    },
+    {
+      "category": "improvement",
+      "title": {
+        "en": "Expanded AI provider controls"
+      },
+      "description": {
+        "en": "OpenRouter transcription is supported and AI model selection can be filtered in the administration settings."
+      }
+    },
+    {
+      "category": "improvement",
+      "title": {
+        "en": "Safer Dokploy template configuration"
+      },
+      "description": {
+        "en": "The packaged template exposes optional integration and operational settings and documents the transition from HTTP smoke testing to HTTPS production deployment."
+      }
+    },
+    {
+      "category": "improvement",
+      "title": {
+        "en": "Longer transcript wait timeout"
+      },
+      "description": {
+        "en": "The packaged deployment defaults allow up to 30 minutes for meeting transcript processing."
+      }
+    }
+  ],
+  "security": [],
+  "upgrade": {
+    "backup_required": true,
+    "downtime_expected": true,
+    "breaking": false,
+    "manual_steps": {
+      "en": [
+        "Back up PostgreSQL and both Garage volumes and test a restore before updating.",
+        "Redeploy the backend and frontend from the shared v0.5.0 release tag without removing persistent volumes; the backend applies migration 069_platform_secrets automatically at startup.",
+        "If using Klipy, configure the key under Admin > Platform Settings or retain KLIPY_API_KEY as an environment fallback; the encrypted platform value takes precedence.",
+        "For Dokploy, set NEBULYNK_SOURCE_REF to v0.5.0 for a pinned deployment; after replacing generated domains, enable HTTPS, set NODE_ENV=production, and update dependent public URLs before redeploying."
+      ]
+    },
+    "docs_url": "https://github.com/sapientorius/Nebulynk/blob/v0.5.0/docs/SELF_HOSTING.md"
+  }
+}

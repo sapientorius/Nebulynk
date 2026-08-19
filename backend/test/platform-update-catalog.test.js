@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createHash, generateKeyPairSync, sign } from 'node:crypto'
+import semver from 'semver'
 import {
   comparePlatformVersions,
   highestSecuritySeverity,
@@ -369,12 +370,14 @@ test('security delivery selects active member admins, bundles releases, retries 
   })
   manager.getState = async () => ({ checks_enabled: true, lease_token: 'mail-lease' })
   manager.renewDeliveryLease = async () => true
+  const firstSecurityVersion = semver.inc(PLATFORM_VERSION, 'minor')
+  const secondSecurityVersion = semver.inc(firstSecurityVersion, 'minor')
   const catalog = {
     releases: [
       release('0.2.0'),
       release(PLATFORM_VERSION),
-      release('0.5.0', { security: [advisory('low', '<0.5.0')] }),
-      release('0.6.0', { security: [advisory('critical', '<0.6.0')] })
+      release(firstSecurityVersion, { security: [advisory('low', `<${firstSecurityVersion}`)] }),
+      release(secondSecurityVersion, { security: [advisory('critical', `<${secondSecurityVersion}`)] })
     ]
   }
 
@@ -394,7 +397,7 @@ test('security delivery selects active member admins, bundles releases, retries 
 
 test('a detected downgrade invalidates old acknowledgements and security delivery deduplication before fetching', async () => {
   const db = createMemoryDb({
-    platform_update_state: [{ id: 'default', lease_token: 'downgrade-lease', observed_version: '0.5.0' }],
+    platform_update_state: [{ id: 'default', lease_token: 'downgrade-lease', observed_version: semver.inc(PLATFORM_VERSION, 'minor') }],
     platform_update_acknowledgements: [{ id: 1, installed_version: '0.2.0' }],
     platform_update_email_deliveries: [{ id: 1, installed_version: '0.2.0', status: 'sent' }]
   })

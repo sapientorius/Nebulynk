@@ -16,21 +16,18 @@ const templateDirectory = join(repositoryRoot, 'dokploy-template')
 const composePath = join(templateDirectory, 'docker-compose.yml')
 const configPath = join(templateDirectory, 'template.toml')
 const metaPath = join(templateDirectory, 'meta.json')
-const packagePath = join(repositoryRoot, 'package.json')
 const outputPath = join(templateDirectory, 'import.base64')
 const check = argumentsPassed.includes('--check')
 
-const [compose, config, metaRaw, packageRaw] = await Promise.all([
+const [compose, config, metaRaw] = await Promise.all([
   readFile(composePath, 'utf8'),
   readFile(configPath, 'utf8'),
-  readFile(metaPath, 'utf8'),
-  readFile(packagePath, 'utf8')
+  readFile(metaPath, 'utf8')
 ])
 
 const meta = JSON.parse(metaRaw)
-const rootPackage = JSON.parse(packageRaw)
-if (meta.version !== 'stable' && meta.version !== rootPackage.version) {
-  throw new Error(`dokploy-template/meta.json version ${meta.version} must be stable or match package.json version ${rootPackage.version}.`)
+if (meta.version !== 'stable') {
+  throw new Error(`dokploy-template/meta.json version ${meta.version} must remain stable.`)
 }
 
 const normalizeLineEndings = (value) => value.replace(/\r\n?/g, '\n')
