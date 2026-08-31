@@ -24,8 +24,11 @@ $statusClasses = [
 ];
 $statusLabel = $statusLabels[$statusKey] ?? ($statusKey !== '' ? $statusKey : 'Nicht installiert');
 $statusClass = $statusClasses[$statusKey] ?? 'neutral';
-$isBusy = in_array($statusKey, ['checking', 'running'], true);
+$isBusy = $statusKey === 'checking';
+$isOperational = in_array($statusKey, ['ready', 'running', 'stopped', 'error'], true);
+$isRunning = $statusKey === 'running';
 $domainName = (string)$this->state['domain_name'];
+$logoUrl = rtrim((string)pm_Context::getBaseUrl(), '/') . '/images/nebulynk.png';
 ?>
 
 <style type="text/css">
@@ -96,19 +99,166 @@ $domainName = (string)$this->state['domain_name'];
         font-weight: 600;
     }
 
-    .nebulynk-hero-mark {
+    .nebulynk-hero-logo {
+        display: block;
+        flex: 0 1 250px;
+        width: min(250px, 34vw);
+        max-width: 100%;
+        height: auto;
+    }
+
+    .nebulynk-status-banner {
+        display: grid;
+        align-items: stretch;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 24px;
+        padding: 24px 28px;
+        margin-bottom: 20px;
+        border: 1px solid #dbe4ec;
+        border-left: 5px solid #9aabb9;
+        border-radius: 9px;
+        background: #ffffff;
+        box-shadow: 0 3px 12px rgba(42, 63, 82, 0.07);
+    }
+
+    .nebulynk-status-banner-success {
+        border-color: #b9dfc2;
+        border-left-color: #3e9c58;
+        background: linear-gradient(120deg, #f0fbf3 0%, #ffffff 72%);
+    }
+
+    .nebulynk-status-banner-working {
+        border-color: #f0dfb7;
+        border-left-color: #d69e2e;
+        background: linear-gradient(120deg, #fffaf0 0%, #ffffff 72%);
+    }
+
+    .nebulynk-status-banner-error {
+        border-color: #efcaca;
+        border-left-color: #c94b4b;
+        background: linear-gradient(120deg, #fff7f7 0%, #ffffff 72%);
+    }
+
+    .nebulynk-status-banner-main {
         display: flex;
-        flex: 0 0 76px;
+        grid-column: 1;
+        gap: 14px;
+        align-items: flex-start;
+        min-width: 0;
+    }
+
+    .nebulynk-status-indicator {
+        display: flex;
+        flex: 0 0 34px;
         align-items: center;
         justify-content: center;
-        width: 76px;
-        height: 76px;
-        border-radius: 20px;
-        background: #337ab7;
-        box-shadow: 0 8px 20px rgba(51, 122, 183, 0.22);
-        color: #ffffff;
-        font-size: 38px;
-        font-weight: 300;
+        width: 34px;
+        height: 34px;
+        margin-top: 2px;
+        border-radius: 50%;
+        background: #edf1f4;
+    }
+
+    .nebulynk-status-dot {
+        display: block;
+        width: 13px;
+        height: 13px;
+        border-radius: 50%;
+        background: #7d8d9b;
+    }
+
+    .nebulynk-status-banner-success .nebulynk-status-indicator {
+        background: #dff2e4;
+    }
+
+    .nebulynk-status-banner-success .nebulynk-status-dot {
+        background: #3e9c58;
+    }
+
+    .nebulynk-status-banner-working .nebulynk-status-indicator {
+        background: #fff0c9;
+    }
+
+    .nebulynk-status-banner-working .nebulynk-status-dot {
+        background: #d69e2e;
+    }
+
+    .nebulynk-status-banner-error .nebulynk-status-indicator {
+        background: #f8dede;
+    }
+
+    .nebulynk-status-banner-error .nebulynk-status-dot {
+        background: #c94b4b;
+    }
+
+    .nebulynk-status-banner-running .nebulynk-status-dot {
+        box-shadow: 0 0 0 5px rgba(62, 156, 88, 0.14);
+    }
+
+    .nebulynk-status-banner-copy {
+        min-width: 0;
+    }
+
+    .nebulynk-status-banner-copy .nebulynk-section-kicker {
+        margin-bottom: 4px;
+    }
+
+    .nebulynk-status-banner-copy h3 {
+        margin: 0;
+        color: #293d51;
+        font-size: 25px;
+        font-weight: 500;
+        line-height: 1.2;
+    }
+
+    .nebulynk-status-banner-running .nebulynk-status-banner-copy h3 {
+        color: #27733c;
+    }
+
+    .nebulynk-status-banner-copy p:last-child {
+        margin: 7px 0 0;
+        color: #53697c;
+        line-height: 1.5;
+    }
+
+    .nebulynk-status-banner-side {
+        display: flex;
+        grid-column: 2;
+        flex: 0 0 auto;
+        align-items: flex-start;
+        justify-content: flex-end;
+    }
+
+    .nebulynk-status-banner-facts {
+        display: grid;
+        grid-column: 1 / -1;
+        grid-template-columns: repeat(4, minmax(120px, 1fr));
+        gap: 10px;
+        min-width: 420px;
+    }
+
+    .nebulynk-status-fact {
+        min-width: 0;
+        padding: 10px 12px;
+        border: 1px solid rgba(145, 165, 181, 0.28);
+        border-radius: 6px;
+        background: rgba(255, 255, 255, 0.72);
+    }
+
+    .nebulynk-status-fact span {
+        display: block;
+        margin-bottom: 4px;
+        color: #718293;
+        font-size: 11px;
+        line-height: 1.2;
+        text-transform: uppercase;
+    }
+
+    .nebulynk-status-fact strong {
+        display: block;
+        color: #2d3e50;
+        font-size: 13px;
+        overflow-wrap: anywhere;
     }
 
     .nebulynk-callout {
@@ -192,6 +342,59 @@ $domainName = (string)$this->state['domain_name'];
         border-radius: 8px;
         background: #ffffff;
         box-shadow: 0 2px 8px rgba(42, 63, 82, 0.05);
+    }
+
+    .nebulynk-prerequisites-card {
+        padding: 0;
+        overflow: hidden;
+    }
+
+    .nebulynk-prerequisites-summary {
+        position: relative;
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 24px 52px 24px 26px;
+        margin: 0;
+        cursor: pointer;
+        list-style: none;
+    }
+
+    .nebulynk-prerequisites-summary::-webkit-details-marker {
+        display: none;
+    }
+
+    .nebulynk-prerequisites-summary::after {
+        position: absolute;
+        top: 22px;
+        right: 25px;
+        width: 22px;
+        height: 22px;
+        border: 1px solid #c8d6e0;
+        border-radius: 50%;
+        color: #5e7485;
+        content: '+';
+        font-size: 17px;
+        line-height: 19px;
+        text-align: center;
+    }
+
+    .nebulynk-prerequisites-card[open] .nebulynk-prerequisites-summary {
+        border-bottom: 1px solid #edf1f4;
+    }
+
+    .nebulynk-prerequisites-card[open] .nebulynk-prerequisites-summary::after {
+        content: '−';
+    }
+
+    .nebulynk-prerequisites-summary:focus-visible {
+        outline: 2px solid #337ab7;
+        outline-offset: -3px;
+    }
+
+    .nebulynk-prerequisites-content {
+        padding: 0 26px 24px;
     }
 
     .nebulynk-section-head {
@@ -324,21 +527,6 @@ $domainName = (string)$this->state['domain_name'];
         font-weight: 700;
     }
 
-    .nebulynk-status-head {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 12px;
-        margin-bottom: 16px;
-    }
-
-    .nebulynk-status-head h3 {
-        margin: 0;
-        color: #293d51;
-        font-size: 20px;
-        font-weight: 400;
-    }
-
     .nebulynk-status-pill {
         display: inline-block;
         padding: 5px 9px;
@@ -364,40 +552,6 @@ $domainName = (string)$this->state['domain_name'];
     .nebulynk-status-pill.nebulynk-status-error {
         background: #fbe7e7;
         color: #a53d3d;
-    }
-
-    .nebulynk-status-list {
-        padding: 0;
-        margin: 0;
-    }
-
-    .nebulynk-status-row {
-        display: flex;
-        justify-content: space-between;
-        gap: 14px;
-        padding: 9px 0;
-        border-top: 1px solid #edf1f4;
-    }
-
-    .nebulynk-status-row dt {
-        color: #718293;
-        font-weight: 400;
-    }
-
-    .nebulynk-status-row dd {
-        max-width: 62%;
-        margin: 0;
-        color: #2d3e50;
-        font-weight: 600;
-        text-align: right;
-        overflow-wrap: anywhere;
-    }
-
-    .nebulynk-status-message {
-        margin: 16px 0 0;
-        color: #617487;
-        font-size: 13px;
-        line-height: 1.5;
     }
 
     .nebulynk-info-card {
@@ -451,6 +605,19 @@ $domainName = (string)$this->state['domain_name'];
     }
 
     @media (max-width: 820px) {
+        .nebulynk-status-banner {
+            display: block;
+        }
+
+        .nebulynk-status-banner-side {
+            justify-content: flex-start;
+            margin-top: 16px;
+        }
+
+        .nebulynk-status-banner-facts {
+            min-width: 0;
+        }
+
         .nebulynk-layout {
             display: block;
         }
@@ -470,15 +637,37 @@ $domainName = (string)$this->state['domain_name'];
 
     @media (max-width: 560px) {
         .nebulynk-hero {
+            display: block;
             padding: 24px;
         }
 
-        .nebulynk-hero-mark {
-            display: none;
+        .nebulynk-hero-logo {
+            width: min(190px, 48vw);
+            margin: 20px 0 0 auto;
         }
 
         .nebulynk-card {
             padding: 20px;
+        }
+
+        .nebulynk-prerequisites-card {
+            padding: 0;
+        }
+
+        .nebulynk-status-banner {
+            padding: 20px;
+        }
+
+        .nebulynk-status-banner-facts {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .nebulynk-prerequisites-summary {
+            padding: 20px 48px 20px 20px;
+        }
+
+        .nebulynk-prerequisites-content {
+            padding: 0 20px 20px;
         }
     }
 </style>
@@ -498,138 +687,86 @@ $domainName = (string)$this->state['domain_name'];
                 <span>Docker</span>
             </div>
         </div>
-        <div class="nebulynk-hero-mark" aria-hidden="true">N</div>
+        <img class="nebulynk-hero-logo" src="<?= $escape($logoUrl) ?>" alt="Nebulynk">
     </section>
 
-    <div class="nebulynk-callout nebulynk-callout-warning">
-        <div class="nebulynk-callout-icon" aria-hidden="true">!</div>
-        <div>
-            <strong>Bitte vor der Einrichtung vorbereiten</strong>
-            <p>
-                Installieren Sie zuerst die Plesk <strong>Docker Extension</strong>
-                und führen Sie danach die Vorabprüfung aus. Die erste Installation
-                kann je nach Server und Internetverbindung mehrere Minuten dauern.
-            </p>
+    <section class="nebulynk-status-banner nebulynk-status-banner-<?= $statusClass ?><?= $isRunning ? ' nebulynk-status-banner-running' : '' ?>" aria-labelledby="nebulynk-status-title">
+        <div class="nebulynk-status-banner-main">
+            <div class="nebulynk-status-indicator" aria-hidden="true">
+                <span class="nebulynk-status-dot"></span>
+            </div>
+            <div class="nebulynk-status-banner-copy">
+                <p class="nebulynk-section-kicker">Betriebsstatus</p>
+                <h3 id="nebulynk-status-title"><?= $escape($statusLabel) ?></h3>
+                <?php if ($isRunning): ?>
+                    <p>Nebulynk läuft. Die aktuellen Zugriffs- und Verbindungsdaten sehen Sie unten.</p>
+                <?php elseif ($isBusy): ?>
+                    <p>Die Vorabprüfung läuft. Bitte warten Sie, bis die Plesk-Aufgabe abgeschlossen ist.</p>
+                <?php elseif ($statusKey === 'ready'): ?>
+                    <p>Die Vorabprüfung ist abgeschlossen. Die Installation kann gestartet werden.</p>
+                <?php elseif ($statusKey === 'stopped'): ?>
+                    <p>Nebulynk ist angehalten. Starten Sie den Dienst über die Aktionen.</p>
+                <?php elseif ($statusKey === 'error'): ?>
+                    <p>Die letzte Aufgabe ist fehlgeschlagen. Prüfen Sie die Logs und starten Sie anschließend eine passende Aktion.</p>
+                <?php else: ?>
+                    <p>Konfigurieren Sie eine Domain und führen Sie die Vorabprüfung aus, um Nebulynk bereitzustellen.</p>
+                <?php endif; ?>
+            </div>
         </div>
-    </div>
+        <div class="nebulynk-status-banner-side">
+            <span class="nebulynk-status-pill nebulynk-status-<?= $statusClass ?>">
+                <?= $escape($statusLabel) ?>
+            </span>
+        </div>
+        <div class="nebulynk-status-banner-facts">
+            <div class="nebulynk-status-fact">
+                <span>Domain</span>
+                <strong><?= $domainName !== '' ? $escape($domainName) : 'Nicht konfiguriert' ?></strong>
+            </div>
+            <div class="nebulynk-status-fact">
+                <span>Plesk-Proxy</span>
+                <strong><?= $this->state['proxy_enabled'] ? 'Aktiv' : 'Deaktiviert' ?></strong>
+            </div>
+            <div class="nebulynk-status-fact">
+                <span>Version</span>
+                <strong><?= $this->state['installed_version'] !== '' ? $escape($this->state['installed_version']) : '—' ?></strong>
+            </div>
+            <div class="nebulynk-status-fact">
+                <span>Extension-Release</span>
+                <strong><?= $this->state['extension_release'] !== '' ? $escape($this->state['extension_release']) : '—' ?></strong>
+            </div>
+            <div class="nebulynk-status-fact">
+                <span>Edge-Port</span>
+                <strong><?= $this->state['edge_port'] !== '' ? $escape($this->state['edge_port']) : '—' ?></strong>
+            </div>
+        </div>
+    </section>
+
+    <?php if (!$isOperational): ?>
+        <div class="nebulynk-callout nebulynk-callout-warning">
+            <div class="nebulynk-callout-icon" aria-hidden="true">!</div>
+            <div>
+                <strong>Bitte vor der Einrichtung vorbereiten</strong>
+                <p>
+                    Installieren Sie zuerst die Plesk <strong>Docker Extension</strong>
+                    und führen Sie danach die Vorabprüfung aus. Die erste Installation
+                    kann je nach Server und Internetverbindung mehrere Minuten dauern.
+                </p>
+            </div>
+        </div>
+    <?php endif; ?>
 
     <div class="nebulynk-layout">
         <div class="nebulynk-primary">
-            <section class="form-box nebulynk-card">
-                <div class="nebulynk-section-head">
-                    <div>
-                        <p class="nebulynk-section-kicker">Schritt 1</p>
-                        <h3>Voraussetzungen</h3>
-                    </div>
-                    <span class="nebulynk-tag">Vor der ersten Installation</span>
-                </div>
-                <p class="nebulynk-card-intro">
-                    Prüfen Sie die folgenden Punkte, bevor Sie eine Aktion starten.
-                    So vermeiden Sie eine unterbrochene Installation.
-                </p>
-                <ol class="nebulynk-steps">
-                    <li class="nebulynk-step">
-                        <span class="nebulynk-step-number">1</span>
-                        <div>
-                            <strong>Plesk Docker Extension installieren</strong>
-                            <p>
-                                Öffnen Sie in Plesk <strong>Extensions &rarr;
-                                Extensions Catalog</strong>, suchen Sie nach
-                                <strong>Docker</strong> und installieren Sie die
-                                Docker Extension. Der lokale Docker-Dienst muss
-                                anschließend erreichbar sein.
-                            </p>
-                            <span class="nebulynk-path">Plesk &rarr; Extensions &rarr; Extensions Catalog &rarr; Docker</span>
-                        </div>
-                    </li>
-                    <li class="nebulynk-step">
-                        <span class="nebulynk-step-number">2</span>
-                        <div>
-                            <strong>Dedizierte Domain oder Subdomain vorbereiten</strong>
-                            <p>
-                                Legen Sie eine Domain an, deren DNS auf diesen
-                                Server zeigt. Weisen Sie ihr ein gültiges SSL/TLS-
-                                Zertifikat zu und stellen Sie sicher, dass Nginx
-                                aktiviert ist. Vorhandene Website-Inhalte am
-                                Domain-Root werden durch Nebulynk ersetzt.
-                            </p>
-                        </div>
-                    </li>
-                    <li class="nebulynk-step">
-                        <span class="nebulynk-step-number">3</span>
-                        <div>
-                            <strong>Firewall und Netzwerk prüfen</strong>
-                            <p>
-                                Erlauben Sie HTTPS (TCP 443) und für Audio/Video
-                                zusätzlich LiveKit auf TCP 7881 und UDP 7882.
-                                Während Installation und Updates müssen Docker Hub
-                                und die npm-Registry erreichbar sein.
-                            </p>
-                        </div>
-                    </li>
-                    <li class="nebulynk-step">
-                        <span class="nebulynk-step-number">4</span>
-                        <div>
-                            <strong>Speicher und Backups einplanen</strong>
-                            <p>
-                                Der erste Lauf baut die Anwendungs-Images auf dem
-                                Server. Stellen Sie ausreichend Speicherplatz
-                                bereit und sichern Sie PostgreSQL sowie Garage
-                                außerhalb der normalen Plesk-Backups.
-                            </p>
-                        </div>
-                    </li>
-                </ol>
-            </section>
+            <?php if ($isOperational): ?>
+                <?= $this->render('index/_actions.phtml') ?>
+            <?php endif; ?>
 
-            <section class="form-box nebulynk-card nebulynk-action-card">
-                <div class="nebulynk-section-head">
-                    <div>
-                        <p class="nebulynk-section-kicker">Schritt 2</p>
-                        <h3>Einrichtung starten</h3>
-                    </div>
-                </div>
-                <p class="nebulynk-card-intro">
-                    Wählen Sie die vorbereitete Domain. Starten Sie zuerst die
-                    Vorabprüfung und anschließend die Installation.
-                </p>
+            <?= $this->render('index/_prerequisites.phtml') ?>
 
-                <?php if (count($this->domains) === 0): ?>
-                    <div class="nebulynk-callout nebulynk-callout-error">
-                        <div class="nebulynk-callout-icon" aria-hidden="true">!</div>
-                        <div>
-                            <strong>Keine passende Domain gefunden</strong>
-                            <p>
-                                Legen Sie zuerst eine aktive Plesk-Domain mit
-                                Hosting an und laden Sie diese Seite anschließend
-                                neu.
-                            </p>
-                        </div>
-                    </div>
-                <?php endif; ?>
-
-                <?= $this->form ?>
-
-                <p class="nebulynk-form-note">
-                    <strong>Empfohlene Reihenfolge:</strong>
-                    Vorabprüfung &rarr; Installieren und bauen &rarr; Domain öffnen.
-                    Bei einer bestehenden Installation verwenden Sie
-                    „Aktualisieren und neu bauen“.
-                </p>
-
-                <div class="nebulynk-callout nebulynk-callout-warning">
-                    <div class="nebulynk-callout-icon" aria-hidden="true">i</div>
-                    <div>
-                        <strong>Installation dauert möglicherweise mehrere Minuten</strong>
-                        <p>
-                            Nebulynk lädt Container-Images, installiert Abhängigkeiten
-                            und baut Backend sowie Frontend. Die Aufgabe läuft im
-                            Hintergrund weiter; starten Sie sie nicht mehrfach.
-                            Den Fortschritt sehen Sie in den Plesk-Aufgaben.
-                        </p>
-                    </div>
-                </div>
-            </section>
+            <?php if (!$isOperational): ?>
+                <?= $this->render('index/_actions.phtml') ?>
+            <?php endif; ?>
         </div>
 
         <aside class="nebulynk-secondary">
@@ -660,47 +797,6 @@ $domainName = (string)$this->state['domain_name'];
                 </ol>
             </section>
 
-            <section class="form-box nebulynk-card">
-                <div class="nebulynk-status-head">
-                    <h3>Status</h3>
-                    <span class="nebulynk-status-pill nebulynk-status-<?= $statusClass ?>">
-                        <?= $escape($statusLabel) ?>
-                    </span>
-                </div>
-                <dl class="nebulynk-status-list">
-                    <div class="nebulynk-status-row">
-                        <dt>Domain</dt>
-                        <dd><?= $domainName !== '' ? $escape($domainName) : 'Nicht konfiguriert' ?></dd>
-                    </div>
-                    <div class="nebulynk-status-row">
-                        <dt>Version</dt>
-                        <dd><?= $this->state['installed_version'] !== '' ? $escape($this->state['installed_version']) : '—' ?></dd>
-                    </div>
-                    <div class="nebulynk-status-row">
-                        <dt>Extension-Release</dt>
-                        <dd><?= $this->state['extension_release'] !== '' ? $escape($this->state['extension_release']) : '—' ?></dd>
-                    </div>
-                    <div class="nebulynk-status-row">
-                        <dt>Plesk-Proxy</dt>
-                        <dd><?= $this->state['proxy_enabled'] ? 'Aktiv' : 'Deaktiviert' ?></dd>
-                    </div>
-                    <div class="nebulynk-status-row">
-                        <dt>Edge-Port</dt>
-                        <dd><?= $this->state['edge_port'] !== '' ? $escape($this->state['edge_port']) : '—' ?></dd>
-                    </div>
-                </dl>
-                <?php if ($isBusy): ?>
-                    <p class="nebulynk-status-message">
-                        Die Aufgabe läuft. Bitte warten Sie, bis sie in den
-                        Plesk-Aufgaben als abgeschlossen angezeigt wird.
-                    </p>
-                <?php elseif ($statusKey === 'error'): ?>
-                    <p class="nebulynk-status-message">
-                        Öffnen Sie „Letzte Logs anzeigen“, um die Ursache der
-                        fehlgeschlagenen Aufgabe zu prüfen.
-                    </p>
-                <?php endif; ?>
-            </section>
         </aside>
     </div>
 

@@ -1,0 +1,73 @@
+<?php
+$statusKey = (string)$this->state['deployment_status'];
+$isOperational = in_array($statusKey, ['ready', 'running', 'stopped', 'error'], true);
+?>
+
+<details class="form-box nebulynk-card nebulynk-prerequisites-card"<?= $isOperational ? '' : ' open' ?>>
+    <summary class="nebulynk-section-head nebulynk-prerequisites-summary">
+        <div>
+            <p class="nebulynk-section-kicker">Schritt 1</p>
+            <h3>Voraussetzungen</h3>
+        </div>
+        <span class="nebulynk-tag">Vor der ersten Installation</span>
+    </summary>
+    <div class="nebulynk-prerequisites-content">
+        <p class="nebulynk-card-intro">
+            Prüfen Sie die folgenden Punkte, bevor Sie eine Aktion starten.
+            So vermeiden Sie eine unterbrochene Installation.
+        </p>
+        <ol class="nebulynk-steps">
+            <li class="nebulynk-step">
+                <span class="nebulynk-step-number">1</span>
+                <div>
+                    <strong>Plesk Docker Extension installieren</strong>
+                    <p>
+                        Öffnen Sie in Plesk <strong>Extensions &rarr;
+                        Extensions Catalog</strong>, suchen Sie nach
+                        <strong>Docker</strong> und installieren Sie die
+                        Docker Extension. Der lokale Docker-Dienst muss
+                        anschließend erreichbar sein.
+                    </p>
+                    <span class="nebulynk-path">Plesk &rarr; Extensions &rarr; Extensions Catalog &rarr; Docker</span>
+                </div>
+            </li>
+            <li class="nebulynk-step">
+                <span class="nebulynk-step-number">2</span>
+                <div>
+                    <strong>Dedizierte Domain oder Subdomain vorbereiten</strong>
+                    <p>
+                        Legen Sie eine Domain an, deren DNS auf diesen
+                        Server zeigt. Weisen Sie ihr ein gültiges SSL/TLS-
+                        Zertifikat zu und stellen Sie sicher, dass Nginx
+                        aktiviert ist. Vorhandene Website-Inhalte am
+                        Domain-Root werden durch Nebulynk ersetzt.
+                    </p>
+                </div>
+            </li>
+            <li class="nebulynk-step">
+                <span class="nebulynk-step-number">3</span>
+                <div>
+                    <strong>Firewall und Netzwerk prüfen</strong>
+                    <p>
+                        Erlauben Sie HTTPS (TCP 443) und für Audio/Video
+                        zusätzlich LiveKit auf TCP 7881 und UDP 7882.
+                        Während Installation und Updates müssen Docker Hub
+                        und die npm-Registry erreichbar sein.
+                    </p>
+                </div>
+            </li>
+            <li class="nebulynk-step">
+                <span class="nebulynk-step-number">4</span>
+                <div>
+                    <strong>Speicher und Backups einplanen</strong>
+                    <p>
+                        Der erste Lauf baut die Anwendungs-Images auf dem
+                        Server. Stellen Sie ausreichend Speicherplatz
+                        bereit und sichern Sie PostgreSQL sowie Garage
+                        außerhalb der normalen Plesk-Backups.
+                    </p>
+                </div>
+            </li>
+        </ol>
+    </div>
+</details>

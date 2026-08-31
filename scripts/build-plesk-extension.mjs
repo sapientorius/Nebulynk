@@ -9,6 +9,8 @@ const extensionSourceRoot = path.join(repositoryRoot, 'plesk-extension')
 const outputRoot = path.join(repositoryRoot, 'dist', 'plesk')
 const stagingRoot = path.join(outputRoot, 'staging')
 const packageRoot = path.join(stagingRoot, 'package')
+const extensionLogoSource = path.join(repositoryRoot, 'frontend', 'src', 'assets', 'nebulynk.png')
+const extensionLogoTarget = path.join(packageRoot, 'htdocs', 'images', 'nebulynk.png')
 
 const payloadEntries = [
   'package.json',
@@ -532,6 +534,12 @@ async function stagePackage(metadata) {
     await cp(sourcePath, path.join(packageRoot, entry), { recursive: true })
   }
 
+  if (!await pathExists(extensionLogoSource)) {
+    throw new Error('Required Nebulynk logo asset does not exist: frontend/src/assets/nebulynk.png')
+  }
+  await mkdir(path.dirname(extensionLogoTarget), { recursive: true })
+  await cp(extensionLogoSource, extensionLogoTarget)
+
   await writeFile(path.join(packageRoot, 'meta.xml'), renderMetaXml(metadata), 'utf8')
   await copyPayload()
   await writePayloadManifest(metadata)
@@ -543,7 +551,11 @@ async function validateStaging(metadata) {
     'DESCRIPTION.md',
     'CHANGES.md',
     'htdocs/index.php',
+    'htdocs/images/nebulynk.png',
     'plib/controllers/IndexController.php',
+    'plib/views/scripts/index/index.phtml',
+    'plib/views/scripts/index/_actions.phtml',
+    'plib/views/scripts/index/_prerequisites.phtml',
     'plib/hooks/WebServer.php',
     'plib/hooks/LongTasks.php',
     'sbin/nebulynk-plesk',
@@ -585,6 +597,9 @@ async function validateArchive(archivePath, metadata) {
   }
   if (!entryNames.includes('sbin/nebulynk-plesk')) {
     throw new Error('Plesk ZIP is missing the privileged helper.')
+  }
+  if (!entryNames.includes('htdocs/images/nebulynk.png')) {
+    throw new Error('Plesk ZIP is missing the Nebulynk logo asset.')
   }
   if (entryNames.some((entry) => entry.startsWith('package/'))) {
     throw new Error('Plesk ZIP must not contain an enclosing package directory.')

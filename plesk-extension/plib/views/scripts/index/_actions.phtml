@@ -1,0 +1,69 @@
+<?php
+$statusKey = (string)$this->state['deployment_status'];
+$isOperational = in_array($statusKey, ['ready', 'running', 'stopped', 'error'], true);
+?>
+
+<section class="form-box nebulynk-card nebulynk-action-card">
+    <div class="nebulynk-section-head">
+        <div>
+            <p class="nebulynk-section-kicker"><?= $isOperational ? 'Betrieb' : 'Schritt 2' ?></p>
+            <h3><?= $isOperational ? 'Aktionen' : 'Einrichtung starten' ?></h3>
+        </div>
+        <?php if ($isOperational): ?>
+            <span class="nebulynk-tag">Verwaltung</span>
+        <?php endif; ?>
+    </div>
+    <p class="nebulynk-card-intro">
+        <?php if ($isOperational): ?>
+            Steuern Sie den Nebulynk-Dienst, prüfen Sie den Containerstatus oder
+            öffnen Sie die letzten Logs.
+        <?php else: ?>
+            Wählen Sie die vorbereitete Domain. Starten Sie zuerst die
+            Vorabprüfung und anschließend die Installation.
+        <?php endif; ?>
+    </p>
+
+    <?php if (count($this->domains) === 0): ?>
+        <div class="nebulynk-callout nebulynk-callout-error">
+            <div class="nebulynk-callout-icon" aria-hidden="true">!</div>
+            <div>
+                <strong>Keine passende Domain gefunden</strong>
+                <p>
+                    Legen Sie zuerst eine aktive Plesk-Domain mit
+                    Hosting an und laden Sie diese Seite anschließend
+                    neu.
+                </p>
+            </div>
+        </div>
+    <?php endif; ?>
+
+    <?= $this->form ?>
+
+    <?php if ($isOperational): ?>
+        <p class="nebulynk-form-note">
+            <strong>Hinweis:</strong>
+            Starten Sie eine neue Aufgabe erst, wenn die aktuelle Aufgabe in den
+            Plesk-Aufgaben abgeschlossen ist.
+        </p>
+    <?php else: ?>
+        <p class="nebulynk-form-note">
+            <strong>Empfohlene Reihenfolge:</strong>
+            Vorabprüfung &rarr; Installieren und bauen &rarr; Domain öffnen.
+            Bei einer bestehenden Installation verwenden Sie
+            „Aktualisieren und neu bauen“.
+        </p>
+    <?php endif; ?>
+
+    <div class="nebulynk-callout nebulynk-callout-warning">
+        <div class="nebulynk-callout-icon" aria-hidden="true">i</div>
+        <div>
+            <strong>Aufgaben können mehrere Minuten dauern</strong>
+            <p>
+                Nebulynk lädt Container-Images, installiert Abhängigkeiten
+                und baut Backend sowie Frontend. Die Aufgabe läuft im
+                Hintergrund weiter; starten Sie sie nicht mehrfach.
+                Den Fortschritt sehen Sie in den Plesk-Aufgaben.
+            </p>
+        </div>
+    </div>
+</section>

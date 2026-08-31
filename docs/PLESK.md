@@ -43,6 +43,8 @@ If the Plesk GUI does not show “Upload Extension”, enable it in
 extensionUpload = true
 ```
 
+You may use the panel.ini editor (extension) to edit the file.
+
 Only install a package from a trusted Nebulynk release. The extension uses
 privileged Plesk operations and controls Docker on the host.
 

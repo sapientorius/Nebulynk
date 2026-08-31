@@ -28,6 +28,11 @@ test('builds and validates an uploadable Plesk package', async () => {
     `${built.checksum}  ${path.basename(built.archivePath)}\n`
   )
 
+  assert.deepEqual(
+    await readFile(repositoryPath('dist', 'plesk', 'staging', 'package', 'htdocs', 'images', 'nebulynk.png')),
+    await readFile(repositoryPath('frontend', 'src', 'assets', 'nebulynk.png'))
+  )
+
   const metaXml = await readFile(repositoryPath('dist', 'plesk', 'staging', 'package', 'meta.xml'), 'utf8')
   assert.match(metaXml, /<id>nebulynk-plesk<\/id>/)
   assert.match(metaXml, /<os>unix<\/os>/)
@@ -124,6 +129,9 @@ test('registers both Plesk Nginx hook variants and keeps domain routing scoped',
   const deployment = await readFile(repositoryPath('plesk-extension', 'plib', 'library', 'Deployment.php'), 'utf8')
   const task = await readFile(repositoryPath('plesk-extension', 'plib', 'library', 'Task', 'Deployment.php'), 'utf8')
   const view = await readFile(repositoryPath('plesk-extension', 'plib', 'views', 'scripts', 'index', 'index.phtml'), 'utf8')
+  const actionView = await readFile(repositoryPath('plesk-extension', 'plib', 'views', 'scripts', 'index', '_actions.phtml'), 'utf8')
+  const prerequisitesView = await readFile(repositoryPath('plesk-extension', 'plib', 'views', 'scripts', 'index', '_prerequisites.phtml'), 'utf8')
+  const viewFragments = `${view}\n${actionView}\n${prerequisitesView}`
 
   assert.match(hook, /getDomainNginxConfig\(pm_Domain \$domain\)/)
   assert.match(hook, /getDomainNginxProxyConfig\(pm_Domain \$domain\)/)
@@ -134,9 +142,27 @@ test('registers both Plesk Nginx hook variants and keeps domain routing scoped',
   assert.match(task, /'--domain'/)
   assert.match(task, /'--port'/)
   assert.match(task, /onError\(Exception \$e\)/)
+  assert.match(view, /pm_Context::getBaseUrl\(\)/)
+  assert.match(view, /images\/nebulynk\.png/)
+  assert.doesNotMatch(view, /nebulynk-hero-mark/)
+  assert.match(view, /\$isBusy = \$statusKey === 'checking'/)
+  assert.match(view, /\$isOperational = in_array\(\$statusKey, \['ready', 'running', 'stopped', 'error'\]/)
+  assert.match(view, /_actions\.phtml/)
+  assert.match(view, /_prerequisites\.phtml/)
+  const statusBannerIndex = view.indexOf('class="nebulynk-status-banner')
+  const heroIndex = view.indexOf('class="nebulynk-hero"')
+  const primaryActionIndex = view.indexOf("render('index/_actions.phtml')")
+  const prerequisitesIndex = view.indexOf("render('index/_prerequisites.phtml')")
+  const setupActionIndex = view.lastIndexOf("render('index/_actions.phtml')")
+  assert.ok(statusBannerIndex > heroIndex, 'status banner must follow the hero')
+  assert.ok(primaryActionIndex < prerequisitesIndex, 'operating actions must precede prerequisites')
+  assert.ok(setupActionIndex > prerequisitesIndex, 'setup actions must follow prerequisites')
+  assert.match(prerequisitesView, /<details class="form-box nebulynk-card nebulynk-prerequisites-card"/)
+  assert.match(prerequisitesView, /\$isOperational \? '' : ' open'/)
+  assert.match(actionView, /\$isOperational/)
   assert.match(controller, /1\. Vorabprüfung starten/)
   assert.match(controller, /kann mehrere Minuten dauern/)
-  assert.match(view, /Docker Extension installieren/)
-  assert.match(view, /Vorabprüfung &rarr; Installieren und bauen/)
-  assert.match(view, /mehrere Minuten dauern/)
+  assert.match(viewFragments, /Docker Extension installieren/)
+  assert.match(viewFragments, /Vorabprüfung &rarr; Installieren und bauen/)
+  assert.match(viewFragments, /mehrere Minuten dauern/)
 })
