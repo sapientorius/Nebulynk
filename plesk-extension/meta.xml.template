@@ -3,7 +3,7 @@
     <id>nebulynk-plesk</id>
     <name>Nebulynk</name>
     <description>Deploy and operate Nebulynk on a Plesk Linux server.</description>
-    <category>server_tool</category>
+    <category>web_app</category>
     <version>__VERSION__</version>
     <release>__RELEASE__</release>
     <vendor>Nebulynk</vendor>

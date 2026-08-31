@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "version": "0.5.0",
-  "revision": 3,
+  "revision": 4,
   "channel": "stable",
   "published_at": "2026-08-19T20:18:49.764Z",
   "title": {
@@ -11,6 +11,15 @@
     "en": "Adds PWA sharing for arbitrary files, admin-managed Klipy integration settings, broader AI provider and transcription support, and safer deployment defaults."
   },
   "changes": [
+    {
+      "category": "improvement",
+      "title": {
+        "en": "Branded Plesk extension listing"
+      },
+      "description": {
+        "en": "The Plesk extension now uses the Nebulynk PWA icon and is listed under Web Apps & Site Editing."
+      }
+    },
     {
       "category": "fix",
       "title": {

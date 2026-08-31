@@ -15,6 +15,20 @@ function repositoryPath(...parts) {
   return path.join(repositoryRoot, ...parts)
 }
 
+const extensionIconEntries = [
+  { relativePath: '_meta/icons/32x32.png', width: 32, height: 32 },
+  { relativePath: '_meta/icons/64x64.png', width: 64, height: 64 },
+  { relativePath: '_meta/icons/128x128.png', width: 128, height: 128 }
+]
+const pngSignature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
+
+function assertPngIcon(content, icon) {
+  assert.ok(content.subarray(0, 8).equals(pngSignature), `${icon.relativePath} must be a PNG`)
+  assert.equal(content.toString('ascii', 12, 16), 'IHDR', `${icon.relativePath} must contain an IHDR chunk`)
+  assert.equal(content.readUInt32BE(16), icon.width, `${icon.relativePath} has an unexpected width`)
+  assert.equal(content.readUInt32BE(20), icon.height, `${icon.relativePath} has an unexpected height`)
+}
+
 test('builds and validates an uploadable Plesk package', async () => {
   const built = await buildPleskExtension()
   const validated = await validatePleskExtension()
@@ -27,6 +41,7 @@ test('builds and validates an uploadable Plesk package', async () => {
     await readFile(`${built.archivePath}.sha256`, 'utf8'),
     `${built.checksum}  ${path.basename(built.archivePath)}\n`
   )
+  assert.equal(built.release, 4)
 
   assert.deepEqual(
     await readFile(repositoryPath('dist', 'plesk', 'staging', 'package', 'htdocs', 'images', 'nebulynk.png')),
@@ -35,8 +50,24 @@ test('builds and validates an uploadable Plesk package', async () => {
 
   const metaXml = await readFile(repositoryPath('dist', 'plesk', 'staging', 'package', 'meta.xml'), 'utf8')
   assert.match(metaXml, /<id>nebulynk-plesk<\/id>/)
+  assert.match(metaXml, /<category>web_app<\/category>/)
+  assert.doesNotMatch(metaXml, /<category>server_tool<\/category>/)
   assert.match(metaXml, /<os>unix<\/os>/)
   assert.match(metaXml, /<plesk_min_version>18\.0\.53<\/plesk_min_version>/)
+
+  const metaTemplate = await readFile(repositoryPath('plesk-extension', 'meta.xml.template'), 'utf8')
+  assert.match(metaTemplate, /<category>web_app<\/category>/)
+  assert.doesNotMatch(metaTemplate, /<category>server_tool<\/category>/)
+
+  for (const icon of extensionIconEntries) {
+    const stagedIcon = await readFile(repositoryPath('dist', 'plesk', 'staging', 'package', icon.relativePath))
+    assertPngIcon(stagedIcon, icon)
+  }
+
+  const archiveText = (await readFile(built.archivePath)).toString('latin1')
+  for (const icon of extensionIconEntries) {
+    assert.ok(archiveText.includes(icon.relativePath), `Plesk ZIP is missing ${icon.relativePath}`)
+  }
 
   const manifest = JSON.parse(await readFile(
     repositoryPath('dist', 'plesk', 'staging', 'package', 'var', 'payload', 'manifest.json'),

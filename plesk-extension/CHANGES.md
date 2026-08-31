@@ -7,3 +7,4 @@
 - Persistent PostgreSQL, Redis and Garage data directories.
 - Clearer setup guidance, prerequisite checks and installation-time messaging.
 - Official Nebulynk branding plus a prominent status-first operating view.
+- Branded PWA icon in Plesk and classification under Web Apps & Site Editing.

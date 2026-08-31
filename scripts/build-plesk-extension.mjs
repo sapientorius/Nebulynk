@@ -11,6 +11,12 @@ const stagingRoot = path.join(outputRoot, 'staging')
 const packageRoot = path.join(stagingRoot, 'package')
 const extensionLogoSource = path.join(repositoryRoot, 'frontend', 'src', 'assets', 'nebulynk.png')
 const extensionLogoTarget = path.join(packageRoot, 'htdocs', 'images', 'nebulynk.png')
+const extensionIconEntries = [
+  { relativePath: '_meta/icons/32x32.png', width: 32, height: 32 },
+  { relativePath: '_meta/icons/64x64.png', width: 64, height: 64 },
+  { relativePath: '_meta/icons/128x128.png', width: 128, height: 128 }
+]
+const pngSignature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
 
 const payloadEntries = [
   'package.json',
@@ -115,7 +121,7 @@ function renderMetaXml({ version, release }) {
     <id>nebulynk-plesk</id>
     <name>Nebulynk</name>
     <description>Deploy and operate Nebulynk on a Plesk Linux server.</description>
-    <category>server_tool</category>
+    <category>web_app</category>
     <version>${version}</version>
     <release>${release}</release>
     <vendor>Nebulynk</vendor>
@@ -126,6 +132,38 @@ function renderMetaXml({ version, release }) {
     <os>unix</os>
 </module>
 `
+}
+
+function readPngDimensions(content, label) {
+  if (content.length < 24 || !content.subarray(0, 8).equals(pngSignature) ||
+    content.toString('ascii', 12, 16) !== 'IHDR') {
+    throw new Error(`Plesk icon is not a valid PNG: ${label}`)
+  }
+
+  return {
+    width: content.readUInt32BE(16),
+    height: content.readUInt32BE(20)
+  }
+}
+
+function validatePngIcon(content, icon) {
+  const dimensions = readPngDimensions(content, icon.relativePath)
+  if (dimensions.width !== icon.width || dimensions.height !== icon.height) {
+    throw new Error(
+      `Plesk icon has unexpected dimensions: ${icon.relativePath} ` +
+      `(${dimensions.width}x${dimensions.height}, expected ${icon.width}x${icon.height})`
+    )
+  }
+}
+
+async function validateExtensionIcons(rootPath) {
+  for (const icon of extensionIconEntries) {
+    const iconPath = path.join(rootPath, icon.relativePath)
+    if (!await pathExists(iconPath)) {
+      throw new Error(`Required Plesk icon is missing: ${icon.relativePath}`)
+    }
+    validatePngIcon(await readFile(iconPath), icon)
+  }
 }
 
 async function collectFiles(rootPath, relativePath = '') {
@@ -525,7 +563,7 @@ async function stagePackage(metadata) {
   await rm(stagingRoot, { recursive: true, force: true })
   await mkdir(packageRoot, { recursive: true })
 
-  const extensionEntries = ['DESCRIPTION.md', 'CHANGES.md', 'htdocs', 'plib', 'sbin']
+  const extensionEntries = ['DESCRIPTION.md', 'CHANGES.md', '_meta', 'htdocs', 'plib', 'sbin']
   for (const entry of extensionEntries) {
     const sourcePath = path.join(extensionSourceRoot, entry)
     if (!await pathExists(sourcePath)) {
@@ -552,6 +590,7 @@ async function validateStaging(metadata) {
     'CHANGES.md',
     'htdocs/index.php',
     'htdocs/images/nebulynk.png',
+    ...extensionIconEntries.map((icon) => icon.relativePath),
     'plib/controllers/IndexController.php',
     'plib/views/scripts/index/index.phtml',
     'plib/views/scripts/index/_actions.phtml',
@@ -569,6 +608,8 @@ async function validateStaging(metadata) {
       throw new Error(`Required staged file is missing: ${relativePath}`)
     }
   }
+
+  await validateExtensionIcons(packageRoot)
 
   const metaXml = await readFile(path.join(packageRoot, 'meta.xml'), 'utf8')
   if (!metaXml.includes('<id>nebulynk-plesk</id>')) {
@@ -600,6 +641,13 @@ async function validateArchive(archivePath, metadata) {
   }
   if (!entryNames.includes('htdocs/images/nebulynk.png')) {
     throw new Error('Plesk ZIP is missing the Nebulynk logo asset.')
+  }
+  for (const icon of extensionIconEntries) {
+    const entry = entries.find((candidate) => candidate.name === icon.relativePath)
+    if (!entry) {
+      throw new Error(`Plesk ZIP is missing the extension icon: ${icon.relativePath}`)
+    }
+    validatePngIcon(readZipEntry(archive, entry), icon)
   }
   if (entryNames.some((entry) => entry.startsWith('package/'))) {
     throw new Error('Plesk ZIP must not contain an enclosing package directory.')
