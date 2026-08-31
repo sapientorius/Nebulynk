@@ -44,6 +44,11 @@ test('builds and validates an uploadable Plesk package', async () => {
 
 test('keeps all one-domain edge routes and signature-sensitive proxy semantics', async () => {
   const edgeConfig = await readFile(repositoryPath('deploy', 'plesk', 'edge.conf'), 'utf8')
+  assert.match(edgeConfig, /map \$http_x_forwarded_proto \$nebulynk_forwarded_proto/)
+  assert.match(edgeConfig, /default \$http_x_forwarded_proto;/)
+  assert.match(edgeConfig, /''\s+\$scheme;/)
+  assert.match(edgeConfig, /proxy_set_header X-Forwarded-Proto \$nebulynk_forwarded_proto;/)
+  assert.doesNotMatch(edgeConfig, /proxy_set_header X-Forwarded-Proto \$scheme;/)
   assert.match(edgeConfig, /location \^~ \/api\//)
   assert.match(edgeConfig, /proxy_pass http:\/\/backend:3030\//)
   assert.match(edgeConfig, /location \^~ \/socket\.io\//)

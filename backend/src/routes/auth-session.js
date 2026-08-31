@@ -26,6 +26,11 @@ function getBearerToken(ctx) {
   return authHeader.slice('Bearer '.length).trim() || null
 }
 
+function isNotAuthenticatedError(error) {
+  return error?.name === 'NotAuthenticated'
+    || error?.className === 'not-authenticated'
+}
+
 function sendError(ctx, status, code, message, params = {}) {
   ctx.status = status
   ctx.body = buildErrorBody(code, message, params)
@@ -192,7 +197,18 @@ export function configureAuthSessionRoutes(app) {
 
         const transport = resolveBootstrapTransport(ctx.request.body || {})
         const remember = ctx.request.body?.remember === true
-        const user = await resolveUserFromAccessToken(app, accessToken)
+        let user
+        try {
+          user = await resolveUserFromAccessToken(app, accessToken)
+        } catch (error) {
+          if (!isNotAuthenticatedError(error)) {
+            throw error
+          }
+
+          sendError(ctx, 401, 'api.authentication.invalid_token', 'Invalid token')
+          return
+        }
+
         const result = await createRefreshSession(app, {
           user,
           transport,

@@ -116,6 +116,12 @@ and both Garage directories before production updates.
 
 - `502` on the domain: check the extension task log and `docker compose ps` in
   `/opt/nebulynk-plesk`.
+- Login succeeds but `POST /api/auth/session/bootstrap` returns `500`: update
+  the extension and run “Update and rebuild” so the edge configuration is
+  synchronized and the edge container is recreated. Inspect the backend logs
+  for `Cannot send secure cookie over unencrypted connection`; the public HTTPS
+  forwarding header must reach the backend. Production cookies remain `Secure`
+  with `SameSite=None`.
 - Login works but realtime does not: verify `/socket.io/` reaches the backend
   and that Nginx WebSocket upgrades are enabled.
 - Voice/video does not connect: verify TCP `7881` and UDP `7882` are allowed by
