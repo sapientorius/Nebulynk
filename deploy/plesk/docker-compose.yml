@@ -1,0 +1,129 @@
+# Nebulynk Plesk deployment.
+# The Plesk extension invokes this file from the source root with:
+# docker compose -p nebulynk-plesk --project-directory <source-root> \
+#   --env-file /opt/nebulynk-plesk/.env -f deploy/plesk/docker-compose.yml up -d --build
+services:
+  postgres:
+    image: ${NEBULYNK_POSTGRES_IMAGE:-postgres:17-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193}
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-nebulynk}
+      POSTGRES_USER: ${POSTGRES_USER:-nebulynk}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+    volumes:
+      - ${NEBULYNK_DATA_ROOT:?NEBULYNK_DATA_ROOT must be set}/postgres:/var/lib/postgresql/data
+
+  redis:
+    image: ${NEBULYNK_REDIS_IMAGE:-redis:7.4.7-alpine3.21}
+    restart: unless-stopped
+    volumes:
+      - ${NEBULYNK_DATA_ROOT:?NEBULYNK_DATA_ROOT must be set}/redis:/data
+
+  garage:
+    image: ${NEBULYNK_GARAGE_IMAGE:-dxflrs/garage:v2.3.0}
+    restart: unless-stopped
+    environment:
+      GARAGE_RPC_SECRET: ${GARAGE_RPC_SECRET:?GARAGE_RPC_SECRET must be set}
+      GARAGE_DEFAULT_ACCESS_KEY: ${STORAGE_S3_ACCESS_KEY:-nebulynk}
+      GARAGE_DEFAULT_SECRET_KEY: ${STORAGE_S3_SECRET_KEY:?STORAGE_S3_SECRET_KEY must be set}
+      GARAGE_DEFAULT_BUCKET: ${STORAGE_S3_BUCKET:-files}
+    command: /garage server --single-node --default-bucket
+    volumes:
+      - ./garage.toml:/etc/garage.toml:ro
+      - ${NEBULYNK_DATA_ROOT:?NEBULYNK_DATA_ROOT must be set}/garage-meta:/var/lib/garage/meta
+      - ${NEBULYNK_DATA_ROOT:?NEBULYNK_DATA_ROOT must be set}/garage-data:/var/lib/garage/data
+
+  livekit:
+    image: ${NEBULYNK_LIVEKIT_SERVER_IMAGE:-livekit/livekit-server:v1.13.4}
+    restart: unless-stopped
+    depends_on:
+      - redis
+    ports:
+      - "7881:7881"
+      - "7882:7882/udp"
+    environment:
+      LIVEKIT_KEYS: "${LIVEKIT_API_KEY:?LIVEKIT_API_KEY must be set}: ${LIVEKIT_API_SECRET:?LIVEKIT_API_SECRET must be set}"
+    command: --config /etc/livekit.yaml
+    volumes:
+      - ./livekit.yaml:/etc/livekit.yaml:ro
+
+  livekit-egress:
+    image: ${NEBULYNK_LIVEKIT_EGRESS_IMAGE:-livekit/egress:v1.13.0}
+    restart: unless-stopped
+    command: --config /etc/livekit-egress.yaml
+    depends_on:
+      - livekit
+      - redis
+      - garage
+    environment:
+      EGRESS_CONFIG_FILE: /etc/livekit-egress.yaml
+      LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:?LIVEKIT_API_KEY must be set}
+      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:?LIVEKIT_API_SECRET must be set}
+      LIVEKIT_WS_URL: ws://livekit:7880
+      AWS_ACCESS_KEY_ID: ${STORAGE_S3_ACCESS_KEY:-nebulynk}
+      AWS_SECRET_ACCESS_KEY: ${STORAGE_S3_SECRET_KEY:?STORAGE_S3_SECRET_KEY must be set}
+      AWS_DEFAULT_REGION: ${STORAGE_S3_REGION:-us-east-1}
+    volumes:
+      - ./deploy/plesk/livekit-egress.yaml:/etc/livekit-egress.yaml:ro
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+      args:
+        NODE_IMAGE: ${NEBULYNK_NODE_IMAGE:-node:22.23.1-alpine3.24}
+    restart: unless-stopped
+    env_file:
+      - ${NEBULYNK_ENV_FILE:?NEBULYNK_ENV_FILE must be set}
+    environment:
+      NODE_ENV: production
+      FRONTEND_URL: https://${NEBULYNK_DOMAIN:?NEBULYNK_DOMAIN must be set}
+      PASSKEY_RP_ID: ${NEBULYNK_DOMAIN:?NEBULYNK_DOMAIN must be set}
+      TRUST_PROXY: "true"
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      STORAGE_S3_ENDPOINT: http://garage:3900
+      STORAGE_S3_PUBLIC_ENDPOINT: https://${NEBULYNK_DOMAIN:?NEBULYNK_DOMAIN must be set}
+      STORAGE_S3_BUCKET: ${STORAGE_S3_BUCKET:-files}
+      LIVEKIT_HOST: http://livekit:7880
+      LIVEKIT_WS_URL: ws://livekit:7880
+      LIVEKIT_PUBLIC_URL: https://${NEBULYNK_DOMAIN:?NEBULYNK_DOMAIN must be set}/livekit
+      MEETING_RECORDINGS_S3_ENDPOINT: http://garage:3900
+      MEETING_RECORDINGS_EGRESS_S3_ENDPOINT: http://garage:3900
+      MEETING_RECORDINGS_BUCKET: ${MEETING_RECORDINGS_BUCKET:-files}
+    depends_on:
+      - postgres
+      - redis
+      - garage
+      - livekit
+      - livekit-egress
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      args:
+        NODE_IMAGE: ${NEBULYNK_NODE_IMAGE:-node:22.23.1-alpine3.24}
+        NGINX_IMAGE: ${NEBULYNK_NGINX_IMAGE:-nginxinc/nginx-unprivileged:1.31-alpine3.23@sha256:6320020c7da8714feab524e02c08c5a1958675c4e68700e93a2fd8970b065786}
+        VITE_API_URL: https://${NEBULYNK_DOMAIN:?NEBULYNK_DOMAIN must be set}/api
+        VITE_LIVEKIT_URL: https://${NEBULYNK_DOMAIN:?NEBULYNK_DOMAIN must be set}/livekit
+        VITE_VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+        VITE_AUTH_CSRF_COOKIE_NAME: ${AUTH_CSRF_COOKIE_NAME:-nebulynk_csrf_token}
+    restart: unless-stopped
+    depends_on:
+      - backend
+
+  edge:
+    image: ${NEBULYNK_NGINX_IMAGE:-nginxinc/nginx-unprivileged:1.31-alpine3.23@sha256:6320020c7da8714feab524e02c08c5a1958675c4e68700e93a2fd8970b065786}
+    restart: unless-stopped
+    depends_on:
+      - frontend
+      - backend
+      - garage
+      - livekit
+    ports:
+      - "127.0.0.1:${EDGE_PORT:?EDGE_PORT must be set}:8080"
+    volumes:
+      - ./deploy/plesk/edge.conf:/etc/nginx/conf.d/default.conf:ro

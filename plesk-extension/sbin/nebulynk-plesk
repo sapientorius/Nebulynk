@@ -1,0 +1,307 @@
+#!/bin/sh
+
+set -eu
+
+MODULE_ID="nebulynk-plesk"
+PSA_ROOT="/usr/local/psa"
+PAYLOAD_ROOT="$PSA_ROOT/var/modules/$MODULE_ID/payload"
+DEPLOYMENT_ROOT="/opt/nebulynk-plesk"
+SOURCE_ROOT="$DEPLOYMENT_ROOT/source"
+DATA_ROOT="$DEPLOYMENT_ROOT/data"
+ENV_FILE="$DEPLOYMENT_ROOT/.env"
+COMPOSE_PROJECT="nebulynk-plesk"
+COMPOSE_FILE="$SOURCE_ROOT/deploy/plesk/docker-compose.yml"
+
+ACTION=""
+DOMAIN=""
+PORT=""
+
+die() {
+    printf '%s\n' "Nebulynk Plesk: $1" >&2
+    exit 1
+}
+
+require_root() {
+    [ "$(id -u)" = "0" ] || die "Der privilegierte Helper muss als root laufen."
+}
+
+valid_domain() {
+    [ -n "$DOMAIN" ] || return 1
+    case "$DOMAIN" in
+        *[!A-Za-z0-9.-]*|.*|*.|*..*) return 1 ;;
+    esac
+    return 0
+}
+
+valid_port() {
+    case "$1" in
+        ''|*[!0-9]*) return 1 ;;
+    esac
+    [ "$1" -ge 1024 ] && [ "$1" -le 65535 ]
+}
+
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --action)
+            [ "$#" -ge 2 ] || die "--action benötigt einen Wert."
+            ACTION="$2"
+            shift 2
+            ;;
+        --domain)
+            [ "$#" -ge 2 ] || die "--domain benötigt einen Wert."
+            DOMAIN="$2"
+            shift 2
+            ;;
+        --port)
+            [ "$#" -ge 2 ] || die "--port benötigt einen Wert."
+            PORT="$2"
+            shift 2
+            ;;
+        *)
+            die "Unbekanntes Argument."
+            ;;
+    esac
+done
+
+require_root
+
+ensure_directories() {
+    mkdir -p "$DEPLOYMENT_ROOT" "$DATA_ROOT"
+    chmod 0750 "$DEPLOYMENT_ROOT" "$DATA_ROOT"
+    mkdir -p "$DATA_ROOT/postgres" "$DATA_ROOT/redis" "$DATA_ROOT/garage-meta" "$DATA_ROOT/garage-data"
+    chmod 0750 "$DATA_ROOT/postgres" "$DATA_ROOT/redis" "$DATA_ROOT/garage-meta" "$DATA_ROOT/garage-data"
+    # These UIDs are fixed by the pinned Alpine images. Garage's scratch image
+    # runs as root and therefore keeps the root ownership of its data paths.
+    chown 70:70 "$DATA_ROOT/postgres"
+    chown 999:1000 "$DATA_ROOT/redis"
+}
+
+set_env_value() {
+    key="$1"
+    value="$2"
+    temporary_file="$ENV_FILE.tmp.$$"
+
+    if [ -f "$ENV_FILE" ]; then
+        awk -v key="$key" -v value="$value" '
+            BEGIN { updated = 0 }
+            index($0, key "=") == 1 { print key "=" value; updated = 1; next }
+            { print }
+            END { if (!updated) print key "=" value }
+        ' "$ENV_FILE" > "$temporary_file"
+    else
+        printf '%s\n' "$key=$value" > "$temporary_file"
+    fi
+
+    chmod 0600 "$temporary_file"
+    mv -f "$temporary_file" "$ENV_FILE"
+}
+
+set_env_if_missing() {
+    key="$1"
+    value="$2"
+    current_value="$(awk -F= -v key="$key" '$1 == key { print substr($0, index($0, "=") + 1); exit }' "$ENV_FILE" 2>/dev/null || true)"
+    [ -n "$current_value" ] || set_env_value "$key" "$value"
+}
+
+set_env_random_if_missing() {
+    key="$1"
+    bytes="$2"
+    current_value="$(awk -F= -v key="$key" '$1 == key { print substr($0, index($0, "=") + 1); exit }' "$ENV_FILE" 2>/dev/null || true)"
+    [ -n "$current_value" ] || set_env_value "$key" "$(openssl rand -hex "$bytes")"
+}
+
+ensure_env() {
+    ensure_directories
+    if [ -z "$DOMAIN" ] && [ -f "$ENV_FILE" ]; then
+        DOMAIN="$(awk -F= '$1 == "NEBULYNK_DOMAIN" { print substr($0, index($0, "=") + 1); exit }' "$ENV_FILE" || true)"
+    fi
+    valid_domain || die "Es ist keine gültige Deployment-Domain konfiguriert."
+    if [ -n "$PORT" ]; then
+        valid_port "$PORT" || die "Ungültiger Edge-Port."
+    fi
+
+    if [ ! -f "$ENV_FILE" ]; then
+        umask 077
+        : > "$ENV_FILE"
+    fi
+    chmod 0600 "$ENV_FILE"
+
+    set_env_if_missing NODE_ENV production
+    set_env_if_missing POSTGRES_DB nebulynk
+    set_env_if_missing POSTGRES_USER nebulynk
+    set_env_random_if_missing POSTGRES_PASSWORD 32
+    set_env_random_if_missing GARAGE_RPC_SECRET 32
+    set_env_if_missing STORAGE_S3_ACCESS_KEY nebulynk
+    set_env_random_if_missing STORAGE_S3_SECRET_KEY 32
+    set_env_if_missing STORAGE_S3_BUCKET files
+    set_env_if_missing STORAGE_S3_REGION us-east-1
+    set_env_random_if_missing JWT_SECRET 48
+    set_env_random_if_missing AI_SECRET_KEY 48
+    set_env_random_if_missing AUTH_2FA_SECRET_KEY 48
+    current_livekit_key="$(awk -F= '$1 == "LIVEKIT_API_KEY" { print substr($0, index($0, "=") + 1); exit }' "$ENV_FILE" 2>/dev/null || true)"
+    [ -n "$current_livekit_key" ] || set_env_value LIVEKIT_API_KEY "nebulynk_$(openssl rand -hex 12)"
+    set_env_random_if_missing LIVEKIT_API_SECRET 48
+    set_env_if_missing AUTH_CSRF_COOKIE_NAME nebulynk_csrf_token
+
+    set_env_value NEBULYNK_DOMAIN "$DOMAIN"
+    set_env_value NEBULYNK_DATA_ROOT "$DATA_ROOT"
+    set_env_value NEBULYNK_ENV_FILE "$ENV_FILE"
+    [ -n "$PORT" ] && set_env_value EDGE_PORT "$PORT"
+}
+
+sync_payload() {
+    [ -d "$PAYLOAD_ROOT" ] || die "Der installierte Extension-Payload wurde nicht gefunden."
+    [ "$SOURCE_ROOT" = "/opt/nebulynk-plesk/source" ] || die "Unsicherer Source-Pfad."
+    if [ -L "$SOURCE_ROOT" ]; then
+        die "Der Source-Pfad darf kein Symlink sein."
+    fi
+    rm -rf -- "$SOURCE_ROOT"
+    mkdir -p "$SOURCE_ROOT"
+    cp -a "$PAYLOAD_ROOT"/. "$SOURCE_ROOT"/
+    chmod -R u+rwX,go-rwx "$SOURCE_ROOT"
+    # The unprivileged edge/LiveKit containers must be able to read their
+    # non-secret bind-mounted configuration files. The environment file stays
+    # outside the source tree at mode 0600.
+    chmod 0644 \
+        "$SOURCE_ROOT/deploy/plesk/edge.conf" \
+        "$SOURCE_ROOT/deploy/plesk/livekit-egress.yaml" \
+        "$SOURCE_ROOT/garage.toml" \
+        "$SOURCE_ROOT/livekit.yaml"
+}
+
+compose() {
+    [ -f "$COMPOSE_FILE" ] || die "Die Plesk-Compose-Datei wurde nicht gefunden."
+    docker compose \
+        --project-name "$COMPOSE_PROJECT" \
+        --project-directory "$SOURCE_ROOT" \
+        --env-file "$ENV_FILE" \
+        --file "$COMPOSE_FILE" "$@"
+}
+
+find_free_port() {
+    command -v ss >/dev/null 2>&1 || die "ss ist für die Portprüfung erforderlich."
+    port=49152
+    while [ "$port" -le 49252 ]; do
+        if ! port_is_listening "$port"; then
+            printf '%s\n' "$port"
+            return 0
+        fi
+        port=$((port + 1))
+    done
+    die "Kein freier Edge-Port im reservierten Bereich 49152-49252."
+}
+
+port_is_listening() {
+    command -v ss >/dev/null 2>&1 || die "ss ist für die Portprüfung erforderlich."
+    ss -H -ltn | awk -v wanted=":$1" '$4 ~ wanted "$" { found = 1 } END { exit found ? 0 : 1 }'
+}
+
+port_is_owned_by_stack() {
+    docker ps \
+        --filter "label=com.docker.compose.project=$COMPOSE_PROJECT" \
+        --filter "label=com.docker.compose.service=edge" \
+        --format '{{.Ports}}' \
+        | awk -v wanted=":$PORT->8080/tcp" 'index($0, wanted) { found = 1 } END { exit found ? 0 : 1 }'
+}
+
+check_edge_port() {
+    if [ -z "$PORT" ] && [ -f "$ENV_FILE" ]; then
+        PORT="$(awk -F= '$1 == "EDGE_PORT" { print substr($0, index($0, "=") + 1); exit }' "$ENV_FILE" || true)"
+    fi
+    valid_port "$PORT" || die "Ungültiger Edge-Port."
+    if port_is_listening "$PORT" && ! port_is_owned_by_stack; then
+        die "Der konfigurierte Edge-Port $PORT ist bereits durch einen anderen Prozess belegt."
+    fi
+}
+
+preflight() {
+    [ "$(uname -m)" = "x86_64" ] || die "Nur x86_64 Linux wird unterstützt."
+    command -v docker >/dev/null 2>&1 || die "Docker wurde nicht gefunden."
+    command -v openssl >/dev/null 2>&1 || die "OpenSSL wurde nicht gefunden."
+    command -v nginx >/dev/null 2>&1 || die "Nginx wurde nicht gefunden."
+    docker info >/dev/null 2>&1 || die "Der lokale Docker-Dienst ist nicht erreichbar."
+    docker compose version >/dev/null 2>&1 || die "Docker Compose V2 wurde nicht gefunden."
+    [ -d "$PAYLOAD_ROOT" ] || die "Der installierte Extension-Payload wurde nicht gefunden."
+    printf '%s\n' "Preflight erfolgreich."
+}
+
+install_stack() {
+    ensure_env
+    check_edge_port
+    sync_payload
+    compose config >/dev/null
+    compose up -d --build --remove-orphans
+}
+
+start_stack() {
+    ensure_env
+    check_edge_port
+    compose up -d --remove-orphans
+}
+
+stop_stack() {
+    if [ -f "$COMPOSE_FILE" ] && [ -f "$ENV_FILE" ]; then
+        compose down --remove-orphans
+    fi
+}
+
+status_stack() {
+    if [ -f "$COMPOSE_FILE" ] && [ -f "$ENV_FILE" ]; then
+        compose ps --all
+    else
+        printf '%s\n' "Nebulynk ist noch nicht installiert."
+    fi
+}
+
+logs_stack() {
+    if [ -f "$COMPOSE_FILE" ] && [ -f "$ENV_FILE" ]; then
+        compose logs --no-color --tail=100
+    else
+        printf '%s\n' "Keine Nebulynk-Logs vorhanden."
+    fi
+}
+
+case "$ACTION" in
+    allocate-port)
+        find_free_port
+        ;;
+    check-port)
+        check_edge_port
+        ;;
+    configure)
+        valid_domain || die "Ungültiger Domainname."
+        valid_port "$PORT" || die "Ungültiger Edge-Port."
+        ensure_env
+        check_edge_port
+        ;;
+    preflight)
+        preflight
+        ;;
+    install|update)
+        install_stack
+        ;;
+    start)
+        ensure_env
+        start_stack
+        ;;
+    stop)
+        stop_stack
+        ;;
+    restart)
+        ensure_env
+        check_edge_port
+        compose restart
+        ;;
+    status)
+        status_stack
+        ;;
+    logs)
+        logs_stack
+        ;;
+    remove-proxy)
+        printf '%s\n' "Proxy wird durch die Plesk-Extension-Einstellung entfernt."
+        ;;
+    *)
+        die "Keine gültige Aktion angegeben."
+        ;;
+esac
