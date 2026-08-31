@@ -245,6 +245,38 @@ stop_stack() {
     fi
 }
 
+project_containers() {
+    docker ps -aq \
+        --filter "label=com.docker.compose.project=$COMPOSE_PROJECT"
+}
+
+assert_no_project_containers() {
+    remaining="$(project_containers)" || die "Die verbleibenden Nebulynk-Container konnten nicht geprüft werden."
+    [ -z "$remaining" ] || die "Nebulynk-Container sind nach dem Stoppen noch vorhanden. Es wurden keine Dateien gelöscht."
+}
+
+cleanup_stack() {
+    [ "$DEPLOYMENT_ROOT" = "/opt/nebulynk-plesk" ] || die "Unsicherer Deployment-Pfad."
+    if [ -L "$DEPLOYMENT_ROOT" ]; then
+        die "Der Deployment-Pfad darf kein Symlink sein."
+    fi
+    if [ -e "$DEPLOYMENT_ROOT" ] && [ ! -d "$DEPLOYMENT_ROOT" ]; then
+        die "Der Deployment-Pfad ist kein Verzeichnis."
+    fi
+
+    command -v docker >/dev/null 2>&1 || die "Docker wurde nicht gefunden. Es wurden keine Dateien gelöscht."
+    docker info >/dev/null 2>&1 || die "Der lokale Docker-Dienst ist nicht erreichbar. Es wurden keine Dateien gelöscht."
+
+    if [ -f "$COMPOSE_FILE" ] && [ -f "$ENV_FILE" ]; then
+        compose down --remove-orphans --rmi local
+    fi
+    assert_no_project_containers
+
+    if [ -e "$DEPLOYMENT_ROOT" ]; then
+        rm -rf -- "$DEPLOYMENT_ROOT"
+    fi
+}
+
 status_stack() {
     if [ -f "$COMPOSE_FILE" ] && [ -f "$ENV_FILE" ]; then
         compose ps --all
@@ -286,6 +318,9 @@ case "$ACTION" in
         ;;
     stop)
         stop_stack
+        ;;
+    cleanup)
+        cleanup_stack
         ;;
     restart)
         ensure_env

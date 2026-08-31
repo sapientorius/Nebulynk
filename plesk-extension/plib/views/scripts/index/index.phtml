@@ -11,6 +11,7 @@ $statusLabels = [
     'ready' => 'Bereit für die Nutzung',
     'running' => 'Nebulynk läuft',
     'stopped' => 'Gestoppt',
+    'cleaning' => 'Vollständige Löschung läuft',
     'error' => 'Fehler bei der letzten Aufgabe',
 ];
 $statusClasses = [
@@ -20,11 +21,13 @@ $statusClasses = [
     'ready' => 'success',
     'running' => 'success',
     'stopped' => 'neutral',
+    'cleaning' => 'working',
     'error' => 'error',
 ];
 $statusLabel = $statusLabels[$statusKey] ?? ($statusKey !== '' ? $statusKey : 'Nicht installiert');
 $statusClass = $statusClasses[$statusKey] ?? 'neutral';
-$isBusy = $statusKey === 'checking';
+$isBusy = in_array($statusKey, ['checking', 'cleaning'], true);
+$isCleanupInProgress = $statusKey === 'cleaning';
 $isOperational = in_array($statusKey, ['ready', 'running', 'stopped', 'error'], true);
 $isRunning = $statusKey === 'running';
 $domainName = (string)$this->state['domain_name'];
@@ -485,6 +488,24 @@ $logoUrl = rtrim((string)pm_Context::getBaseUrl(), '/') . '/images/nebulynk.png'
         margin-bottom: 0;
     }
 
+    .nebulynk-cleanup-card {
+        border-color: #efcaca;
+        box-shadow: 0 2px 10px rgba(165, 61, 61, 0.08);
+    }
+
+    .nebulynk-cleanup-card .nebulynk-section-head h3 {
+        color: #a53d3d;
+    }
+
+    .nebulynk-cleanup-card code {
+        padding: 2px 5px;
+        border-radius: 3px;
+        background: #fbe7e7;
+        color: #8d3333;
+        font-size: 12px;
+        font-weight: 700;
+    }
+
     .nebulynk-form-note {
         padding-top: 14px;
         margin: 14px 0 0;
@@ -700,6 +721,8 @@ $logoUrl = rtrim((string)pm_Context::getBaseUrl(), '/') . '/images/nebulynk.png'
                 <h3 id="nebulynk-status-title"><?= $escape($statusLabel) ?></h3>
                 <?php if ($isRunning): ?>
                     <p>Nebulynk läuft. Die aktuellen Zugriffs- und Verbindungsdaten sehen Sie unten.</p>
+                <?php elseif ($isCleanupInProgress): ?>
+                    <p>Die vollständige Löschung läuft. Bitte warten Sie, bis die Plesk-Aufgabe abgeschlossen ist.</p>
                 <?php elseif ($isBusy): ?>
                     <p>Die Vorabprüfung läuft. Bitte warten Sie, bis die Plesk-Aufgabe abgeschlossen ist.</p>
                 <?php elseif ($statusKey === 'ready'): ?>
@@ -742,7 +765,7 @@ $logoUrl = rtrim((string)pm_Context::getBaseUrl(), '/') . '/images/nebulynk.png'
         </div>
     </section>
 
-    <?php if (!$isOperational): ?>
+    <?php if (!$isOperational && !$isCleanupInProgress): ?>
         <div class="nebulynk-callout nebulynk-callout-warning">
             <div class="nebulynk-callout-icon" aria-hidden="true">!</div>
             <div>
@@ -764,8 +787,12 @@ $logoUrl = rtrim((string)pm_Context::getBaseUrl(), '/') . '/images/nebulynk.png'
 
             <?= $this->render('index/_prerequisites.phtml') ?>
 
-            <?php if (!$isOperational): ?>
+            <?php if (!$isOperational && !$isCleanupInProgress): ?>
                 <?= $this->render('index/_actions.phtml') ?>
+            <?php endif; ?>
+
+            <?php if (!$isCleanupInProgress && $this->showCleanup): ?>
+                <?= $this->render('index/_cleanup.phtml') ?>
             <?php endif; ?>
         </div>
 

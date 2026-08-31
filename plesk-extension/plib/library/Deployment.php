@@ -5,6 +5,7 @@ class Modules_NebulynkPlesk_Deployment
     public const MODULE_ID = 'nebulynk-plesk';
     public const DEPLOYMENT_ROOT = '/opt/nebulynk-plesk';
     public const COMPOSE_PROJECT = 'nebulynk-plesk';
+    public const CLEANUP_CONFIRMATION = 'DELETE NEBULYNK DATA';
 
     private const ALLOWED_TASK_ACTIONS = [
         'preflight',
@@ -13,6 +14,7 @@ class Modules_NebulynkPlesk_Deployment
         'start',
         'stop',
         'restart',
+        'cleanup',
     ];
 
     public static function getState(): array
@@ -118,6 +120,29 @@ class Modules_NebulynkPlesk_Deployment
         self::updateDomainConfiguration(self::getDomainByGuid($state['domain_guid']));
     }
 
+    public static function prepareCleanup(): void
+    {
+        $state = self::getState();
+        $proxyWasEnabled = $state['proxy_enabled'];
+
+        pm_Settings::set('proxy_enabled', '0');
+        if ($state['domain_guid'] === '') {
+            return;
+        }
+
+        try {
+            $domain = self::findDomainByGuidForCleanup($state['domain_guid']);
+            if ($domain === null) {
+                return;
+            }
+
+            self::updateDomainConfiguration($domain);
+        } catch (Throwable $exception) {
+            pm_Settings::set('proxy_enabled', $proxyWasEnabled ? '1' : '0');
+            throw $exception;
+        }
+    }
+
     public static function updateDomainConfiguration(pm_Domain $domain): void
     {
         $webServer = new pm_WebServer();
@@ -200,6 +225,11 @@ NGINX;
 
     public static function markDeploymentSuccessful(string $action): void
     {
+        if ($action === 'cleanup') {
+            self::resetDeploymentState();
+            return;
+        }
+
         $status = $action === 'stop'
             ? 'stopped'
             : ($action === 'preflight' ? 'ready' : 'running');
@@ -214,6 +244,19 @@ NGINX;
         }
     }
 
+    public static function resetDeploymentState(): void
+    {
+        pm_Settings::set('domain_guid', '');
+        pm_Settings::set('domain_name', '');
+        pm_Settings::set('deployment_root', self::DEPLOYMENT_ROOT);
+        pm_Settings::set('compose_project', self::COMPOSE_PROJECT);
+        pm_Settings::set('edge_port', '');
+        pm_Settings::set('installed_version', '');
+        pm_Settings::set('extension_release', '');
+        pm_Settings::set('proxy_enabled', '0');
+        pm_Settings::set('deployment_status', 'unconfigured');
+    }
+
     public static function isValidDomainName(string $name): bool
     {
         return $name !== ''
@@ -226,6 +269,17 @@ NGINX;
         return preg_match('/^[0-9]+$/', $port) === 1
             && (int)$port >= 1024
             && (int)$port <= 65535;
+    }
+
+    private static function findDomainByGuidForCleanup(string $guid): ?pm_Domain
+    {
+        foreach (pm_Domain::getAllDomains(false) as $domain) {
+            if ((string)$domain->getGuid() === $guid) {
+                return new pm_Domain($domain->getId());
+            }
+        }
+
+        return null;
     }
 
     private static function assertDeployableDomain(pm_Domain $domain): void

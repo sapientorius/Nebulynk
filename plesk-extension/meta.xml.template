@@ -2,7 +2,7 @@
 <module>
     <id>nebulynk-plesk</id>
     <name>Nebulynk</name>
-    <description>Deploy and operate Nebulynk on a Plesk Linux server.</description>
+    <description>Deploy a self-hosted Nebulynk collaboration workspace on Plesk Linux x64 with Docker, one dedicated domain, built-in chat, meetings, files and optional BYOK AI.</description>
     <category>web_app</category>
     <version>__VERSION__</version>
     <release>__RELEASE__</release>

@@ -1,0 +1,44 @@
+<?php
+$escape = static function ($value) {
+    return htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8');
+};
+
+$confirmationPhrase = $escape($this->cleanupConfirmationPhrase);
+?>
+
+<section class="form-box nebulynk-card nebulynk-cleanup-card">
+    <div class="nebulynk-section-head">
+        <div>
+            <p class="nebulynk-section-kicker">Gefahrenzone</p>
+            <h3>Nebulynk vollständig löschen</h3>
+        </div>
+        <span class="nebulynk-tag">Unwiderruflich</span>
+    </div>
+
+    <div class="nebulynk-callout nebulynk-callout-error">
+        <div class="nebulynk-callout-icon" aria-hidden="true">!</div>
+        <div>
+            <strong>Alle Nebulynk-Daten werden gelöscht</strong>
+            <p>
+                Diese Aktion stoppt den Stack und löscht das Deployment unter
+                <strong>/opt/nebulynk-plesk</strong> einschließlich Source,
+                <strong>.env</strong>, PostgreSQL-, Redis- und Garage-Daten.
+                Die Löschung kann nicht rückgängig gemacht werden.
+            </p>
+        </div>
+    </div>
+
+    <p class="nebulynk-card-intro">
+        Erstellen und prüfen Sie zuerst ein Backup. Plesk-Domain, DNS,
+        TLS-Zertifikat und Firewall-Regeln werden nicht verändert. Geben Sie
+        zur Bestätigung exakt <code><?= $confirmationPhrase ?></code> ein.
+    </p>
+
+    <?= $this->cleanupForm ?>
+
+    <p class="nebulynk-form-note">
+        Bei einem Fehler beim Proxy- oder Docker-Cleanup werden keine Dateien
+        gelöscht. Gemeinsam genutzte Docker-Images und der globale Docker-Cache
+        bleiben erhalten.
+    </p>
+</section>

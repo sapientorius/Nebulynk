@@ -41,10 +41,36 @@ class IndexController extends pm_Controller_Action
             'cancelLink' => pm_Context::getModulesListUrl(),
         ]);
 
-        if ($this->getRequest()->isPost() && $form->isValid($this->getRequest()->getPost())) {
-            $operation = (string)$form->getValue('operation');
+        $cleanupForm = new pm_Form_Simple();
+        $cleanupForm->addElement('hidden', 'cleanup_action', [
+            'value' => '1',
+        ]);
+        $cleanupForm->addElement('text', 'cleanup_confirmation', [
+            'label' => 'Bestätigung',
+            'description' => 'Geben Sie exakt DELETE NEBULYNK DATA ein.',
+            'required' => true,
+            'validators' => [['NotEmpty', true]],
+        ]);
+        $cleanupForm->addControlButtons([
+            'sendButton' => 'Alle Daten löschen',
+            'cancelLink' => pm_Context::getModulesListUrl(),
+        ]);
+
+        $this->view->cleanupForm = $cleanupForm;
+        $this->view->cleanupConfirmationPhrase = Modules_NebulynkPlesk_Deployment::CLEANUP_CONFIRMATION;
+        $this->view->showCleanup = $this->canCleanup($this->view->state);
+
+        if ($this->getRequest()->isPost()) {
+            $post = $this->getRequest()->getPost();
             try {
-                $this->handleOperation($operation, (string)$form->getValue('domain_guid'));
+                if ((string)($post['cleanup_action'] ?? '') === '1') {
+                    if ($cleanupForm->isValid($post)) {
+                        $this->handleCleanup((string)$cleanupForm->getValue('cleanup_confirmation'));
+                    }
+                } elseif ($form->isValid($post)) {
+                    $operation = (string)$form->getValue('operation');
+                    $this->handleOperation($operation, (string)$form->getValue('domain_guid'));
+                }
             } catch (Throwable $exception) {
                 $this->_status->addMessage('error', $exception->getMessage());
             }
@@ -55,6 +81,10 @@ class IndexController extends pm_Controller_Action
 
     private function handleOperation(string $operation, string $domainGuid): void
     {
+        if (Modules_NebulynkPlesk_Deployment::getState()['deployment_status'] === 'cleaning') {
+            throw new pm_Exception('Die vollständige Löschung läuft bereits.');
+        }
+
         $taskOperations = ['preflight', 'install', 'update', 'start', 'stop', 'restart'];
         if ($operation === 'preflight') {
             Modules_NebulynkPlesk_Deployment::configureDomain($domainGuid);
@@ -101,5 +131,36 @@ class IndexController extends pm_Controller_Action
             ? 'Die Nebulynk-Installation wurde gestartet. Der erste Build kann mehrere Minuten dauern. Der Fortschritt wird in den Plesk-Aufgaben angezeigt.'
             : 'Die Nebulynk-Aufgabe wurde gestartet. Der Fortschritt wird in den Plesk-Aufgaben angezeigt.';
         $this->_status->addMessage('info', $message);
+    }
+
+    private function handleCleanup(string $confirmation): void
+    {
+        if ($confirmation !== Modules_NebulynkPlesk_Deployment::CLEANUP_CONFIRMATION) {
+            throw new pm_Exception('Die Cleanup-Bestätigung ist ungültig. Geben Sie exakt DELETE NEBULYNK DATA ein.');
+        }
+
+        $state = Modules_NebulynkPlesk_Deployment::getState();
+        if (!$this->canCleanup($state)) {
+            throw new pm_Exception('Die Cleanup-Aktion ist in diesem Zustand nicht verfügbar.');
+        }
+
+        Modules_NebulynkPlesk_Deployment::prepareCleanup();
+        Modules_NebulynkPlesk_Deployment::setDeploymentStatus('cleaning');
+        try {
+            Modules_NebulynkPlesk_Deployment::startTask('cleanup');
+        } catch (Throwable $exception) {
+            Modules_NebulynkPlesk_Deployment::setDeploymentStatus('error');
+            throw $exception;
+        }
+
+        $this->_status->addMessage(
+            'info',
+            'Die vollständige Löschung wurde gestartet. Der Fortschritt wird in den Plesk-Aufgaben angezeigt.'
+        );
+    }
+
+    private function canCleanup(array $state): bool
+    {
+        return in_array($state['deployment_status'], ['configured', 'ready', 'running', 'stopped', 'error'], true);
     }
 }

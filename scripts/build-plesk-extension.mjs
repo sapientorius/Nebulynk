@@ -120,7 +120,7 @@ function renderMetaXml({ version, release }) {
 <module>
     <id>nebulynk-plesk</id>
     <name>Nebulynk</name>
-    <description>Deploy and operate Nebulynk on a Plesk Linux server.</description>
+    <description>Deploy a self-hosted Nebulynk collaboration workspace on Plesk Linux x64 with Docker, one dedicated domain, built-in chat, meetings, files and optional BYOK AI.</description>
     <category>web_app</category>
     <version>${version}</version>
     <release>${release}</release>
@@ -594,9 +594,11 @@ async function validateStaging(metadata) {
     'plib/controllers/IndexController.php',
     'plib/views/scripts/index/index.phtml',
     'plib/views/scripts/index/_actions.phtml',
+    'plib/views/scripts/index/_cleanup.phtml',
     'plib/views/scripts/index/_prerequisites.phtml',
     'plib/hooks/WebServer.php',
     'plib/hooks/LongTasks.php',
+    'plib/scripts/pre-uninstall.php',
     'sbin/nebulynk-plesk',
     'var/payload/package.json',
     'var/payload/deploy/plesk/docker-compose.yml',
@@ -638,6 +640,12 @@ async function validateArchive(archivePath, metadata) {
   }
   if (!entryNames.includes('sbin/nebulynk-plesk')) {
     throw new Error('Plesk ZIP is missing the privileged helper.')
+  }
+  if (!entryNames.includes('plib/scripts/pre-uninstall.php')) {
+    throw new Error('Plesk ZIP is missing the pre-uninstall hook.')
+  }
+  if (!entryNames.includes('plib/views/scripts/index/_cleanup.phtml')) {
+    throw new Error('Plesk ZIP is missing the cleanup view.')
   }
   if (!entryNames.includes('htdocs/images/nebulynk.png')) {
     throw new Error('Plesk ZIP is missing the Nebulynk logo asset.')

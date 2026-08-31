@@ -8,9 +8,12 @@ class Modules_NebulynkPlesk_Task_Deployment extends pm_LongTask_Task
     {
         $action = (string)$this->getParam('action');
         $this->updateProgress(5);
-        Modules_NebulynkPlesk_Deployment::setDeploymentStatus($action === 'preflight' ? 'checking' : 'running');
+        $status = $action === 'preflight'
+            ? 'checking'
+            : ($action === 'cleanup' ? 'cleaning' : 'running');
+        Modules_NebulynkPlesk_Deployment::setDeploymentStatus($status);
 
-        if (in_array($action, ['install', 'update', 'start', 'restart'], true)) {
+        if (in_array($action, ['install', 'update', 'start', 'restart', 'cleanup'], true)) {
             $this->updateProgress(20);
         }
 
