@@ -40,6 +40,22 @@ test('builds and validates an uploadable Plesk package', async () => {
   assert.equal(manifest.application_version, built.version)
   assert.equal(manifest.extension_release, built.release)
   assert.ok(manifest.files.some((file) => file.path === 'deploy/plesk/edge.conf'))
+
+  for (const publicAsset of [
+    'frontend/public/manifest.webmanifest',
+    'frontend/public/sw.js',
+    'frontend/public/share-target-storage.js',
+    'frontend/public/favicon.ico',
+    'frontend/public/apple-touch-icon.png',
+    'frontend/public/pwa-icon-192.png',
+    'frontend/public/pwa-icon-512.png',
+    'frontend/public/pwa-icon-maskable-512.png'
+  ]) {
+    assert.ok(
+      manifest.files.some((file) => file.path === publicAsset),
+      `Plesk payload is missing ${publicAsset}`
+    )
+  }
 })
 
 test('keeps all one-domain edge routes and signature-sensitive proxy semantics', async () => {
@@ -82,9 +98,24 @@ test('uses fixed safe helper paths and does not expose a volume-deleting action'
   assert.match(helper, /label=com\.docker\.compose\.project=\$COMPOSE_PROJECT/)
   assert.match(helper, /chown 70:70 "\$DATA_ROOT\/postgres"/)
   assert.match(helper, /chown 999:1000 "\$DATA_ROOT\/redis"/)
+  assert.match(helper, /chmod -R u\+rwX,go-rwx "\$SOURCE_ROOT"/)
+  assert.match(helper, /chmod 0600 "\$ENV_FILE"/)
   assert.match(helper, /chmod 0644 \\\n\s+"\$SOURCE_ROOT\/deploy\/plesk\/edge\.conf"/)
   assert.doesNotMatch(helper, /compose down[^\n]*-v/)
   assert.doesNotMatch(helper, /docker system prune/)
+})
+
+test('normalizes frontend document-root permissions before using the unprivileged nginx user', async () => {
+  const dockerfile = await readFile(repositoryPath('frontend', 'Dockerfile'), 'utf8')
+
+  assert.match(
+    dockerfile,
+    /COPY --from=build-stage \/app\/frontend\/dist \/usr\/share\/nginx\/html/
+  )
+  assert.match(
+    dockerfile,
+    /USER root\s+RUN chmod -R a\+rX \/usr\/share\/nginx\/html\s+USER 101/
+  )
 })
 
 test('registers both Plesk Nginx hook variants and keeps domain routing scoped', async () => {

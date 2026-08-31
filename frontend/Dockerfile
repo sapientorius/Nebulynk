@@ -27,6 +27,10 @@ RUN node scripts/render-nginx-conf.mjs --out /tmp/nginx/default.conf
 FROM ${NGINX_IMAGE} as production-stage
 COPY --from=build-stage /app/frontend/dist /usr/share/nginx/html
 COPY --from=build-stage /tmp/nginx/default.conf /etc/nginx/conf.d/default.conf
+# The Plesk helper keeps the source tree private. Normalize the public
+# document root before dropping privileges so Nginx can serve every asset.
+USER root
+RUN chmod -R a+rX /usr/share/nginx/html
 USER 101
 EXPOSE 8080
 CMD ["nginx", "-g", "daemon off;"]

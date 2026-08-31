@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "version": "0.5.0",
-  "revision": 2,
+  "revision": 3,
   "channel": "stable",
   "published_at": "2026-08-19T20:18:49.764Z",
   "title": {
@@ -11,6 +11,15 @@
     "en": "Adds PWA sharing for arbitrary files, admin-managed Klipy integration settings, broader AI provider and transcription support, and safer deployment defaults."
   },
   "changes": [
+    {
+      "category": "fix",
+      "title": {
+        "en": "Serve Plesk public assets correctly"
+      },
+      "description": {
+        "en": "The Plesk frontend image normalizes public asset permissions before running Nginx as the unprivileged user, preventing 403 responses for the manifest, icons and service worker."
+      }
+    },
     {
       "category": "improvement",
       "title": {

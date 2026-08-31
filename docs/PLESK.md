@@ -116,6 +116,11 @@ and both Garage directories before production updates.
 
 - `502` on the domain: check the extension task log and `docker compose ps` in
   `/opt/nebulynk-plesk`.
+- Manifest, favicon, service worker or PWA icons return `403` while bundled
+  `/assets/...` files work: upload the updated extension and run `Update and
+  rebuild` so the frontend image is rebuilt with readable public document-root
+  permissions. Inspect `docker compose logs frontend` and verify the mode with
+  `docker compose exec frontend stat -c '%a %U:%G %n' /usr/share/nginx/html/manifest.webmanifest`.
 - Login succeeds but `POST /api/auth/session/bootstrap` returns `500`: update
   the extension and run “Update and rebuild” so the edge configuration is
   synchronized and the edge container is recreated. Inspect the backend logs
