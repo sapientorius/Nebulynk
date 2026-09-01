@@ -4,13 +4,14 @@ class IndexController extends pm_Controller_Action
 {
     protected $_accessLevel = 'admin';
 
+    private const RUNTIME_OUTPUT_SESSION_KEY = 'runtime_output';
+
     public function indexAction()
     {
         $this->view->pageTitle = 'Nebulynk';
         $this->view->state = Modules_NebulynkPlesk_Deployment::getState();
         $this->view->domains = Modules_NebulynkPlesk_Deployment::getAvailableDomains();
-        $this->view->runtimeStatus = '';
-        $this->view->runtimeLogs = '';
+        $this->view->runtimeOutput = $this->consumeRuntimeOutput();
 
         $form = new pm_Form_Simple([
             'name' => 'nebulynkActionForm',
@@ -42,9 +43,9 @@ class IndexController extends pm_Controller_Action
         ]);
         $form->addControlButtons([
             'sendTitle' => 'Run action',
-            'cancelTitle' => 'Cancel',
-            'cancelLink' => pm_Context::getModulesListUrl(),
+            'cancelHidden' => true,
         ]);
+        $form->getElement('send')->setAttrib('id', 'nebulynkActionSubmit');
 
         $cleanupForm = new pm_Form_Simple([
             'name' => 'nebulynkCleanupForm',
@@ -61,9 +62,9 @@ class IndexController extends pm_Controller_Action
         ]);
         $cleanupForm->addControlButtons([
             'sendTitle' => 'Delete all data',
-            'cancelTitle' => 'Cancel',
-            'cancelLink' => pm_Context::getModulesListUrl(),
+            'cancelHidden' => true,
         ]);
+        $cleanupForm->getElement('send')->setAttrib('id', 'nebulynkCleanupSubmit');
 
         $this->view->cleanupForm = $cleanupForm;
         $this->view->cleanupConfirmationPhrase = Modules_NebulynkPlesk_Deployment::CLEANUP_CONFIRMATION;
@@ -71,17 +72,24 @@ class IndexController extends pm_Controller_Action
 
         if ($this->getRequest()->isPost()) {
             $post = $this->getRequest()->getPost();
+            $redirectAfterPost = false;
             try {
                 if ((string)($post['cleanup_action'] ?? '') === '1') {
                     if ($cleanupForm->isValid($post)) {
+                        $redirectAfterPost = true;
                         $this->handleCleanup((string)$cleanupForm->getValue('cleanup_confirmation'));
                     }
                 } elseif ($form->isValid($post)) {
+                    $redirectAfterPost = true;
                     $operation = (string)$form->getValue('operation');
                     $this->handleOperation($operation, (string)$form->getValue('domain_guid'));
                 }
             } catch (Throwable $exception) {
                 $this->_status->addMessage('error', $exception->getMessage());
+            }
+
+            if ($redirectAfterPost) {
+                $this->_helper->json(['redirect' => pm_Context::getBaseUrl()]);
             }
         }
 
@@ -118,16 +126,27 @@ class IndexController extends pm_Controller_Action
         }
 
         if ($operation === 'status' || $operation === 'logs') {
-            $output = Modules_NebulynkPlesk_Deployment::callHelper(
-                $operation,
-                [],
-                pm_ApiCli::RESULT_STDOUT
-            );
-            if ($operation === 'status') {
-                $this->view->runtimeStatus = is_string($output) ? $output : json_encode($output);
-            } else {
-                $this->view->runtimeLogs = is_string($output) ? $output : json_encode($output);
+            $result = Modules_NebulynkPlesk_Deployment::callHelper($operation);
+            $output = is_array($result) && isset($result['stdout'])
+                ? (string)$result['stdout']
+                : '';
+            $isStatus = $operation === 'status';
+            if (trim($output) === '') {
+                $output = $isStatus
+                    ? 'No Nebulynk containers are currently present.'
+                    : 'No log entries are available yet.';
             }
+
+            $this->storeRuntimeOutput(
+                $isStatus ? 'Container status' : 'Latest logs',
+                $output
+            );
+            $this->_status->addMessage(
+                'info',
+                $isStatus
+                    ? 'Container status retrieved. See the result below.'
+                    : 'Latest logs retrieved. See the result below.'
+            );
             return;
         }
 
@@ -166,6 +185,29 @@ class IndexController extends pm_Controller_Action
             'info',
             'Complete deletion started. Progress is shown in Plesk Tasks.'
         );
+    }
+
+    private function consumeRuntimeOutput(): ?array
+    {
+        $output = $_SESSION['module'][Modules_NebulynkPlesk_Deployment::MODULE_ID][self::RUNTIME_OUTPUT_SESSION_KEY] ?? null;
+        unset($_SESSION['module'][Modules_NebulynkPlesk_Deployment::MODULE_ID][self::RUNTIME_OUTPUT_SESSION_KEY]);
+
+        if (!is_array($output)
+            || !isset($output['title'], $output['content'])
+            || !is_string($output['title'])
+            || !is_string($output['content'])) {
+            return null;
+        }
+
+        return $output;
+    }
+
+    private function storeRuntimeOutput(string $title, string $content): void
+    {
+        $_SESSION['module'][Modules_NebulynkPlesk_Deployment::MODULE_ID][self::RUNTIME_OUTPUT_SESSION_KEY] = [
+            'title' => $title,
+            'content' => $content,
+        ];
     }
 
     private function canCleanup(array $state): bool

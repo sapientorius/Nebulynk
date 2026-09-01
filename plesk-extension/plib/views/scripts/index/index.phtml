@@ -970,21 +970,4 @@ $logoUrl = rtrim((string)pm_Context::getBaseUrl(), '/') . '/images/nebulynk.png'
         </div>
     </section>
 
-    <?php if ($this->runtimeStatus !== ''): ?>
-        <details class="form-box nebulynk-card nebulynk-output-card">
-            <summary class="nebulynk-output-summary">
-                <span class="nebulynk-output-title">Container status</span>
-            </summary>
-            <pre class="nebulynk-output"><?= $escape($this->runtimeStatus) ?></pre>
-        </details>
-    <?php endif; ?>
-
-    <?php if ($this->runtimeLogs !== ''): ?>
-        <details class="form-box nebulynk-card nebulynk-output-card">
-            <summary class="nebulynk-output-summary">
-                <span class="nebulynk-output-title">Latest logs</span>
-            </summary>
-            <pre class="nebulynk-output"><?= $escape($this->runtimeLogs) ?></pre>
-        </details>
-    <?php endif; ?>
 </div>

@@ -279,7 +279,12 @@ cleanup_stack() {
 
 status_stack() {
     if [ -f "$COMPOSE_FILE" ] && [ -f "$ENV_FILE" ]; then
-        compose ps --all
+        output="$(compose ps --all)"
+        if [ -n "$output" ]; then
+            printf '%s\n' "$output"
+        else
+            printf '%s\n' "No Nebulynk containers are currently present."
+        fi
     else
         printf '%s\n' "Nebulynk is not installed yet."
     fi
@@ -287,7 +292,12 @@ status_stack() {
 
 logs_stack() {
     if [ -f "$COMPOSE_FILE" ] && [ -f "$ENV_FILE" ]; then
-        compose logs --no-color --tail=100
+        output="$(compose logs --no-color --tail=100)"
+        if [ -n "$output" ]; then
+            printf '%s\n' "$output"
+        else
+            printf '%s\n' "No log entries are available yet."
+        fi
     else
         printf '%s\n' "No Nebulynk logs are available."
     fi
