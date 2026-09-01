@@ -43,9 +43,9 @@ class Modules_NebulynkPlesk_Task_Deployment extends pm_LongTask_Task
         $action = (string)$this->getParam('action');
         switch ($this->getStatus()) {
             case static::STATUS_RUNNING:
-                return 'Nebulynk: ' . $action . ' läuft';
+                return 'Nebulynk: ' . $action . ' in progress';
             case static::STATUS_DONE:
-                return 'Nebulynk: ' . $action . ' abgeschlossen';
+                return 'Nebulynk: ' . $action . ' completed';
             default:
                 return 'Nebulynk: ' . $action;
         }

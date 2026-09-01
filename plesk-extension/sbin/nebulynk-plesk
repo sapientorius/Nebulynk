@@ -22,7 +22,7 @@ die() {
 }
 
 require_root() {
-    [ "$(id -u)" = "0" ] || die "Der privilegierte Helper muss als root laufen."
+    [ "$(id -u)" = "0" ] || die "The privileged helper must run as root."
 }
 
 valid_domain() {
@@ -43,22 +43,22 @@ valid_port() {
 while [ "$#" -gt 0 ]; do
     case "$1" in
         --action)
-            [ "$#" -ge 2 ] || die "--action benötigt einen Wert."
+            [ "$#" -ge 2 ] || die "--action requires a value."
             ACTION="$2"
             shift 2
             ;;
         --domain)
-            [ "$#" -ge 2 ] || die "--domain benötigt einen Wert."
+            [ "$#" -ge 2 ] || die "--domain requires a value."
             DOMAIN="$2"
             shift 2
             ;;
         --port)
-            [ "$#" -ge 2 ] || die "--port benötigt einen Wert."
+            [ "$#" -ge 2 ] || die "--port requires a value."
             PORT="$2"
             shift 2
             ;;
         *)
-            die "Unbekanntes Argument."
+            die "Unknown argument."
             ;;
     esac
 done
@@ -115,9 +115,9 @@ ensure_env() {
     if [ -z "$DOMAIN" ] && [ -f "$ENV_FILE" ]; then
         DOMAIN="$(awk -F= '$1 == "NEBULYNK_DOMAIN" { print substr($0, index($0, "=") + 1); exit }' "$ENV_FILE" || true)"
     fi
-    valid_domain || die "Es ist keine gültige Deployment-Domain konfiguriert."
+    valid_domain || die "No valid deployment domain is configured."
     if [ -n "$PORT" ]; then
-        valid_port "$PORT" || die "Ungültiger Edge-Port."
+        valid_port "$PORT" || die "Invalid edge port."
     fi
 
     if [ ! -f "$ENV_FILE" ]; then
@@ -150,10 +150,10 @@ ensure_env() {
 }
 
 sync_payload() {
-    [ -d "$PAYLOAD_ROOT" ] || die "Der installierte Extension-Payload wurde nicht gefunden."
-    [ "$SOURCE_ROOT" = "/opt/nebulynk-plesk/source" ] || die "Unsicherer Source-Pfad."
+    [ -d "$PAYLOAD_ROOT" ] || die "The installed extension payload was not found."
+    [ "$SOURCE_ROOT" = "/opt/nebulynk-plesk/source" ] || die "Unsafe source path."
     if [ -L "$SOURCE_ROOT" ]; then
-        die "Der Source-Pfad darf kein Symlink sein."
+        die "The source path must not be a symlink."
     fi
     rm -rf -- "$SOURCE_ROOT"
     mkdir -p "$SOURCE_ROOT"
@@ -170,7 +170,7 @@ sync_payload() {
 }
 
 compose() {
-    [ -f "$COMPOSE_FILE" ] || die "Die Plesk-Compose-Datei wurde nicht gefunden."
+    [ -f "$COMPOSE_FILE" ] || die "The Plesk Compose file was not found."
     docker compose \
         --project-name "$COMPOSE_PROJECT" \
         --project-directory "$SOURCE_ROOT" \
@@ -179,7 +179,7 @@ compose() {
 }
 
 find_free_port() {
-    command -v ss >/dev/null 2>&1 || die "ss ist für die Portprüfung erforderlich."
+    command -v ss >/dev/null 2>&1 || die "ss is required for port checks."
     port=49152
     while [ "$port" -le 49252 ]; do
         if ! port_is_listening "$port"; then
@@ -188,11 +188,11 @@ find_free_port() {
         fi
         port=$((port + 1))
     done
-    die "Kein freier Edge-Port im reservierten Bereich 49152-49252."
+    die "No free edge port in the reserved range 49152-49252."
 }
 
 port_is_listening() {
-    command -v ss >/dev/null 2>&1 || die "ss ist für die Portprüfung erforderlich."
+    command -v ss >/dev/null 2>&1 || die "ss is required for port checks."
     ss -H -ltn | awk -v wanted=":$1" '$4 ~ wanted "$" { found = 1 } END { exit found ? 0 : 1 }'
 }
 
@@ -208,21 +208,21 @@ check_edge_port() {
     if [ -z "$PORT" ] && [ -f "$ENV_FILE" ]; then
         PORT="$(awk -F= '$1 == "EDGE_PORT" { print substr($0, index($0, "=") + 1); exit }' "$ENV_FILE" || true)"
     fi
-    valid_port "$PORT" || die "Ungültiger Edge-Port."
+    valid_port "$PORT" || die "Invalid edge port."
     if port_is_listening "$PORT" && ! port_is_owned_by_stack; then
-        die "Der konfigurierte Edge-Port $PORT ist bereits durch einen anderen Prozess belegt."
+        die "The configured edge port $PORT is already in use by another process."
     fi
 }
 
 preflight() {
-    [ "$(uname -m)" = "x86_64" ] || die "Nur x86_64 Linux wird unterstützt."
-    command -v docker >/dev/null 2>&1 || die "Docker wurde nicht gefunden."
-    command -v openssl >/dev/null 2>&1 || die "OpenSSL wurde nicht gefunden."
-    command -v nginx >/dev/null 2>&1 || die "Nginx wurde nicht gefunden."
-    docker info >/dev/null 2>&1 || die "Der lokale Docker-Dienst ist nicht erreichbar."
-    docker compose version >/dev/null 2>&1 || die "Docker Compose V2 wurde nicht gefunden."
-    [ -d "$PAYLOAD_ROOT" ] || die "Der installierte Extension-Payload wurde nicht gefunden."
-    printf '%s\n' "Preflight erfolgreich."
+    [ "$(uname -m)" = "x86_64" ] || die "Only x86_64 Linux is supported."
+    command -v docker >/dev/null 2>&1 || die "Docker was not found."
+    command -v openssl >/dev/null 2>&1 || die "OpenSSL was not found."
+    command -v nginx >/dev/null 2>&1 || die "Nginx was not found."
+    docker info >/dev/null 2>&1 || die "The local Docker service is not reachable."
+    docker compose version >/dev/null 2>&1 || die "Docker Compose V2 was not found."
+    [ -d "$PAYLOAD_ROOT" ] || die "The installed extension payload was not found."
+    printf '%s\n' "Preflight completed successfully."
 }
 
 install_stack() {
@@ -251,21 +251,21 @@ project_containers() {
 }
 
 assert_no_project_containers() {
-    remaining="$(project_containers)" || die "Die verbleibenden Nebulynk-Container konnten nicht geprüft werden."
-    [ -z "$remaining" ] || die "Nebulynk-Container sind nach dem Stoppen noch vorhanden. Es wurden keine Dateien gelöscht."
+    remaining="$(project_containers)" || die "The remaining Nebulynk containers could not be checked."
+    [ -z "$remaining" ] || die "Nebulynk containers are still present after stopping. No files were deleted."
 }
 
 cleanup_stack() {
-    [ "$DEPLOYMENT_ROOT" = "/opt/nebulynk-plesk" ] || die "Unsicherer Deployment-Pfad."
+    [ "$DEPLOYMENT_ROOT" = "/opt/nebulynk-plesk" ] || die "Unsafe deployment path."
     if [ -L "$DEPLOYMENT_ROOT" ]; then
-        die "Der Deployment-Pfad darf kein Symlink sein."
+        die "The deployment path must not be a symlink."
     fi
     if [ -e "$DEPLOYMENT_ROOT" ] && [ ! -d "$DEPLOYMENT_ROOT" ]; then
-        die "Der Deployment-Pfad ist kein Verzeichnis."
+        die "The deployment path is not a directory."
     fi
 
-    command -v docker >/dev/null 2>&1 || die "Docker wurde nicht gefunden. Es wurden keine Dateien gelöscht."
-    docker info >/dev/null 2>&1 || die "Der lokale Docker-Dienst ist nicht erreichbar. Es wurden keine Dateien gelöscht."
+    command -v docker >/dev/null 2>&1 || die "Docker was not found. No files were deleted."
+    docker info >/dev/null 2>&1 || die "The local Docker service is not reachable. No files were deleted."
 
     if [ -f "$COMPOSE_FILE" ] && [ -f "$ENV_FILE" ]; then
         compose down --remove-orphans --rmi local
@@ -281,7 +281,7 @@ status_stack() {
     if [ -f "$COMPOSE_FILE" ] && [ -f "$ENV_FILE" ]; then
         compose ps --all
     else
-        printf '%s\n' "Nebulynk ist noch nicht installiert."
+        printf '%s\n' "Nebulynk is not installed yet."
     fi
 }
 
@@ -289,7 +289,7 @@ logs_stack() {
     if [ -f "$COMPOSE_FILE" ] && [ -f "$ENV_FILE" ]; then
         compose logs --no-color --tail=100
     else
-        printf '%s\n' "Keine Nebulynk-Logs vorhanden."
+        printf '%s\n' "No Nebulynk logs are available."
     fi
 }
 
@@ -301,8 +301,8 @@ case "$ACTION" in
         check_edge_port
         ;;
     configure)
-        valid_domain || die "Ungültiger Domainname."
-        valid_port "$PORT" || die "Ungültiger Edge-Port."
+        valid_domain || die "Invalid domain name."
+        valid_port "$PORT" || die "Invalid edge port."
         ensure_env
         check_edge_port
         ;;
@@ -334,9 +334,9 @@ case "$ACTION" in
         logs_stack
         ;;
     remove-proxy)
-        printf '%s\n' "Proxy wird durch die Plesk-Extension-Einstellung entfernt."
+        printf '%s\n' "The proxy is removed by the Plesk extension setting."
         ;;
     *)
-        die "Keine gültige Aktion angegeben."
+        die "No valid action was provided."
         ;;
 esac

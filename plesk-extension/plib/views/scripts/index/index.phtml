@@ -5,14 +5,14 @@ $escape = static function ($value) {
 
 $statusKey = (string)$this->state['deployment_status'];
 $statusLabels = [
-    'unconfigured' => 'Noch nicht eingerichtet',
-    'configured' => 'Konfiguration gespeichert',
-    'checking' => 'Vorabprüfung läuft',
-    'ready' => 'Bereit für die Nutzung',
-    'running' => 'Nebulynk läuft',
-    'stopped' => 'Gestoppt',
-    'cleaning' => 'Vollständige Löschung läuft',
-    'error' => 'Fehler bei der letzten Aufgabe',
+    'unconfigured' => 'Not configured yet',
+    'configured' => 'Configuration saved',
+    'checking' => 'Preflight check in progress',
+    'ready' => 'Ready to use',
+    'running' => 'Nebulynk is running',
+    'stopped' => 'Stopped',
+    'cleaning' => 'Full deletion in progress',
+    'error' => 'Last task failed',
 ];
 $statusClasses = [
     'unconfigured' => 'neutral',
@@ -24,7 +24,7 @@ $statusClasses = [
     'cleaning' => 'working',
     'error' => 'error',
 ];
-$statusLabel = $statusLabels[$statusKey] ?? ($statusKey !== '' ? $statusKey : 'Nicht installiert');
+$statusLabel = $statusLabels[$statusKey] ?? ($statusKey !== '' ? $statusKey : 'Not installed');
 $statusClass = $statusClasses[$statusKey] ?? 'neutral';
 $isBusy = in_array($statusKey, ['checking', 'cleaning'], true);
 $isCleanupInProgress = $statusKey === 'cleaning';
@@ -489,8 +489,54 @@ $logoUrl = rtrim((string)pm_Context::getBaseUrl(), '/') . '/images/nebulynk.png'
     }
 
     .nebulynk-cleanup-card {
+        padding: 0;
+        overflow: hidden;
         border-color: #efcaca;
         box-shadow: 0 2px 10px rgba(165, 61, 61, 0.08);
+    }
+
+    .nebulynk-cleanup-summary {
+        position: relative;
+        padding: 24px 52px 24px 26px;
+        margin: 0;
+        cursor: pointer;
+        list-style: none;
+    }
+
+    .nebulynk-cleanup-summary::-webkit-details-marker {
+        display: none;
+    }
+
+    .nebulynk-cleanup-summary::after {
+        position: absolute;
+        top: 22px;
+        right: 25px;
+        width: 22px;
+        height: 22px;
+        border: 1px solid #e1bcbc;
+        border-radius: 50%;
+        color: #a53d3d;
+        content: '+';
+        font-size: 17px;
+        line-height: 19px;
+        text-align: center;
+    }
+
+    .nebulynk-cleanup-card[open] .nebulynk-cleanup-summary {
+        border-bottom: 1px solid #f3dddd;
+    }
+
+    .nebulynk-cleanup-card[open] .nebulynk-cleanup-summary::after {
+        content: '−';
+    }
+
+    .nebulynk-cleanup-summary:focus-visible {
+        outline: 2px solid #c94b4b;
+        outline-offset: -3px;
+    }
+
+    .nebulynk-cleanup-content {
+        padding: 24px 26px;
     }
 
     .nebulynk-cleanup-card .nebulynk-section-head h3 {
@@ -603,11 +649,64 @@ $logoUrl = rtrim((string)pm_Context::getBaseUrl(), '/') . '/images/nebulynk.png'
         line-height: 1.5;
     }
 
-    .nebulynk-output-card h3 {
-        margin: 0 0 14px;
+    .nebulynk-output-card {
+        padding: 0;
+        overflow: hidden;
+    }
+
+    .nebulynk-output-summary {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 20px 52px 20px 26px;
+        margin: 0;
+        cursor: pointer;
+        list-style: none;
+    }
+
+    .nebulynk-output-summary::-webkit-details-marker {
+        display: none;
+    }
+
+    .nebulynk-output-summary::after {
+        position: absolute;
+        top: 17px;
+        right: 25px;
+        width: 22px;
+        height: 22px;
+        border: 1px solid #c8d6e0;
+        border-radius: 50%;
+        color: #5e7485;
+        content: '+';
+        font-size: 17px;
+        line-height: 19px;
+        text-align: center;
+    }
+
+    .nebulynk-output-card[open] .nebulynk-output-summary {
+        border-bottom: 1px solid #edf1f4;
+    }
+
+    .nebulynk-output-card[open] .nebulynk-output-summary::after {
+        content: '−';
+    }
+
+    .nebulynk-output-summary:focus-visible {
+        outline: 2px solid #337ab7;
+        outline-offset: -3px;
+    }
+
+    .nebulynk-output-title {
         color: #293d51;
         font-size: 20px;
         font-weight: 400;
+        line-height: 1.2;
+    }
+
+    .nebulynk-output-card > .nebulynk-output {
+        margin: 0 26px 24px;
     }
 
     .nebulynk-output {
@@ -675,6 +774,10 @@ $logoUrl = rtrim((string)pm_Context::getBaseUrl(), '/') . '/images/nebulynk.png'
             padding: 0;
         }
 
+        .nebulynk-cleanup-card {
+            padding: 0;
+        }
+
         .nebulynk-status-banner {
             padding: 20px;
         }
@@ -690,17 +793,33 @@ $logoUrl = rtrim((string)pm_Context::getBaseUrl(), '/') . '/images/nebulynk.png'
         .nebulynk-prerequisites-content {
             padding: 0 20px 20px;
         }
+
+        .nebulynk-cleanup-summary {
+            padding: 20px 48px 20px 20px;
+        }
+
+        .nebulynk-cleanup-content {
+            padding: 20px;
+        }
+
+        .nebulynk-output-summary {
+            padding: 20px 48px 20px 20px;
+        }
+
+        .nebulynk-output-card > .nebulynk-output {
+            margin: 0 20px 20px;
+        }
     }
 </style>
 
 <div class="nebulynk-shell">
     <section class="nebulynk-hero">
         <div>
-            <p class="nebulynk-eyebrow">Nebulynk für Plesk</p>
-            <h2>Kommunikation auf Ihrer eigenen Domain</h2>
+            <p class="nebulynk-eyebrow">Nebulynk for Plesk</p>
+            <h2>Communication on your own domain</h2>
             <p>
-                Nebulynk bündelt Web-App, API, Dateispeicher und
-                LiveKit-Signalisierung unter einer dedizierten Plesk-Domain.
+                Nebulynk combines the web app, API, file storage, and LiveKit
+                signaling under a dedicated Plesk domain.
             </p>
             <div class="nebulynk-hero-meta">
                 <span>Plesk Obsidian</span>
@@ -717,22 +836,22 @@ $logoUrl = rtrim((string)pm_Context::getBaseUrl(), '/') . '/images/nebulynk.png'
                 <span class="nebulynk-status-dot"></span>
             </div>
             <div class="nebulynk-status-banner-copy">
-                <p class="nebulynk-section-kicker">Betriebsstatus</p>
+                <p class="nebulynk-section-kicker">Operational status</p>
                 <h3 id="nebulynk-status-title"><?= $escape($statusLabel) ?></h3>
                 <?php if ($isRunning): ?>
-                    <p>Nebulynk läuft. Die aktuellen Zugriffs- und Verbindungsdaten sehen Sie unten.</p>
+                    <p>Nebulynk is running. Current access and connection details are shown below.</p>
                 <?php elseif ($isCleanupInProgress): ?>
-                    <p>Die vollständige Löschung läuft. Bitte warten Sie, bis die Plesk-Aufgabe abgeschlossen ist.</p>
+                    <p>Full deletion is in progress. Please wait until the Plesk task has completed.</p>
                 <?php elseif ($isBusy): ?>
-                    <p>Die Vorabprüfung läuft. Bitte warten Sie, bis die Plesk-Aufgabe abgeschlossen ist.</p>
+                    <p>The preflight check is in progress. Please wait until the Plesk task has completed.</p>
                 <?php elseif ($statusKey === 'ready'): ?>
-                    <p>Die Vorabprüfung ist abgeschlossen. Die Installation kann gestartet werden.</p>
+                    <p>The preflight check is complete. Installation can be started.</p>
                 <?php elseif ($statusKey === 'stopped'): ?>
-                    <p>Nebulynk ist angehalten. Starten Sie den Dienst über die Aktionen.</p>
+                    <p>Nebulynk is stopped. Start the service from Actions.</p>
                 <?php elseif ($statusKey === 'error'): ?>
-                    <p>Die letzte Aufgabe ist fehlgeschlagen. Prüfen Sie die Logs und starten Sie anschließend eine passende Aktion.</p>
+                    <p>The last task failed. Check the logs, then start an appropriate action.</p>
                 <?php else: ?>
-                    <p>Konfigurieren Sie eine Domain und führen Sie die Vorabprüfung aus, um Nebulynk bereitzustellen.</p>
+                    <p>Configure a domain and run the preflight check to deploy Nebulynk.</p>
                 <?php endif; ?>
             </div>
         </div>
@@ -744,11 +863,11 @@ $logoUrl = rtrim((string)pm_Context::getBaseUrl(), '/') . '/images/nebulynk.png'
         <div class="nebulynk-status-banner-facts">
             <div class="nebulynk-status-fact">
                 <span>Domain</span>
-                <strong><?= $domainName !== '' ? $escape($domainName) : 'Nicht konfiguriert' ?></strong>
+                <strong><?= $domainName !== '' ? $escape($domainName) : 'Not configured' ?></strong>
             </div>
             <div class="nebulynk-status-fact">
-                <span>Plesk-Proxy</span>
-                <strong><?= $this->state['proxy_enabled'] ? 'Aktiv' : 'Deaktiviert' ?></strong>
+                <span>Plesk proxy</span>
+                <strong><?= $this->state['proxy_enabled'] ? 'Enabled' : 'Disabled' ?></strong>
             </div>
             <div class="nebulynk-status-fact">
                 <span>Version</span>
@@ -769,11 +888,12 @@ $logoUrl = rtrim((string)pm_Context::getBaseUrl(), '/') . '/images/nebulynk.png'
         <div class="nebulynk-callout nebulynk-callout-warning">
             <div class="nebulynk-callout-icon" aria-hidden="true">!</div>
             <div>
-                <strong>Bitte vor der Einrichtung vorbereiten</strong>
+                <strong>Prepare before setup</strong>
                 <p>
-                    Installieren Sie zuerst die Plesk <strong>Docker Extension</strong>
-                    und führen Sie danach die Vorabprüfung aus. Die erste Installation
-                    kann je nach Server und Internetverbindung mehrere Minuten dauern.
+                    Install the Plesk <strong>Docker Extension</strong> first,
+                    then run the preflight check. The first installation may
+                    take several minutes depending on the server and Internet
+                    connection.
                 </p>
             </div>
         </div>
@@ -800,26 +920,26 @@ $logoUrl = rtrim((string)pm_Context::getBaseUrl(), '/') . '/images/nebulynk.png'
             <section class="form-box nebulynk-card">
                 <div class="nebulynk-section-head">
                     <div>
-                        <p class="nebulynk-section-kicker">Ablauf</p>
-                        <h3>Was passiert jetzt?</h3>
+                        <p class="nebulynk-section-kicker">Workflow</p>
+                        <h3>What happens next?</h3>
                     </div>
                 </div>
                 <ol class="nebulynk-workflow">
                     <li>
                         <span class="nebulynk-workflow-number">1</span>
-                        <span>Die gewählte Domain und der lokale Edge-Port werden geprüft.</span>
+                        <span>The selected domain and local edge port are checked.</span>
                     </li>
                     <li>
                         <span class="nebulynk-workflow-number">2</span>
-                        <span>Die Nebulynk-Quelle wird unter <strong>/opt/nebulynk-plesk</strong> bereitgestellt.</span>
+                        <span>The Nebulynk source is deployed to <strong>/opt/nebulynk-plesk</strong>.</span>
                     </li>
                     <li>
                         <span class="nebulynk-workflow-number">3</span>
-                        <span>Docker baut und startet die benötigten Dienste.</span>
+                        <span>Docker builds and starts the required services.</span>
                     </li>
                     <li>
                         <span class="nebulynk-workflow-number">4</span>
-                        <span>Der Plesk-Proxy routet die Domain zu Nebulynk.</span>
+                        <span>The Plesk proxy routes the domain to Nebulynk.</span>
                     </li>
                 </ol>
             </section>
@@ -830,37 +950,41 @@ $logoUrl = rtrim((string)pm_Context::getBaseUrl(), '/') . '/images/nebulynk.png'
     <section class="form-box nebulynk-card nebulynk-info-card">
         <div class="nebulynk-section-head">
             <div>
-                <p class="nebulynk-section-kicker">Nach der Installation</p>
-                <h3>Zugriff und Betrieb</h3>
+                <p class="nebulynk-section-kicker">After installation</p>
+                <h3>Access and operation</h3>
             </div>
         </div>
         <div class="nebulynk-info-grid">
             <div class="nebulynk-info-item">
                 <strong>Web-App</strong>
-                <p>Die Anwendung ist über Ihre Domain mit HTTPS erreichbar.</p>
+                <p>The application is available over HTTPS through your domain.</p>
             </div>
             <div class="nebulynk-info-item">
-                <strong>Audio und Video</strong>
-                <p>LiveKit benötigt zusätzlich TCP 7881 und UDP 7882 in der Firewall.</p>
+                <strong>Audio and video</strong>
+                <p>LiveKit also requires TCP 7881 and UDP 7882 in the firewall.</p>
             </div>
             <div class="nebulynk-info-item">
                 <strong>Backups</strong>
-                <p>Die Daten unter /opt/nebulynk-plesk bitte separat sichern.</p>
+                <p>Back up the data under /opt/nebulynk-plesk separately.</p>
             </div>
         </div>
     </section>
 
     <?php if ($this->runtimeStatus !== ''): ?>
-        <section class="form-box nebulynk-card nebulynk-output-card">
-            <h3>Containerstatus</h3>
+        <details class="form-box nebulynk-card nebulynk-output-card">
+            <summary class="nebulynk-output-summary">
+                <span class="nebulynk-output-title">Container status</span>
+            </summary>
             <pre class="nebulynk-output"><?= $escape($this->runtimeStatus) ?></pre>
-        </section>
+        </details>
     <?php endif; ?>
 
     <?php if ($this->runtimeLogs !== ''): ?>
-        <section class="form-box nebulynk-card nebulynk-output-card">
-            <h3>Letzte Logs</h3>
+        <details class="form-box nebulynk-card nebulynk-output-card">
+            <summary class="nebulynk-output-summary">
+                <span class="nebulynk-output-title">Latest logs</span>
+            </summary>
             <pre class="nebulynk-output"><?= $escape($this->runtimeLogs) ?></pre>
-        </section>
+        </details>
     <?php endif; ?>
 </div>

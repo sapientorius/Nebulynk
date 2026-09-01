@@ -6,20 +6,20 @@ $isOperational = in_array($statusKey, ['ready', 'running', 'stopped', 'error'], 
 <section class="form-box nebulynk-card nebulynk-action-card">
     <div class="nebulynk-section-head">
         <div>
-            <p class="nebulynk-section-kicker"><?= $isOperational ? 'Betrieb' : 'Schritt 2' ?></p>
-            <h3><?= $isOperational ? 'Aktionen' : 'Einrichtung starten' ?></h3>
+            <p class="nebulynk-section-kicker"><?= $isOperational ? 'Operations' : 'Step 2' ?></p>
+            <h3><?= $isOperational ? 'Actions' : 'Start setup' ?></h3>
         </div>
         <?php if ($isOperational): ?>
-            <span class="nebulynk-tag">Verwaltung</span>
+            <span class="nebulynk-tag">Management</span>
         <?php endif; ?>
     </div>
     <p class="nebulynk-card-intro">
         <?php if ($isOperational): ?>
-            Steuern Sie den Nebulynk-Dienst, prüfen Sie den Containerstatus oder
-            öffnen Sie die letzten Logs.
+            Control the Nebulynk service, check the container status, or view
+            the latest logs.
         <?php else: ?>
-            Wählen Sie die vorbereitete Domain. Starten Sie zuerst die
-            Vorabprüfung und anschließend die Installation.
+            Select the prepared domain. Run the preflight check first,
+            followed by the installation.
         <?php endif; ?>
     </p>
 
@@ -27,11 +27,10 @@ $isOperational = in_array($statusKey, ['ready', 'running', 'stopped', 'error'], 
         <div class="nebulynk-callout nebulynk-callout-error">
             <div class="nebulynk-callout-icon" aria-hidden="true">!</div>
             <div>
-                <strong>Keine passende Domain gefunden</strong>
+                <strong>No matching domain found</strong>
                 <p>
-                    Legen Sie zuerst eine aktive Plesk-Domain mit
-                    Hosting an und laden Sie diese Seite anschließend
-                    neu.
+                    First create an active Plesk domain with hosting, then
+                    reload this page.
                 </p>
             </div>
         </div>
@@ -41,28 +40,27 @@ $isOperational = in_array($statusKey, ['ready', 'running', 'stopped', 'error'], 
 
     <?php if ($isOperational): ?>
         <p class="nebulynk-form-note">
-            <strong>Hinweis:</strong>
-            Starten Sie eine neue Aufgabe erst, wenn die aktuelle Aufgabe in den
-            Plesk-Aufgaben abgeschlossen ist.
+            <strong>Note:</strong>
+            Start a new task only after the current task has completed in
+            Plesk Tasks.
         </p>
     <?php else: ?>
         <p class="nebulynk-form-note">
-            <strong>Empfohlene Reihenfolge:</strong>
-            Vorabprüfung &rarr; Installieren und bauen &rarr; Domain öffnen.
-            Bei einer bestehenden Installation verwenden Sie
-            „Aktualisieren und neu bauen“.
+            <strong>Recommended order:</strong>
+            Preflight check &rarr; Install and build &rarr; Open domain.
+            For an existing installation, use “Update and rebuild.”
         </p>
     <?php endif; ?>
 
     <div class="nebulynk-callout nebulynk-callout-warning">
         <div class="nebulynk-callout-icon" aria-hidden="true">i</div>
         <div>
-            <strong>Aufgaben können mehrere Minuten dauern</strong>
+            <strong>Tasks may take several minutes</strong>
             <p>
-                Nebulynk lädt Container-Images, installiert Abhängigkeiten
-                und baut Backend sowie Frontend. Die Aufgabe läuft im
-                Hintergrund weiter; starten Sie sie nicht mehrfach.
-                Den Fortschritt sehen Sie in den Plesk-Aufgaben.
+                Nebulynk downloads container images, installs dependencies,
+                and builds the backend and frontend. The task continues in
+                the background; do not start it more than once. View progress
+                in Plesk Tasks.
             </p>
         </div>
     </div>

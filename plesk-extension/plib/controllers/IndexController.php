@@ -12,47 +12,56 @@ class IndexController extends pm_Controller_Action
         $this->view->runtimeStatus = '';
         $this->view->runtimeLogs = '';
 
-        $form = new pm_Form_Simple();
+        $form = new pm_Form_Simple([
+            'name' => 'nebulynkActionForm',
+        ]);
+        $form->setAttrib('id', 'nebulynkActionForm');
         $form->addElement('select', 'domain_guid', [
-            'label' => 'Plesk-Domain',
-            'multiOptions' => ['' => 'Bitte auswählen'] + $this->view->domains,
+            'label' => 'Plesk domain',
+            'multiOptions' => ['' => 'Please select'] + $this->view->domains,
             'value' => $this->view->state['domain_guid'],
             'required' => true,
             'validators' => [['NotEmpty', true]],
         ]);
         $form->addElement('select', 'operation', [
-            'label' => 'Aktion',
+            'label' => 'Action',
             'multiOptions' => [
-                'preflight' => '1. Vorabprüfung starten (empfohlen)',
-                'install' => '2. Installieren und bauen',
-                'update' => 'Aktualisieren und neu bauen',
-                'start' => 'Starten',
-                'stop' => 'Stoppen',
-                'restart' => 'Neu starten',
-                'status' => 'Containerstatus anzeigen',
-                'logs' => 'Letzte Logs anzeigen',
-                'proxy-on' => 'Plesk-Proxy aktivieren',
-                'proxy-off' => 'Plesk-Proxy deaktivieren',
+                'preflight' => '1. Run preflight check (recommended)',
+                'install' => '2. Install and build',
+                'update' => 'Update and rebuild',
+                'start' => 'Start',
+                'stop' => 'Stop',
+                'restart' => 'Restart',
+                'status' => 'Show container status',
+                'logs' => 'Show latest logs',
+                'proxy-on' => 'Enable Plesk proxy',
+                'proxy-off' => 'Disable Plesk proxy',
             ],
             'value' => 'preflight',
             'required' => true,
         ]);
         $form->addControlButtons([
+            'sendTitle' => 'Run action',
+            'cancelTitle' => 'Cancel',
             'cancelLink' => pm_Context::getModulesListUrl(),
         ]);
 
-        $cleanupForm = new pm_Form_Simple();
+        $cleanupForm = new pm_Form_Simple([
+            'name' => 'nebulynkCleanupForm',
+        ]);
+        $cleanupForm->setAttrib('id', 'nebulynkCleanupForm');
         $cleanupForm->addElement('hidden', 'cleanup_action', [
             'value' => '1',
         ]);
         $cleanupForm->addElement('text', 'cleanup_confirmation', [
-            'label' => 'Bestätigung',
-            'description' => 'Geben Sie exakt DELETE NEBULYNK DATA ein.',
+            'label' => 'Confirmation',
+            'description' => 'Enter DELETE NEBULYNK DATA exactly.',
             'required' => true,
             'validators' => [['NotEmpty', true]],
         ]);
         $cleanupForm->addControlButtons([
-            'sendButton' => 'Alle Daten löschen',
+            'sendTitle' => 'Delete all data',
+            'cancelTitle' => 'Cancel',
             'cancelLink' => pm_Context::getModulesListUrl(),
         ]);
 
@@ -82,7 +91,7 @@ class IndexController extends pm_Controller_Action
     private function handleOperation(string $operation, string $domainGuid): void
     {
         if (Modules_NebulynkPlesk_Deployment::getState()['deployment_status'] === 'cleaning') {
-            throw new pm_Exception('Die vollständige Löschung läuft bereits.');
+            throw new pm_Exception('Complete deletion is already in progress.');
         }
 
         $taskOperations = ['preflight', 'install', 'update', 'start', 'stop', 'restart'];
@@ -98,13 +107,13 @@ class IndexController extends pm_Controller_Action
         if ($operation === 'proxy-on') {
             Modules_NebulynkPlesk_Deployment::configureDomain($domainGuid);
             Modules_NebulynkPlesk_Deployment::setProxyEnabled(true);
-            $this->_status->addMessage('info', 'Der Plesk-Proxy wurde aktiviert.');
+            $this->_status->addMessage('info', 'The Plesk proxy has been enabled.');
             return;
         }
 
         if ($operation === 'proxy-off') {
             Modules_NebulynkPlesk_Deployment::setProxyEnabled(false);
-            $this->_status->addMessage('info', 'Der Plesk-Proxy wurde deaktiviert.');
+            $this->_status->addMessage('info', 'The Plesk proxy has been disabled.');
             return;
         }
 
@@ -123,25 +132,25 @@ class IndexController extends pm_Controller_Action
         }
 
         if (!in_array($operation, $taskOperations, true)) {
-            throw new pm_Exception('Unbekannte Nebulynk-Aktion.');
+            throw new pm_Exception('Unknown Nebulynk action.');
         }
 
         Modules_NebulynkPlesk_Deployment::startTask($operation, $operation === 'install');
         $message = in_array($operation, ['install', 'update'], true)
-            ? 'Die Nebulynk-Installation wurde gestartet. Der erste Build kann mehrere Minuten dauern. Der Fortschritt wird in den Plesk-Aufgaben angezeigt.'
-            : 'Die Nebulynk-Aufgabe wurde gestartet. Der Fortschritt wird in den Plesk-Aufgaben angezeigt.';
+            ? 'Nebulynk installation started. The first build may take several minutes. Progress is shown in Plesk Tasks.'
+            : 'Nebulynk task started. Progress is shown in Plesk Tasks.';
         $this->_status->addMessage('info', $message);
     }
 
     private function handleCleanup(string $confirmation): void
     {
         if ($confirmation !== Modules_NebulynkPlesk_Deployment::CLEANUP_CONFIRMATION) {
-            throw new pm_Exception('Die Cleanup-Bestätigung ist ungültig. Geben Sie exakt DELETE NEBULYNK DATA ein.');
+            throw new pm_Exception('The cleanup confirmation is invalid. Enter DELETE NEBULYNK DATA exactly.');
         }
 
         $state = Modules_NebulynkPlesk_Deployment::getState();
         if (!$this->canCleanup($state)) {
-            throw new pm_Exception('Die Cleanup-Aktion ist in diesem Zustand nicht verfügbar.');
+            throw new pm_Exception('Cleanup is not available in the current state.');
         }
 
         Modules_NebulynkPlesk_Deployment::prepareCleanup();
@@ -155,7 +164,7 @@ class IndexController extends pm_Controller_Action
 
         $this->_status->addMessage(
             'info',
-            'Die vollständige Löschung wurde gestartet. Der Fortschritt wird in den Plesk-Aufgaben angezeigt.'
+            'Complete deletion started. Progress is shown in Plesk Tasks.'
         );
     }
 

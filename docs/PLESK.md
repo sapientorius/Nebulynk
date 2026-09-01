@@ -117,7 +117,7 @@ and both Garage directories before production updates.
 ## Cleanup and removal
 
 To remove the deployed Nebulynk instance and its data, create and verify an
-external backup first. In the extension, open the **Gefahrenzone** section and
+external backup first. In the extension, open the **Danger zone** section and
 enter `DELETE NEBULYNK DATA` in the confirmation field. The cleanup task disables
 the Plesk proxy, stops the `nebulynk-plesk` Compose project, removes local
 Nebulynk build images where possible, verifies that no project containers remain,
@@ -130,7 +130,7 @@ directory. It never runs a global Docker prune. Shared or pinned runtime images,
 the Plesk Docker Extension, the domain, DNS, TLS certificate and firewall rules
 are not removed.
 
-The normal **Stoppen** action and removal of the Plesk extension remain
+The normal **Stop** action and removal of the Plesk extension remain
 data-preserving. Run the cleanup before removing the extension if the data should
 also be deleted. After the extension has been removed, only manual cleanup of
 `/opt/nebulynk-plesk` and any remaining Docker resources is possible.

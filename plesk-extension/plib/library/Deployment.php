@@ -56,19 +56,19 @@ class Modules_NebulynkPlesk_Deployment
     public static function getDomainByGuid(string $guid): pm_Domain
     {
         if ($guid === '' || strlen($guid) > 128) {
-            throw new pm_Exception('Ungültige Plesk-Domain ausgewählt.');
+            throw new pm_Exception('Invalid Plesk domain selected.');
         }
 
         foreach (pm_Domain::getAllDomains(false) as $domain) {
             if ((string)$domain->getGuid() === $guid) {
                 if (!$domain->isActive() || !self::isValidDomainName($domain->getName())) {
-                    throw new pm_Exception('Die ausgewählte Domain ist nicht aktiv oder kein gültiger Hostname.');
+                    throw new pm_Exception('The selected domain is inactive or has an invalid hostname.');
                 }
                 return $domain;
             }
         }
 
-        throw new pm_Exception('Die ausgewählte Plesk-Domain wurde nicht gefunden.');
+        throw new pm_Exception('The selected Plesk domain was not found.');
     }
 
     public static function configureDomain(string $guid, ?bool $enableProxy = null): pm_Domain
@@ -91,7 +91,7 @@ class Modules_NebulynkPlesk_Deployment
         if (!self::isValidEdgePort($port)) {
             $port = trim((string)self::callHelper('allocate-port', [], pm_ApiCli::RESULT_STDOUT));
             if (!self::isValidEdgePort($port)) {
-                throw new pm_Exception('Es konnte kein freier lokaler Edge-Port ermittelt werden.');
+                throw new pm_Exception('No free local edge port could be determined.');
             }
         }
 
@@ -113,7 +113,7 @@ class Modules_NebulynkPlesk_Deployment
     {
         $state = self::getState();
         if ($state['domain_guid'] === '') {
-            throw new pm_Exception('Zuerst muss eine Domain konfiguriert werden.');
+            throw new pm_Exception('A domain must be configured first.');
         }
 
         pm_Settings::set('proxy_enabled', $enabled ? '1' : '0');
@@ -185,7 +185,7 @@ NGINX;
     public static function startTask(string $action, bool $activateProxy = false)
     {
         if (!in_array($action, self::ALLOWED_TASK_ACTIONS, true)) {
-            throw new pm_Exception('Unbekannte Nebulynk-Aktion.');
+            throw new pm_Exception('Unknown Nebulynk action.');
         }
 
         $state = self::getState();
@@ -208,7 +208,7 @@ NGINX;
             'remove-proxy',
         ]);
         if (!in_array($action, $allowedActions, true)) {
-            throw new pm_Exception('Unbekannte Helper-Aktion.');
+            throw new pm_Exception('Unknown helper action.');
         }
 
         return pm_ApiCli::callSbin(
@@ -285,16 +285,16 @@ NGINX;
     private static function assertDeployableDomain(pm_Domain $domain): void
     {
         if (!$domain->hasHosting()) {
-            throw new pm_Exception('Die ausgewählte Domain benötigt physisches Webhosting.');
+            throw new pm_Exception('The selected domain requires physical web hosting.');
         }
         if (!$domain->hasSsl()) {
-            throw new pm_Exception('Für die ausgewählte Domain muss SSL/TLS in Plesk aktiviert sein.');
+            throw new pm_Exception('SSL/TLS must be enabled in Plesk for the selected domain.');
         }
         if (method_exists($domain, 'getHostingCertificate') && $domain->getHostingCertificate() === null) {
-            throw new pm_Exception('Der ausgewählten Domain ist noch kein Zertifikat zugewiesen.');
+            throw new pm_Exception('No certificate has been assigned to the selected domain yet.');
         }
         if (method_exists($domain, 'isResolved') && !$domain->isResolved()) {
-            throw new pm_Exception('Die ausgewählte Domain ist laut Plesk noch nicht auf diesen Server aufgelöst.');
+            throw new pm_Exception('According to Plesk, the selected domain has not resolved to this server yet.');
         }
     }
 }

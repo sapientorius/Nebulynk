@@ -6,39 +6,41 @@ $escape = static function ($value) {
 $confirmationPhrase = $escape($this->cleanupConfirmationPhrase);
 ?>
 
-<section class="form-box nebulynk-card nebulynk-cleanup-card">
-    <div class="nebulynk-section-head">
+<details class="form-box nebulynk-card nebulynk-cleanup-card">
+    <summary class="nebulynk-section-head nebulynk-cleanup-summary">
         <div>
-            <p class="nebulynk-section-kicker">Gefahrenzone</p>
-            <h3>Nebulynk vollständig löschen</h3>
+            <p class="nebulynk-section-kicker">Danger zone</p>
+            <h3>Remove Nebulynk completely</h3>
         </div>
-        <span class="nebulynk-tag">Unwiderruflich</span>
-    </div>
+        <span class="nebulynk-tag">Irreversible</span>
+    </summary>
 
-    <div class="nebulynk-callout nebulynk-callout-error">
-        <div class="nebulynk-callout-icon" aria-hidden="true">!</div>
-        <div>
-            <strong>Alle Nebulynk-Daten werden gelöscht</strong>
-            <p>
-                Diese Aktion stoppt den Stack und löscht das Deployment unter
-                <strong>/opt/nebulynk-plesk</strong> einschließlich Source,
-                <strong>.env</strong>, PostgreSQL-, Redis- und Garage-Daten.
-                Die Löschung kann nicht rückgängig gemacht werden.
-            </p>
+    <div class="nebulynk-cleanup-content">
+
+        <div class="nebulynk-callout nebulynk-callout-error">
+            <div class="nebulynk-callout-icon" aria-hidden="true">!</div>
+            <div>
+                <strong>All Nebulynk data will be deleted</strong>
+                <p>
+                    This action stops the stack and deletes the deployment at
+                    <strong>/opt/nebulynk-plesk</strong>, including the source,
+                    <strong>.env</strong>, PostgreSQL, Redis, and Garage data.
+                    This deletion cannot be undone.
+                </p>
+            </div>
         </div>
+
+        <p class="nebulynk-card-intro">
+            Create and verify a backup first. The Plesk domain, DNS, TLS
+            certificate, and firewall rules are not changed. Enter
+            <code><?= $confirmationPhrase ?></code> exactly to confirm.
+        </p>
+
+        <?= $this->cleanupForm ?>
+
+        <p class="nebulynk-form-note">
+            If proxy or Docker cleanup fails, no files are deleted. Shared Docker
+            images and the global Docker cache are retained.
+        </p>
     </div>
-
-    <p class="nebulynk-card-intro">
-        Erstellen und prüfen Sie zuerst ein Backup. Plesk-Domain, DNS,
-        TLS-Zertifikat und Firewall-Regeln werden nicht verändert. Geben Sie
-        zur Bestätigung exakt <code><?= $confirmationPhrase ?></code> ein.
-    </p>
-
-    <?= $this->cleanupForm ?>
-
-    <p class="nebulynk-form-note">
-        Bei einem Fehler beim Proxy- oder Docker-Cleanup werden keine Dateien
-        gelöscht. Gemeinsam genutzte Docker-Images und der globale Docker-Cache
-        bleiben erhalten.
-    </p>
-</section>
+</details>
