@@ -87,6 +87,7 @@ will be published on [GitHub Releases](https://github.com/sapientorius/Nebulynk/
 - [Architecture Overview](docs/ARCHITECTURE.md)
 - [Deploying with Coolify](docs/COOLIFY.md)
 - [Deploying with Dokploy](docs/DOKPLOY.md)
+- [Deploying with Plesk](docs/PLESK.md)
 - [Self-Hosting with Docker](docs/SELF_HOSTING.md)
 - [Secure Self-Hosting](docs/security-hardening.md)
 - [Platform Update Architecture](docs/PLATFORM_UPDATES.md)
