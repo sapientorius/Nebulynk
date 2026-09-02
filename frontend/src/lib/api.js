@@ -155,6 +155,16 @@ export async function getPlatformUpdates() {
   return data
 }
 
+export async function getSystemStorageUsage() {
+  const { data } = await api.get('/system-info/storage-usage')
+  return data
+}
+
+export async function refreshSystemStorageUsage() {
+  const { data } = await api.post('/system-info/storage-usage/refresh', {})
+  return data
+}
+
 export async function checkPlatformUpdates() {
   const { data } = await api.post('/platform-updates/check', {})
   return data

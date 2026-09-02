@@ -35,12 +35,15 @@ export function isActiveMeetingRecordingStatus(status) {
   return ACTIVE_MEETING_RECORDING_STATUSES.has(status)
 }
 
-export function getMeetingRecordingPrefix(meetingId) {
+export function getMeetingRecordingBasePrefix() {
   const configuredPrefix = typeof process.env.MEETING_RECORDINGS_PREFIX === 'string'
     ? process.env.MEETING_RECORDINGS_PREFIX.trim().replace(/^\/+|\/+$/g, '')
     : ''
-  const basePrefix = configuredPrefix || 'meeting-recordings'
-  return `${basePrefix}/${meetingId}`
+  return configuredPrefix || 'meeting-recordings'
+}
+
+export function getMeetingRecordingPrefix(meetingId) {
+  return `${getMeetingRecordingBasePrefix()}/${meetingId}`
 }
 
 export function buildMeetingRecordingKey({ meetingId, userId, recordingId }) {

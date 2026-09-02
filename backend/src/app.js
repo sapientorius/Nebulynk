@@ -33,6 +33,7 @@ import { configureUserPasskeyRoutes } from './routes/user-passkeys.js'
 import { configurePrimaryAdminTransferRoutes } from './routes/primary-admin-transfer.js'
 import { configureOwnerSponsorshipPromptRoutes } from './routes/owner-sponsorship-prompt.js'
 import { configurePlatformUpdateRoutes } from './routes/platform-updates.js'
+import { configureSystemInfoRoutes } from './routes/system-info.js'
 import { endExpiredIdleMeetings } from './services/meetings/idle-timeout.js'
 import { endOverdueScheduledMeetings } from './services/meetings/overdue-scheduled.js'
 import { processPendingMeetingTranscripts } from './services/meetings/transcript-processor.js'
@@ -40,6 +41,7 @@ import { processPendingMeetingSummaries } from './services/meetings/summary-proc
 import { processDueMessageReminders } from './services/message-reminders/processor.js'
 import { assertUserAccountActive } from './lib/account-state.js'
 import { PlatformUpdateManager } from './lib/platform-updates.js'
+import { StorageUsageManager } from './lib/storage-usage.js'
 import {
   getApiSecurityHeaders,
   resolveAuthenticationSecret,
@@ -132,6 +134,7 @@ configureUserPasskeyRoutes(app)
 configurePrimaryAdminTransferRoutes(app)
 configureOwnerSponsorshipPromptRoutes(app)
 configurePlatformUpdateRoutes(app)
+configureSystemInfoRoutes(app)
 
 // Mount message forward route until Feathers custom REST methods are routed consistently
 configureMessageForwardRoute(app)
@@ -160,6 +163,7 @@ const db = knex({
 
 app.set('postgresqlClient', db)
 app.set('platformUpdateManager', new PlatformUpdateManager(app))
+app.set('storageUsageManager', new StorageUsageManager(app))
 
 // Set up authentication
 app.configure(authentication)

@@ -258,6 +258,38 @@ native domain management. Follow [Deploying Nebulynk with Dokploy](DOKPLOY.md)
 instead of applying the manual Docker environment checklist directly to a
 Dokploy service.
 
+## System Info: storage usage
+
+Platform administrators can open **Admin → System Info** to view Nebulynk's
+logical storage usage. The first and currently only section is **Storage
+usage**. It reports the following values from a point-in-time scan:
+
+| Value | Definition |
+| --- | --- |
+| Total | Database size plus all counted object-storage bytes. |
+| Database | PostgreSQL `pg_database_size(current_database())`, including the database's table and index data. |
+| Files | All counted non-recording objects, including attachments, voice messages, avatars, and video backgrounds. |
+| Stored meeting recordings | Objects identified through the configured recording prefix and known `meeting_recordings` entries. They are counted even when the corresponding recording is no longer downloadable. |
+
+The object-storage scan pages through the configured bucket. When recordings
+use a separate bucket, its configured recording prefix is scanned as well. The
+reported figures are byte totals for objects Nebulynk can access, not a
+filesystem usage report.
+
+A successful scan is held only in the backend process memory. It is marked
+fresh for five minutes and remains visible afterward without an automatic
+rescan; after ten minutes the UI displays a warning and highlights
+**Refresh**. Refresh always starts an immediate new scan, while concurrent
+refreshes are combined and rate-limited. If a refresh fails, the last
+successful values remain visible as stale. Restarting the backend clears the
+snapshot.
+
+These values deliberately do **not** represent real Docker-volume or host disk
+consumption, available capacity, quotas, or growth history. They exclude, for
+example, PostgreSQL WAL and temporary files, Garage/S3 metadata, replication or
+versioning overhead, container layers, and logs. Use your database, object
+storage, Docker, and host monitoring for physical capacity planning.
+
 ## Acceptance checks, troubleshooting, and updates
 
 After the first deployment and after infrastructure changes, check that:

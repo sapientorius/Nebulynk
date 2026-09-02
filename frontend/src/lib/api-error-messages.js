@@ -315,6 +315,12 @@ export const apiErrorMessages = {
         versions_invalid: 'The selected releases are invalid',
         versions_required: 'Select at least one release'
       },
+      system_info: {
+        admin_required: 'Only platform administrators can access system information',
+        rate_limited: 'Too many storage-usage refresh requests. Please try again later',
+        unavailable: 'The system information service is unavailable',
+        unexpected_error: 'The system information request failed unexpectedly'
+      },
       presence: {
         active_channel_invalid: 'Active channel is invalid',
         connection_required: 'Connection is required',
@@ -761,6 +767,12 @@ export const apiErrorMessages = {
         unexpected_error: 'Die Update-Anfrage ist unerwartet fehlgeschlagen',
         versions_invalid: 'Die ausgewählten Versionen sind ungültig',
         versions_required: 'Wähle mindestens eine Version aus'
+      },
+      system_info: {
+        admin_required: 'Nur Plattform-Administratoren können Systeminformationen abrufen',
+        rate_limited: 'Zu viele Aktualisierungen der Speichernutzung. Bitte versuche es später erneut',
+        unavailable: 'Der System-Info-Dienst ist nicht verfügbar',
+        unexpected_error: 'Die System-Info-Anfrage ist unerwartet fehlgeschlagen'
       },
       presence: {
         active_channel_invalid: 'Aktiver Channel ist ungueltig',

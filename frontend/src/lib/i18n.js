@@ -505,6 +505,24 @@ const baseMessages = {
       bannerSecurity: '{count} security-relevant Nebulynk update(s) are available (highest severity: {severity}).',
       bannerUpdate: 'A new Nebulynk version is available.'
     },
+    systemInfo: {
+      menu: 'System Info',
+      title: 'System Info',
+      storageUsage: 'Storage usage',
+      refresh: 'Refresh',
+      total: 'Total',
+      database: 'Database',
+      files: 'Files',
+      meetingRecordings: 'Stored meeting recordings',
+      objects: '{count} objects',
+      lastUpdated: 'Measured: {time}',
+      never: 'Not yet measured',
+      stale: 'The displayed storage usage is more than ten minutes old. Refresh it to get current values.',
+      partial: 'Some storage values are currently unavailable.',
+      logicalUsage: 'Values show logical Nebulynk data usage. Docker volumes, PostgreSQL WAL, Garage metadata, replication, logs, and host disk capacity are not included.',
+      refreshFailed: 'Storage usage could not be refreshed. The last successful values remain visible.',
+      loadFailed: 'Storage usage could not be loaded.'
+    },
     invite: {
       loading: 'Loading invitation...',
       invalidDescription: 'The invitation is invalid or no longer available.',
@@ -1367,6 +1385,24 @@ const baseMessages = {
       bannerDisabled: 'Update-Pruefungen sind deaktiviert. Neue Security-Fixes werden nicht erkannt.',
       bannerSecurity: '{count} sicherheitsrelevante Nebulynk-Update(s) sind verfuegbar (hoechste Severity: {severity}).',
       bannerUpdate: 'Eine neue Nebulynk-Version ist verfuegbar.'
+    },
+    systemInfo: {
+      menu: 'System Info',
+      title: 'System Info',
+      storageUsage: 'Speichernutzung',
+      refresh: 'Aktualisieren',
+      total: 'Gesamt',
+      database: 'Datenbank',
+      files: 'Dateien',
+      meetingRecordings: 'Gespeicherte Meeting-Aufnahmen',
+      objects: '{count} Objekte',
+      lastUpdated: 'Messzeitpunkt: {time}',
+      never: 'Noch nicht gemessen',
+      stale: 'Die angezeigte Speichernutzung ist aelter als zehn Minuten. Aktualisiere sie fuer aktuelle Werte.',
+      partial: 'Einige Speicherwerte sind derzeit nicht verfuegbar.',
+      logicalUsage: 'Die Werte zeigen die logische Nebulynk-Datennutzung. Docker-Volumes, PostgreSQL-WAL, Garage-Metadaten, Replikation, Logs und die Host-Festplattenkapazitaet sind nicht enthalten.',
+      refreshFailed: 'Die Speichernutzung konnte nicht aktualisiert werden. Die letzten erfolgreichen Werte bleiben sichtbar.',
+      loadFailed: 'Die Speichernutzung konnte nicht geladen werden.'
     },
     invite: {
       loading: 'Einladung wird geladen...',
