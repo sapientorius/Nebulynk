@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "version": "0.5.0",
-  "revision": 1,
+  "revision": 6,
   "channel": "stable",
   "published_at": "2026-08-19T20:18:49.764Z",
   "title": {
@@ -11,6 +11,51 @@
     "en": "Adds PWA sharing for arbitrary files, admin-managed Klipy integration settings, broader AI provider and transcription support, and safer deployment defaults."
   },
   "changes": [
+    {
+      "category": "improvement",
+      "title": {
+        "en": "Branded Plesk extension listing"
+      },
+      "description": {
+        "en": "The Plesk extension now uses the Nebulynk PWA icon and is listed under Web Apps & Site Editing."
+      }
+    },
+    {
+      "category": "fix",
+      "title": {
+        "en": "Serve Plesk public assets correctly"
+      },
+      "description": {
+        "en": "The Plesk frontend image normalizes public asset permissions before running Nginx as the unprivileged user, preventing 403 responses for the manifest, icons and service worker."
+      }
+    },
+    {
+      "category": "improvement",
+      "title": {
+        "en": "Clearer Plesk setup experience"
+      },
+      "description": {
+        "en": "The Plesk extension now presents the Docker prerequisite, setup order, expected installation time and runtime status more clearly."
+      }
+    },
+    {
+      "category": "fix",
+      "title": {
+        "en": "Fix Plesk form controls and cleanup panel"
+      },
+      "description": {
+        "en": "Plesk setup and cleanup forms now show their action labels, and the destructive cleanup panel can be collapsed and expanded."
+      }
+    },
+    {
+      "category": "fix",
+      "title": {
+        "en": "Keep Plesk form controls isolated"
+      },
+      "description": {
+        "en": "The setup and cleanup forms now use separate form identities so their action buttons keep the correct labels."
+      }
+    },
     {
       "category": "feature",
       "title": {

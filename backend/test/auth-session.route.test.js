@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createServer } from 'node:http'
 import { feathers } from '@feathersjs/feathers'
+import { NotAuthenticated } from '@feathersjs/errors'
 import { koa, bodyParser } from '@feathersjs/koa'
 import { configureAuthSessionRoutes } from '../src/routes/auth-session.js'
 import { assertAccessTokenVersion } from '../src/lib/auth-token-version.js'
@@ -127,6 +128,9 @@ async function createHarness({ nodeEnv = 'development', dbOptions = {} } = {}) {
         if (token === 'reactivated-access-token') {
           return { sub: 'user-1', auth_version: 3 }
         }
+        if (token === 'invalid-access-token' || token === 'expired-access-token') {
+          throw new NotAuthenticated('Invalid token')
+        }
         throw new Error('Invalid token')
       },
       async createAccessToken(payload, options = {}) {
@@ -220,6 +224,31 @@ test('auth session bootstrap with cookie transport sets refresh and csrf cookies
     assert.equal(loggerCalls[0].meta.csrfCookie.httpOnly, false)
   } finally {
     logger.info = originalLoggerInfo
+    await harness.close()
+  }
+})
+
+test('rejects invalid or expired bootstrap tokens with a stable 401 response', async () => {
+  const harness = await createHarness()
+
+  try {
+    for (const accessToken of ['invalid-access-token', 'expired-access-token']) {
+      const response = await fetch(`${harness.baseUrl}/auth/session/bootstrap`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ transport: 'body', remember: false })
+      })
+      const payload = await response.json()
+
+      assert.equal(response.status, 401)
+      assert.equal(payload.error_code, 'api.authentication.invalid_token')
+      assert.equal(payload.message, 'Invalid token')
+      assert.equal(harness.db._state.auth_sessions.length, 0)
+    }
+  } finally {
     await harness.close()
   }
 })

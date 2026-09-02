@@ -1,0 +1,11 @@
+# LiveKit credentials are supplied through the Compose environment.
+insecure: true
+log_level: info
+health_port: 8080
+
+redis:
+  address: redis:6379
+
+s3:
+  bucket: files
+  endpoint: http://garage:3900

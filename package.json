@@ -1,6 +1,6 @@
 {
   "name": "nebulynk",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "private": true,
   "description": "Self-hosted communication platform for business teams",
   "workspaces": [
@@ -9,6 +9,7 @@
     "desktop-ptt-helper"
   ],
   "overrides": {
+    "browserslist": "4.28.7",
     "fast-uri": "4.1.2",
     "form-data": "4.0.6",
     "linkify-it": "6.1.0",
@@ -75,8 +76,8 @@
     "release:keygen:rtk": "rtk node scripts/generate-update-signing-key.mjs",
     "release:validate-keyring": "node scripts/validate-update-keyring.mjs",
     "release:validate-keyring:rtk": "rtk node scripts/validate-update-keyring.mjs",
-    "ci": "npm run dokploy:template:check && npm run lint && npm run i18n:check && npm run test:backend && npm run test:frontend && npm run build:frontend",
-    "ci:rtk": "rtk npm run dokploy:template:check:rtk && rtk npm run lint:rtk && rtk npm run i18n:check:rtk && rtk npm run test:backend:rtk && rtk npm run test:frontend:rtk && rtk npm run build:frontend:rtk",
+    "ci": "npm run dokploy:template:check && npm run lint && npm run i18n:check && npm run test:backend && npm run test:frontend && npm run build:frontend && npm run plesk:package && npm run plesk:package:check && npm run test:plesk && npm run test:plesk:garage",
+    "ci:rtk": "rtk npm run dokploy:template:check:rtk && rtk npm run lint:rtk && rtk npm run i18n:check:rtk && rtk npm run test:backend:rtk && rtk npm run test:frontend:rtk && rtk npm run build:frontend:rtk && rtk npm run plesk:package:rtk && rtk npm run plesk:package:check:rtk && rtk npm run test:plesk:rtk && rtk npm run test:plesk:garage:rtk",
     "docker:up": "docker compose up -d",
     "docker:up:rtk": "rtk docker compose up -d",
     "docker:down": "docker compose down",
@@ -84,7 +85,15 @@
     "dokploy:template": "node scripts/build-dokploy-template.mjs",
     "dokploy:template:rtk": "rtk node scripts/build-dokploy-template.mjs",
     "dokploy:template:check": "node scripts/build-dokploy-template.mjs --check",
-    "dokploy:template:check:rtk": "rtk node scripts/build-dokploy-template.mjs --check"
+    "dokploy:template:check:rtk": "rtk node scripts/build-dokploy-template.mjs --check",
+    "plesk:package": "node scripts/build-plesk-extension.mjs",
+    "plesk:package:rtk": "rtk node scripts/build-plesk-extension.mjs",
+    "plesk:package:check": "node scripts/build-plesk-extension.mjs --check",
+    "plesk:package:check:rtk": "rtk node scripts/build-plesk-extension.mjs --check",
+    "test:plesk": "node --test scripts/plesk-extension.test.mjs",
+    "test:plesk:rtk": "rtk node --test scripts/plesk-extension.test.mjs",
+    "test:plesk:garage": "node scripts/run-plesk-garage-integration.mjs",
+    "test:plesk:garage:rtk": "rtk node scripts/run-plesk-garage-integration.mjs"
   },
   "devDependencies": {
     "ajv": "^8.18.0",

@@ -36,6 +36,9 @@ jobs:
       - name: Frontend build
         run: npm run build:frontend
 
+      - name: Build and validate Plesk extension
+        run: npm run plesk:package && npm run plesk:package:check && npm run test:plesk && npm run test:plesk:garage
+
   security:
     runs-on: ubuntu-latest
     steps:

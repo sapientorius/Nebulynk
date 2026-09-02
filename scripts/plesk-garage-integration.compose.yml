@@ -1,0 +1,38 @@
+services:
+  garage:
+    image: dxflrs/garage:v2.3.0
+    environment:
+      GARAGE_RPC_SECRET: "0000000000000000000000000000000000000000000000000000000000000000"
+      GARAGE_DEFAULT_ACCESS_KEY: nebulynk
+      GARAGE_DEFAULT_SECRET_KEY: integration-storage-secret
+      GARAGE_DEFAULT_BUCKET: files
+    command: /garage server --single-node --default-bucket
+    volumes:
+      - ../garage.toml:/etc/garage.toml:ro
+      - garage_meta:/var/lib/garage/meta
+      - garage_data:/var/lib/garage/data
+
+  backend:
+    image: nginx:1.27-alpine
+
+  frontend:
+    image: nginx:1.27-alpine
+
+  livekit:
+    image: nginx:1.27-alpine
+
+  edge:
+    image: nginxinc/nginx-unprivileged:1.31-alpine3.23@sha256:6320020c7da8714feab524e02c08c5a1958675c4e68700e93a2fd8970b065786
+    depends_on:
+      - garage
+      - backend
+      - frontend
+      - livekit
+    ports:
+      - "127.0.0.1:${EDGE_TEST_PORT:?EDGE_TEST_PORT must be set}:8080"
+    volumes:
+      - ../deploy/plesk/edge.conf:/etc/nginx/conf.d/default.conf:ro
+
+volumes:
+  garage_meta:
+  garage_data:

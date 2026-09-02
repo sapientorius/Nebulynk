@@ -1,0 +1,11 @@
+# Changes
+
+## Next release
+
+- Initial Linux x64 Plesk deployment with one-domain routing.
+- Source-based Docker build from the extension payload.
+- Persistent PostgreSQL, Redis and Garage data directories.
+- Explicitly confirmed cleanup action for removing the deployment and its data.
+- Clearer setup guidance, prerequisite checks and installation-time messaging.
+- Official Nebulynk branding plus a prominent status-first operating view.
+- Branded PWA icon in Plesk and classification under Web Apps & Site Editing.

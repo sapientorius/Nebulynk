@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<module>
+    <id>nebulynk-plesk</id>
+    <name>Nebulynk</name>
+    <description>Deploy a self-hosted Nebulynk collaboration workspace on Plesk Linux x64 with Docker, one dedicated domain, built-in chat, meetings, files and optional BYOK AI.</description>
+    <category>web_app</category>
+    <version>__VERSION__</version>
+    <release>__RELEASE__</release>
+    <vendor>Nebulynk</vendor>
+    <url>https://github.com/sapientorius/Nebulynk</url>
+    <help_url>https://github.com/sapientorius/Nebulynk/blob/stable/docs/PLESK.md</help_url>
+    <support_url>https://github.com/sapientorius/Nebulynk/issues</support_url>
+    <plesk_min_version>18.0.53</plesk_min_version>
+    <os>unix</os>
+</module>
