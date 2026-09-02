@@ -54,7 +54,47 @@ Before opening the Nebulynk extension, install the Plesk Docker Extension from
 **Extensions > Extensions Catalog > Docker** and verify that the local Docker
 service is running. Then follow this order:
 
-From the repository root, create and verify the package:
+1. Open the [latest stable Nebulynk release](https://github.com/sapientorius/Nebulynk/releases/latest).
+2. Under **Assets**, download the matching
+   `nebulynk-plesk-<version>-<release>.zip` file and its
+   `nebulynk-plesk-<version>-<release>.zip.sha256` sidecar file into the same
+   directory.
+3. Verify the ZIP before uploading it. On Linux:
+
+   ```sh
+   sha256sum -c nebulynk-plesk-<version>-<release>.zip.sha256
+   ```
+
+   On macOS, use `shasum -a 256 -c` with the same checksum file. On Windows
+   PowerShell:
+
+   ```powershell
+   $expected = ((Get-Content .\nebulynk-plesk-<version>-<release>.zip.sha256) -split '\s+')[0].ToLowerInvariant()
+   $actual = (Get-FileHash .\nebulynk-plesk-<version>-<release>.zip -Algorithm SHA256).Hash.ToLowerInvariant()
+   if ($actual -ne $expected) { throw 'Plesk package checksum mismatch.' }
+   ```
+
+4. Upload the ZIP under Plesk > Extensions > My Extensions > Upload Extension.
+5. Open Nebulynk in the Plesk administration area.
+6. Select the prepared domain and run the preflight check. This verifies the
+   host architecture, Docker, Docker Compose, Nginx, OpenSSL and the extension
+   payload.
+7. Start the installation. The first run can take several minutes because the
+   extension downloads container images, installs npm dependencies and builds
+   the backend and frontend images. The task continues in the background; do
+   not start the same installation more than once.
+8. Wait until the Plesk task is complete and open the prepared domain. The
+   extension copies the bundled source, generates production secrets, starts
+   the Compose project, and activates the domain proxy.
+
+The build is intentionally source-based. The Plesk server must therefore be
+able to pull the pinned base images and install npm dependencies inside the
+Docker build.
+
+## Build an unreleased package from source
+
+For development or for testing changes that have not been released yet, create
+and verify a local package from the repository root:
 
 ```sh
 npm run plesk:package
@@ -62,24 +102,7 @@ npm run plesk:package:check
 ```
 
 The output is `dist/plesk/nebulynk-plesk-<version>-<release>.zip` and its
-`.sha256` sidecar file. Verify the checksum before uploading.
-
-1. Upload the ZIP under Plesk → Extensions → My Extensions → Upload Extension.
-2. Open Nebulynk in the Plesk administration area.
-3. Select the prepared domain and run the preflight check. This verifies the
-   host architecture, Docker, Docker Compose, Nginx, OpenSSL and the extension
-   payload.
-4. Start the installation. The first run can take several minutes because the
-   extension downloads container images, installs npm dependencies and builds
-   the backend and frontend images. The task continues in the background; do
-   not start the same installation more than once.
-5. Wait until the Plesk task is complete and open the prepared domain. The
-   extension copies the bundled source, generates production secrets, starts
-   the Compose project, and activates the domain proxy.
-
-The build is intentionally source-based. The Plesk server must therefore be
-able to pull the pinned base images and install npm dependencies inside the
-Docker build.
+`.sha256` sidecar file.
 
 ## Release gate for `/files/`
 

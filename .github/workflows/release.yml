@@ -60,6 +60,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Build and validate Plesk extension package
+        run: npm run plesk:package && npm run plesk:package:check
+
       - name: Require the active signing key to be embedded in the release
         env:
           UPDATE_FEED_SIGNING_KEY_ID: ${{ vars.UPDATE_FEED_SIGNING_KEY_ID }}
@@ -89,12 +92,37 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if gh release view "${{ github.ref_name }}" >/dev/null 2>&1; then
+          shopt -s nullglob
+          plesk_archives=(dist/plesk/nebulynk-plesk-*.zip)
+          if [ "${#plesk_archives[@]}" -ne 1 ]; then
+            echo "Expected exactly one Plesk extension archive, found ${#plesk_archives[@]}."
+            exit 1
+          fi
+
+          plesk_archive="${plesk_archives[0]}"
+          plesk_checksum="${plesk_archive}.sha256"
+          if [ ! -f "$plesk_checksum" ]; then
+            echo "Plesk extension checksum is missing: $plesk_checksum"
+            exit 1
+          fi
+
+          if release_state="$(gh release view "${{ github.ref_name }}" --json isDraft --jq '.isDraft' 2>/dev/null)"; then
+            if [ "$release_state" = "true" ]; then
+              echo "GitHub release ${{ github.ref_name }} is an unpublished draft; resolve it before rerunning this release."
+              exit 1
+            fi
+
             # Published immutable releases and their assets must never be changed.
             # A rerun may still safely rebuild and publish the signed Pages feed.
             echo "GitHub release ${{ github.ref_name }} already exists; leaving immutable release unchanged."
           else
-            gh release create "${{ github.ref_name }}" --verify-tag --title "Nebulynk ${{ github.ref_name }}" --notes-file dist-release-notes/release-notes.md dist-release-notes/CHANGELOG.md
+            gh release create "${{ github.ref_name }}" \
+              --verify-tag \
+              --title "Nebulynk ${{ github.ref_name }}" \
+              --notes-file dist-release-notes/release-notes.md \
+              dist-release-notes/CHANGELOG.md \
+              "$plesk_archive" \
+              "$plesk_checksum"
           fi
 
       - name: Upload signed GitHub Pages artifact
