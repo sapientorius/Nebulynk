@@ -45,7 +45,11 @@ test('builds and validates an uploadable Plesk package', async () => {
     await readFile(`${built.archivePath}.sha256`, 'utf8'),
     `${built.checksum}  ${path.basename(built.archivePath)}\n`
   )
-  assert.equal(built.release, 6)
+  const releaseDocument = JSON.parse(await readFile(
+    repositoryPath('releases', `v${built.version}.json`),
+    'utf8'
+  ))
+  assert.equal(built.release, releaseDocument.revision)
 
   assert.deepEqual(
     await readFile(repositoryPath('dist', 'plesk', 'staging', 'package', 'htdocs', 'images', 'nebulynk.png')),
@@ -132,7 +136,8 @@ test('keeps internal services private and exposes only the edge and LiveKit medi
 })
 
 test('uses fixed safe helper paths and restricts destructive cleanup to the project', async () => {
-  const helper = await readFile(repositoryPath('plesk-extension', 'sbin', 'nebulynk-plesk'), 'utf8')
+  const helper = (await readFile(repositoryPath('plesk-extension', 'sbin', 'nebulynk-plesk'), 'utf8'))
+    .replace(/\r\n/g, '\n')
   assert.match(helper, /DEPLOYMENT_ROOT="\/opt\/nebulynk-plesk"/)
   assert.match(helper, /PAYLOAD_ROOT="\$PSA_ROOT\/var\/modules\/\$MODULE_ID\/payload"/)
   assert.match(helper, /rm -rf -- "\$SOURCE_ROOT"/)

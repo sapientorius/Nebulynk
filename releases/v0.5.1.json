@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "version": "0.5.1",
+  "revision": 1,
+  "channel": "stable",
+  "published_at": "2026-09-02T11:33:58.729Z",
+  "title": {
+    "en": "Nebulynk 0.5.1"
+  },
+  "summary": {
+    "en": "Introduces a versioned Plesk extension package that is attached to every stable GitHub release."
+  },
+  "changes": [
+    {
+      "category": "feature",
+      "title": {
+        "en": "Downloadable Plesk extension"
+      },
+      "description": {
+        "en": "Stable GitHub releases now include a versioned Nebulynk Plesk extension ZIP and its SHA-256 checksum for verification before upload."
+      }
+    },
+    {
+      "category": "improvement",
+      "title": {
+        "en": "Safer Plesk deployment lifecycle"
+      },
+      "description": {
+        "en": "The extension packages guided setup, status output and data-preserving update and removal behavior for Plesk-managed deployments."
+      }
+    }
+  ],
+  "security": [],
+  "upgrade": {
+    "backup_required": true,
+    "downtime_expected": true,
+    "breaking": false,
+    "manual_steps": {
+      "en": [
+        "For a Plesk installation, download the v0.5.1 extension ZIP and its SHA-256 sidecar from the GitHub release, verify the checksum, then upload the ZIP in Plesk under Extensions > My Extensions.",
+        "For an existing Plesk deployment, create and verify an external backup of PostgreSQL and both Garage data directories before uploading the update and running Update and rebuild. Persistent application data is preserved."
+      ]
+    },
+    "docs_url": "https://github.com/sapientorius/Nebulynk/blob/v0.5.1/docs/PLESK.md"
+  }
+}

@@ -1,6 +1,6 @@
 {
   "name": "nebulynk",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "private": true,
   "description": "Self-hosted communication platform for business teams",
   "workspaces": [
@@ -9,6 +9,7 @@
     "desktop-ptt-helper"
   ],
   "overrides": {
+    "browserslist": "4.28.7",
     "fast-uri": "4.1.2",
     "form-data": "4.0.6",
     "linkify-it": "6.1.0",
