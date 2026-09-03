@@ -13,6 +13,7 @@ function createDomainService({
     deleteUser: [],
     createdUsers: [],
     addUserRole: [],
+    ensureDefaultChannelMembership: [],
     markInviteAccepted: []
   }
 
@@ -22,6 +23,9 @@ function createDomainService({
     },
     async addUserRole(userId, roleId) {
       calls.addUserRole.push({ userId, roleId })
+    },
+    async ensureDefaultChannelMembership(userId) {
+      calls.ensureDefaultChannelMembership.push(userId)
     },
     async markInviteAccepted(inviteId, acceptedBy, updatedAt) {
       calls.markInviteAccepted.push({ inviteId, acceptedBy, updatedAt })
@@ -165,6 +169,7 @@ test('invite-accept behavior: successful accept assigns role and updates invite'
   assert.equal(result.user.display_name, 'Test User')
   assert.equal(calls.createdUsers[0].preferred_locale, 'en')
   assert.deepEqual(calls.addUserRole, [{ userId: 'user-1', roleId: 'role-platform:member' }])
+  assert.deepEqual(calls.ensureDefaultChannelMembership, ['user-1'])
   assert.equal(calls.markInviteAccepted.length, 1)
 })
 

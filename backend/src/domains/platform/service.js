@@ -5,14 +5,13 @@ import {
   normalizeSetupPayload,
   normalizeSettingsPatch,
   DEFAULT_AUTO_AWAY_MINUTES,
-  DEFAULT_CHANNEL_NAME,
-  DEFAULT_CHANNEL_DESCRIPTION,
   DEFAULT_PLATFORM_MEETING_HISTORY_ACCESS,
   buildSetupResult,
   platformInitializationFailedError
 } from './policy.js'
 import { UPLOAD_SETTING_KEYS } from '../../lib/upload-settings.js'
 import { THEME_SETTING_KEYS } from '../../lib/theme-settings.js'
+import { DEFAULT_CHANNEL_NAME } from '../../lib/default-channel-membership.js'
 
 const THEME_PATCH_SETTING_MAP = {
   themePrimaryColor: THEME_SETTING_KEYS.primaryColor,
@@ -75,7 +74,6 @@ export class PlatformDomainService {
         await trxRepository.createChannel({
           id: defaultChannelId,
           name: DEFAULT_CHANNEL_NAME,
-          description: DEFAULT_CHANNEL_DESCRIPTION,
           type: 'public',
           purpose: 'default',
           is_voice: false,

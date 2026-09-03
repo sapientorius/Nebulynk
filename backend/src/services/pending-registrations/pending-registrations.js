@@ -9,6 +9,7 @@ import {
   getPlatformDefaultLocale,
   isRegistrationStatusPending
 } from '../../lib/self-registration.js'
+import { ensureDefaultChannelMembership } from '../../lib/default-channel-membership.js'
 import { validate } from '../../schemas/validators.js'
 import { patchSchema } from './pending-registrations.schema.js'
 
@@ -76,6 +77,7 @@ export class PendingRegistrationsService {
           updated_at: nowIso
         })
       await assignDefaultMemberRole(trx, user.id)
+      await ensureDefaultChannelMembership(trx, user.id)
 
       return {
         ...user,

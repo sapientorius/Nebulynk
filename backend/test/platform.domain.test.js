@@ -160,7 +160,6 @@ test('platform domain behavior: setup uses defaults and creates baseline records
   assert.deepEqual(calls.createdChannels[0], {
     id: 'id-1',
     name: 'General',
-    description: 'Standard-Channel f\u00fcr alle',
     type: 'public',
     purpose: 'default',
     is_voice: false,

@@ -23,8 +23,6 @@ export const DEFAULT_PLATFORM_MEETING_LANGUAGE = DEFAULT_MEETING_LANGUAGE
 export const DEFAULT_AUTO_AWAY_MINUTES = 15
 export const DEFAULT_MEETING_VIDEO_ENABLED = true
 export const DEFAULT_PLATFORM_MEETING_HISTORY_ACCESS = DEFAULT_MEETING_HISTORY_ACCESS
-export const DEFAULT_CHANNEL_NAME = 'General'
-export const DEFAULT_CHANNEL_DESCRIPTION = 'Standard-Channel f\u00fcr alle'
 
 export function mapSettingsRows(settingsRows) {
   const result = {}

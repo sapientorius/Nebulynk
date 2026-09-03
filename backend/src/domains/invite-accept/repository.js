@@ -1,4 +1,5 @@
 import { createId } from '@paralleldrive/cuid2'
+import { ensureDefaultChannelMembership as ensureDefaultChannelMembershipForUser } from '../../lib/default-channel-membership.js'
 
 export class InviteAcceptRepository {
   constructor(db) {
@@ -55,6 +56,10 @@ export class InviteAcceptRepository {
       user_id: userId,
       role_id: roleId
     })
+  }
+
+  async ensureDefaultChannelMembership(userId) {
+    return ensureDefaultChannelMembershipForUser(this.db, userId)
   }
 
   async deleteUser(userId) {

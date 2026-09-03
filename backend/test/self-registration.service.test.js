@@ -10,6 +10,18 @@ import { createRateLimiter, MemoryRateLimitStore } from '../src/lib/rate-limit.j
 
 const DEFAULT_NOW = '2026-08-09T12:00:00.000Z'
 
+function defaultGeneralChannel(overrides = {}) {
+  return {
+    id: 'channel-general',
+    name: 'General',
+    type: 'public',
+    purpose: 'default',
+    is_archived: false,
+    created_at: DEFAULT_NOW,
+    ...overrides
+  }
+}
+
 function createRegistrationHarness({
   enabled = true,
   allowedDomains = [],
@@ -32,6 +44,7 @@ function createRegistrationHarness({
     roles: [{ id: 'role-member', name: 'platform:member' }],
     users: [],
     user_roles: [],
+    channels: [defaultGeneralChannel()],
     registration_email_tokens: [],
     ...seed
   })
@@ -194,12 +207,13 @@ test('self-registration keeps registrations manually confirmable when SMTP is un
   }])
 })
 
-test('self-registration confirms an email once, activates the account, and assigns the member role', async () => {
+test('self-registration confirms an email once, activates the account, and assigns the member role and General membership', async () => {
   const { app, calls, db } = createRegistrationHarness()
 
   const created = await app.service('self-registration').create(registrationPayload(), publicParams())
   assert.equal(created.confirmation_delivery, 'email')
   assert.equal(db.tables.registration_email_tokens.length, 1)
+  assert.equal(db.tables.channel_members.length, 0)
   assert.equal(db.tables.registration_email_tokens[0].token_hash, hashRegistrationToken('registration-confirmation-token'))
   assert.equal(db.tables.registration_email_tokens[0].token_hash.includes('registration-confirmation-token'), false)
   assert.deepEqual(calls.confirmationEmails, [{
@@ -225,6 +239,15 @@ test('self-registration confirms an email once, activates the account, and assig
   assert.deepEqual(db.tables.user_roles.map(({ user_id: userId, role_id: roleId }) => ({ userId, roleId })), [{
     userId: 'registration-user-1',
     roleId: 'role-member'
+  }])
+  assert.deepEqual(db.tables.channel_members.map(({ channel_id: channelId, user_id: userId, role }) => ({
+    channelId,
+    userId,
+    role
+  })), [{
+    channelId: 'channel-general',
+    userId: 'registration-user-1',
+    role: 'member'
   }])
 
   await assert.rejects(
@@ -259,6 +282,7 @@ test('self-registration transitions email-confirmed accounts to admin approval w
   assert.equal(registration.registration_status, 'pending_admin_approval')
   assert.equal(registration.registration_pending_reason, 'email_confirmed_admin_approval')
   assert.equal(db.tables.user_roles.length, 0)
+  assert.equal(db.tables.channel_members.length, 0)
   assert.equal(db.tables.notifications.length, 1)
   assert.equal(db.tables.notifications[0].user_id, 'registration-manager')
   assert.equal(db.tables.notifications[0].type, 'registration_pending')
@@ -310,6 +334,7 @@ test('pending registrations can be manually activated or deleted by an administr
   const db = createMemoryDb({
     platform_settings: [{ key: 'default_locale', value: 'en' }],
     roles: [{ id: 'role-member', name: 'platform:member' }],
+    channels: [defaultGeneralChannel()],
     users: [
       {
         id: 'pending-email',
@@ -376,6 +401,15 @@ test('pending registrations can be manually activated or deleted by an administr
   assert.equal(db.tables.user_roles.some((entry) => (
     entry.user_id === 'pending-email' && entry.role_id === 'role-member'
   )), true)
+  assert.deepEqual(db.tables.channel_members.map(({ channel_id: channelId, user_id: userId, role }) => ({
+    channelId,
+    userId,
+    role
+  })), [{
+    channelId: 'channel-general',
+    userId: 'pending-email',
+    role: 'member'
+  }])
   assert.equal(await getPendingRegistrationAlertCount(db), 1)
 
   const removed = await service.remove('pending-approval')

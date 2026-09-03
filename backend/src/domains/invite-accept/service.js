@@ -63,6 +63,8 @@ export class InviteAcceptDomainService {
           }
         }
 
+        await trxRepository.ensureDefaultChannelMembership(newUser.id)
+
         await trxRepository.markInviteAccepted(invite.id, newUser.id, nowIso)
       })
     } catch {

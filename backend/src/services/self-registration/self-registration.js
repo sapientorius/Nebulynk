@@ -23,6 +23,7 @@ import {
 } from '../../hooks/rate-limit.js'
 import { createSchema, patchSchema } from './self-registration.schema.js'
 import { assignDefaultMemberRole, normalizeEmail } from '../../lib/self-registration.js'
+import { ensureDefaultChannelMembership } from '../../lib/default-channel-membership.js'
 
 function isExpired(expiresAt, now) {
   const expiresAtMs = Date.parse(expiresAt)
@@ -198,6 +199,7 @@ export class SelfRegistrationService {
 
       if (registrationStatus === REGISTRATION_STATUS.active) {
         await assignDefaultMemberRole(trx, user.id)
+        await ensureDefaultChannelMembership(trx, user.id)
       }
 
       return {
