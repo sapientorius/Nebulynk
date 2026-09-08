@@ -119,6 +119,17 @@ test('socket contract: meeting invitations without target users are not broadcas
   assert.equal(invited({}), null)
 })
 
+for (const event of ['joined', 'ended', 'artifacts-queued', 'artifacts-updated']) {
+  test(`socket contract: meeting ${event} stays within its chat room and preserves its payload`, () => {
+    const harness = createAppHarness()
+    channels(harness.app)
+    const payload = Object.freeze({ meetingId: 'meeting-one', chatChannelId: 'private-meeting-chat', userId: 'member', status: 'ended' })
+    const publish = harness.getPublishHandler('meetings', event)
+    assert.equal(publish(payload).name, 'channel/private-meeting-chat')
+    assert.deepEqual(payload, { meetingId: 'meeting-one', chatChannelId: 'private-meeting-chat', userId: 'member', status: 'ended' })
+  })
+}
+
 test('socket contract: raw admin role and invite payloads are not broadcast', () => {
   const harness = createAppHarness()
   channels(harness.app)

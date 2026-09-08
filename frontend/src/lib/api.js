@@ -186,28 +186,19 @@ export async function beginPlatformUpdateSettingsPasskeyOptions() {
 }
 
 export async function getSmtpSettings() {
-  const { data } = await api.get('/smtp-settings')
-  return data
+  return activeApiClient.getSmtpSettings()
 }
 
 export async function updateSmtpSettings(payload) {
-  const { data } = await api.patch('/smtp-settings', payload)
-  return data
+  return activeApiClient.updateSmtpSettings(payload)
 }
 
 export async function testSmtpConnection() {
-  const { data } = await api.post('/smtp-settings', {
-    action: 'test_connection'
-  })
-  return data
+  return activeApiClient.testSmtpConnection()
 }
 
 export async function sendSmtpTestEmail(payload = {}) {
-  const { data } = await api.post('/smtp-settings', {
-    action: 'send_test_email',
-    ...payload
-  })
-  return data
+  return activeApiClient.sendSmtpTestEmail(payload)
 }
 
 export async function listAiProviderInstances() {

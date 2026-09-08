@@ -15,6 +15,8 @@ vi.mock('../../src/lib/api.js', async (original) => ({
   getPlatformStatus: vi.fn(async () => ({}))
 }))
 vi.mock('../../src/lib/image-upload-optimizer.js', () => ({ optimizeImageForUpload: vi.fn() }))
+// Resolve this async leaf at the module boundary so no import survives teardown.
+vi.mock('../../src/components/MessageList.vue', () => ({ default: { template: '<div />' } }))
 
 let context, channels, messages
 const uploaded = { id: 'upload', original_name: 'test.txt', mime_type: 'text/plain', url: 'https://storage.invalid/file' }

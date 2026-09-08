@@ -3,8 +3,9 @@ import { DOMWrapper, flushPromises } from '@vue/test-utils'
 import { nextTick } from 'vue'
 import { NSelect } from 'naive-ui'
 import MeetingView from '../../src/views/MeetingView.vue'
-import { componentContext } from '../helpers/mount-component.js'
-import { useMeetingsStore, useSessionStore, useVoiceStore, useUiStore } from '../../src/stores/index.js'
+import { componentContext, deferred } from '../helpers/mount-component.js'
+import MeetingInviteDialog from '../../src/components/meetings/MeetingInviteDialog.vue'
+import { useMeetingsStore, useSessionStore, useVoiceStore, useUiStore, useMessagesStore, useChannelsStore } from '../../src/stores/index.js'
 import api from '../../src/lib/api.js'
 
 vi.mock('../../src/lib/api.js', async original => ({
@@ -18,9 +19,9 @@ const panel = {
 }
 const stubs = {
   MessageList: { template: '<div data-testid="chat-messages" />' }, MessageInput: true,
-  MeetingVideoGrid: true, MemberList: true, VideoSettingsContent: true, TranscriptionRecordingBanner: true,
+  MeetingVideoGrid: { props: ['variant', 'participants'], emits: ['hide-videos'], template: '<div data-testid="video-grid"><button data-testid="hide-videos" @click="$emit(\'hide-videos\')">Hide</button></div>' }, MemberList: true, VideoSettingsContent: true, TranscriptionRecordingBanner: true,
   MeetingScreenSharePanel: panel,
-  MeetingSummaryPanel: { props: ['summaryArtifact'], template: '<div data-testid="summary-content">{{ summaryArtifact?.payload?.text }}</div>' },
+  MeetingSummaryPanel: { props: ['summaryArtifact', 'canShareInApp'], emits: ['share-summary'], template: '<div data-testid="summary-content">{{ summaryArtifact?.payload?.text }}<button v-if="canShareInApp" data-testid="share-summary" @click="$emit(\'share-summary\')">Share</button></div>' },
   MeetingTranscriptPanel: { template: '<div data-testid="transcript-content" />' }, AskMeetingPanel: true
 }
 beforeEach(async () => {
@@ -36,11 +37,127 @@ async function render() {
   await flushPromises()
   return wrapper
 }
+
+it('ignores a directory response after closing the invitation dialog and cleans pending timers', async () => {
+  const pending = deferred()
+  vi.spyOn(useSessionStore(), 'searchUsers').mockReturnValue(pending.promise)
+  const wrapper = await render()
+  await button(wrapper, 'Invite').trigger('click')
+  await flushPromises()
+  const dialog = wrapper.findComponent(MeetingInviteDialog)
+  dialog.findComponent(NSelect).vm.$emit('search', 'late')
+  await new Promise(resolve => setTimeout(resolve, 180))
+  await button(new DOMWrapper(document.body.querySelector('.n-modal')), 'Cancel').trigger('click')
+  await nextTick()
+  pending.resolve([{ id: 'late', display_name: 'Late result' }])
+  await flushPromises()
+  expect(dialog.vm.inviteSearchResults).toEqual([])
+  await button(wrapper, 'Invite').trigger('click')
+  await flushPromises()
+  dialog.findComponent(NSelect).vm.$emit('search', 'pending')
+  wrapper.unmount()
+  expect(dialog.vm.inviteSearchTimer).toBeNull()
+})
+
+it('keeps meeting and share context when navigating to the separate screenshare route', async () => {
+  await render()
+  useUiStore().setScreenShareMaximized(true)
+  await context.router.push('/meetings/one/screenshare')
+  await flushPromises()
+  expect(useMeetingsStore().activeMeeting?.id).toBe('one')
+  expect(useUiStore().maximizeScreenShare).toBe(true)
+})
+
+it('opens query evidence in the history surface and ignores an old evidence load after navigation', async () => {
+  meeting.status = 'ended'
+  meeting.artifacts = [{ artifact_type: 'summary', status: 'ready', payload: { text: 'Summary' } }, { artifact_type: 'transcript', status: 'ready', payload: {} }]
+  const pending = deferred()
+  const messages = useMessagesStore()
+  vi.spyOn(messages, 'loadAroundMessage').mockReturnValue(pending.promise)
+  const wrapper = await render()
+  await context.router.push('/meetings/one?message=message-one&transcript_start_ms=1000')
+  await flushPromises()
+  expect(messages.loadAroundMessage).toHaveBeenCalledWith('message-one', { channelId: 'chat' })
+  await context.router.push('/meetings/two')
+  await flushPromises()
+  pending.resolve()
+  await flushPromises()
+  expect(useMeetingsStore().activeMeeting.id).toBe('two')
+  expect(wrapper.find('[data-testid=summary-content]').exists()).toBe(true)
+  expect(wrapper.find('[data-testid=transcript-content]').exists()).toBe(false)
+})
 function button(wrapper, label) {
   const found = wrapper.findAll('button').find(b => b.text() === label)
   expect(found, `button ${label}`).toBeTruthy()
   return found
 }
+
+it('switches the live stage between video and share focus and hides video outside the connected call', async () => {
+  const wrapper = await render()
+  const voice = useVoiceStore()
+  expect(wrapper.find('[data-testid=video-grid]').exists()).toBe(false)
+  voice.channelId = 'chat'; voice.connected = true; voice.meetingVideoEnabled = true
+  await flushPromises()
+  expect(wrapper.get('[data-testid=meeting-live-stage]').classes()).toContain('video-focused')
+  voice.screenSharesByChannel = { chat: [{ participantId: 'bob', track: {}, isLocal: false }] }
+  await flushPromises()
+  expect(wrapper.get('[data-testid=meeting-live-stage]').classes()).toContain('share-focused')
+  await wrapper.get('[data-testid=hide-videos]').trigger('click')
+  expect(wrapper.find('[data-testid=video-grid]').exists()).toBe(false)
+  expect(wrapper.find('[data-testid=share-panel]').exists()).toBe(true)
+  voice.connected = false
+  await flushPromises()
+  expect(wrapper.find('[data-testid=video-grid]').exists()).toBe(false)
+})
+
+it('shows camera errors from the mobile video drawer and releases viewport listeners', async () => {
+  const remove = vi.fn()
+  const removeWindowListener = vi.spyOn(window, 'removeEventListener')
+  window.matchMedia.mockImplementation(query => ({ matches: true, media: query, addEventListener: vi.fn(), removeEventListener: remove }))
+  const voice = useVoiceStore()
+  voice.channelId = 'chat'; voice.connected = true; voice.meetingVideoEnabled = true
+  vi.spyOn(voice, 'toggleCamera').mockRejectedValue(new Error('camera denied'))
+  const wrapper = await render()
+  await wrapper.get('[data-testid=meeting-mobile-overflow-trigger]').trigger('click')
+  await flushPromises()
+  await new DOMWrapper(document.body).get('[data-testid=meeting-mobile-video-controls]').trigger('click')
+  await flushPromises()
+  await new DOMWrapper(document.body).get('[data-testid=meeting-video-mobile-toggle-camera]').trigger('click')
+  await flushPromises()
+  expect(window.$message.error).toHaveBeenCalled()
+  expect(voice.cameraEnabled).toBe(false)
+  wrapper.unmount()
+  expect(remove).toHaveBeenCalledWith('change', expect.any(Function))
+  expect(removeWindowListener).toHaveBeenCalledWith('resize', expect.any(Function))
+})
+
+it('keeps guests out of the meeting invitation directory', async () => {
+  const wrapper = await render()
+  api.get.mockResolvedValue({ data: [{ id: 'member', display_name: 'Member', account_type: 'member' }, { id: 'guest', display_name: 'Guest', account_type: 'guest' }] })
+  await button(wrapper, 'Invite').trigger('click')
+  await flushPromises()
+  expect(wrapper.findComponent(NSelect).props('options')).toEqual([{ value: 'member', label: 'Member' }])
+})
+
+it.each([false, true])('shares a summary with its meeting link and guards guests (guest=%s)', async guest => {
+  meeting.status = 'ended'
+  meeting.artifacts = [{ artifact_type: 'summary', status: 'ready', payload: { markdown: 'Decision: ship Friday' } }]
+  useChannelsStore().channels = [{ id: 'destination', name: 'Destination' }]
+  const send = vi.spyOn(useMessagesStore(), 'sendToChannel').mockResolvedValue({})
+  const wrapper = await render()
+  await wrapper.get('[data-testid=share-summary]').trigger('click')
+  await flushPromises()
+  wrapper.findComponent(NSelect).vm.$emit('update:value', 'destination')
+  if (guest) useSessionStore().user.account_type = 'guest'
+  await nextTick()
+  const modal = new DOMWrapper(document.body.querySelector('.n-modal'))
+  await button(modal, wrapper.vm.$t('ui.views.share_in_nebulynk')).trigger('click')
+  await flushPromises()
+  if (guest) {
+    expect(send).not.toHaveBeenCalled()
+    expect(wrapper.find('[data-testid=share-summary]').exists()).toBe(false)
+  } else expect(send).toHaveBeenCalledWith('destination', expect.stringMatching(/^Meeting: .*\/meetings\/one\n\nDecision: ship Friday$/))
+})
 
 it.each([
   ['scheduled', 'Cancel meeting', 'End meeting'],
@@ -141,7 +258,7 @@ it('cancels a pending directory search and releases the viewport listener on unm
   vi.useFakeTimers()
   wrapper.findComponent(NSelect).vm.$emit('search', 'Carol')
   await nextTick()
-  const timer = wrapper.vm.inviteSearchTimer
+  const timer = wrapper.findComponent({ name: 'MeetingInviteDialog' }).vm.inviteSearchTimer
   expect(timer).not.toBeNull()
   const clear = vi.spyOn(window, 'clearTimeout')
   wrapper.unmount()

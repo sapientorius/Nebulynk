@@ -1,4 +1,5 @@
-import { computed, ref } from 'vue'
+import { computed, ref, onScopeDispose } from 'vue'
+import { createMeetingCallRuntime } from '../lib/meeting-call-runtime.js'
 import { defineStore } from 'pinia'
 import api from '../lib/api.js'
 import { playSfx, SFX_EVENTS } from '../lib/sfx.js'
@@ -15,8 +16,6 @@ import { useDmsStore } from './dms.js'
 import { useSessionStore } from './session.js'
 import { useNotificationsStore } from './notifications.js'
 
-const RING_DURATION_MS = 30_000
-const RING_INTERVAL_MS = 4_000
 const RECOVERY_REFRESH_DEBOUNCE_MS = 500
 
 function asList(payload) {
@@ -108,8 +107,6 @@ function buildIncomingCallToast(call, meeting) {
   }
 }
 
-const callTimeouts = new Map()
-let ringLoopId = null
 
 export const useMeetingsStore = defineStore('meetings', () => {
   const meetings = ref([])
@@ -122,6 +119,20 @@ export const useMeetingsStore = defineStore('meetings', () => {
   const pendingSourceMeetingLoads = new Map()
   const sourceHistoryAccessGenerations = new Map()
   let recoveryRefreshTimeoutId = null
+  let activationGeneration = 0
+  let runtimeGeneration = 0
+  const callRuntime = createMeetingCallRuntime({
+    hasCalls: () => incomingCalls.value.length > 0,
+    playRing: () => playSfx(SFX_EVENTS.CALL_INCOMING),
+    onTimeout: meetingId => declineIncomingCall(meetingId, { silent: true })
+  })
+  const { clearRingLoop, ensureRingLoop, clearCallTimeout, scheduleIncomingCallTimeout } = callRuntime
+  onScopeDispose(() => {
+    runtimeGeneration++
+    clearActive()
+    callRuntime.stop()
+    clearRecoveryRefresh()
+  })
   const activeSourceChannelIds = computed(() => {
     const ids = meetings.value
       .filter((meeting) => (
@@ -134,36 +145,10 @@ export const useMeetingsStore = defineStore('meetings', () => {
     return new Set(ids)
   })
 
-  function clearRingLoop() {
-    if (!ringLoopId) return
-    clearInterval(ringLoopId)
-    ringLoopId = null
-  }
-
   function clearRecoveryRefresh() {
     if (!recoveryRefreshTimeoutId) return
     clearTimeout(recoveryRefreshTimeoutId)
     recoveryRefreshTimeoutId = null
-  }
-
-  function ensureRingLoop() {
-    if (ringLoopId || incomingCalls.value.length === 0) return
-
-    playSfx(SFX_EVENTS.CALL_INCOMING)
-    ringLoopId = setInterval(() => {
-      if (incomingCalls.value.length === 0) {
-        clearRingLoop()
-        return
-      }
-      playSfx(SFX_EVENTS.CALL_INCOMING)
-    }, RING_INTERVAL_MS)
-  }
-
-  function clearCallTimeout(meetingId) {
-    const timeoutId = callTimeouts.get(meetingId)
-    if (!timeoutId) return
-    clearTimeout(timeoutId)
-    callTimeouts.delete(meetingId)
   }
 
   function clearIncomingCall(meetingId) {
@@ -172,14 +157,6 @@ export const useMeetingsStore = defineStore('meetings', () => {
     if (incomingCalls.value.length === 0) {
       clearRingLoop()
     }
-  }
-
-  function scheduleIncomingCallTimeout(meetingId) {
-    clearCallTimeout(meetingId)
-    const timeoutId = setTimeout(() => {
-      declineIncomingCall(meetingId, { silent: true }).catch(() => {})
-    }, RING_DURATION_MS)
-    callTimeouts.set(meetingId, timeoutId)
   }
 
   function upsertIncomingCall(call) {
@@ -196,13 +173,10 @@ export const useMeetingsStore = defineStore('meetings', () => {
   }
 
   function reset() {
+    runtimeGeneration++
     meetings.value = []
     clearActive()
-    for (const timeoutId of callTimeouts.values()) {
-      clearTimeout(timeoutId)
-    }
-    callTimeouts.clear()
-    clearRingLoop()
+    callRuntime.stop()
     clearRecoveryRefresh()
     incomingCalls.value = []
     questionsByMeetingId.value = {}
@@ -239,6 +213,7 @@ export const useMeetingsStore = defineStore('meetings', () => {
   }
 
   function clearActive() {
+    activationGeneration++
     activeMeetingId.value = null
     activeMeeting.value = null
   }
@@ -456,7 +431,7 @@ export const useMeetingsStore = defineStore('meetings', () => {
     }
   }
 
-  async function get(meetingId, { retryOnHistoryAccessChange = true } = {}) {
+  async function get(meetingId, { retryOnHistoryAccessChange = true, isCurrent = () => true } = {}) {
     const knownMeeting = getMeetingById(meetingId)
     const sourceChannelId = knownMeeting?.source_channel_id || null
     const generation = sourceChannelId
@@ -464,6 +439,7 @@ export const useMeetingsStore = defineStore('meetings', () => {
       : null
     const revision = historyAccessRevision.value
     const { data } = await api.get(`/meetings/${meetingId}`)
+    if (!isCurrent()) return null
     const responseSourceChannelId = data?.source_channel_id || sourceChannelId
     const sourceAccessChanged = responseSourceChannelId && (
       generation !== null
@@ -472,7 +448,7 @@ export const useMeetingsStore = defineStore('meetings', () => {
     )
     if (sourceAccessChanged) {
       if (retryOnHistoryAccessChange) {
-        return get(meetingId, { retryOnHistoryAccessChange: false })
+        return get(meetingId, { retryOnHistoryAccessChange: false, isCurrent })
       }
       return null
     }
@@ -584,9 +560,18 @@ export const useMeetingsStore = defineStore('meetings', () => {
   }
 
   async function setActive(meetingId) {
+    const generation = ++activationGeneration
+    const isCurrent = () => generation === activationGeneration
     activeMeetingId.value = meetingId
-
-    const meeting = await get(meetingId)
+    activeMeeting.value = null
+    let meeting
+    try {
+      meeting = await get(meetingId, { isCurrent })
+    } catch (error) {
+      if (!isCurrent()) return null
+      throw error
+    }
+    if (!isCurrent()) return null
     activeMeeting.value = meeting
 
     if (!meeting) {
@@ -600,11 +585,12 @@ export const useMeetingsStore = defineStore('meetings', () => {
 
     const notificationsStore = useNotificationsStore()
     await notificationsStore.markMeetingInviteRead(meetingId).catch(() => {})
+    if (!isCurrent()) return null
 
     const channelsStore = useChannelsStore()
-    await channelsStore.select(meeting.chat_channel_id)
+    await channelsStore.select(meeting.chat_channel_id, { isCurrent })
 
-    return meeting
+    return isCurrent() ? meeting : null
   }
 
   async function handleSourceHistoryAccessChanged(sourceChannelId) {
@@ -921,6 +907,8 @@ export const useMeetingsStore = defineStore('meetings', () => {
 
   async function handleMeetingInvited(eventPayload) {
     if (!eventPayload?.meetingId) return
+    const generation = runtimeGeneration
+    const isCurrent = () => generation === runtimeGeneration
 
     const selfId = useSessionStore().user?.id
     if (Array.isArray(eventPayload.userIds) && selfId && !eventPayload.userIds.includes(selfId)) {
@@ -929,10 +917,12 @@ export const useMeetingsStore = defineStore('meetings', () => {
 
     let meeting = null
     try {
-      meeting = await get(eventPayload.meetingId)
+      meeting = await get(eventPayload.meetingId, { isCurrent })
     } catch {
+      if (!isCurrent()) return
       await refresh(true)
     }
+    if (!isCurrent()) return
 
     const meetingStatus = eventPayload.meetingStatus || meeting?.status || null
     if (meetingStatus !== 'active') {

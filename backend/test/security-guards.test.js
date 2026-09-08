@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
+import { meetings } from '../src/services/meetings/meetings.js'
 
 const backendRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -95,16 +96,25 @@ test('gifs service no longer logs process.env or console.log', async () => {
   assert.doesNotMatch(src, /Using KLIPY API key/)
 })
 
-test('meetings service uses patch action contract and internal source message create', async () => {
-  const src = await read('src/services/meetings/meetings.js')
-  assert.match(src, /methods:\s*\['find', 'get', 'create', 'patch'\]/)
-  assert.match(src, /patch:\s*\[validate\(patchSchema\)\]/)
-  assert.match(src, /async patch\(id, data, params\)/)
-  assert.match(src, /action === 'invite'/)
-  assert.match(src, /action === 'join'/)
-  assert.match(src, /action === 'end'/)
-  assert.match(src, /action === 'decline'/)
-  assert.match(src, /action === 'set_title'/)
-  assert.match(src, /async _createSourceMessage\(\{ meetingId, sourceChannel, user \}\)/)
-  assert.doesNotMatch(src, /async _createSourceMessage\(\{[^}]*provider/)
+test('meetings service registers only its public methods, validates input and dispatches patch actions', async () => {
+  let service, registration, hooks
+  const app = {
+    get: () => () => { throw new Error('Unexpected database access') },
+    use(path, instance, options) { assert.equal(path, 'meetings'); service = instance; registration = options },
+    service: () => ({ hooks(value) { hooks = value } })
+  }
+  meetings(app)
+  assert.deepEqual(registration.methods, ['find', 'get', 'create', 'patch'])
+  assert.equal(hooks.around.all.length, 1)
+  await assert.rejects(hooks.before.patch[0]({ data: { action: 17 }, params: { provider: 'rest' } }), error => error.code === 400)
+  await assert.rejects(hooks.before.create[0]({ data: {}, params: { provider: 'rest' } }), error => error.code === 400)
+  const params = { user: { id: 'host' } }
+  for (const [action, method, fields] of [
+    ['invite', 'invite', { user_ids: ['member'] }], ['join', 'join', {}],
+    ['end', 'end', {}], ['decline', 'decline', {}], ['set_title', 'setTitle', { title: 'Planning' }]
+  ]) {
+    const data = { action, ...fields }
+    service[method] = async (...args) => { assert.deepEqual(args, ['meeting', data, params]); return action }
+    assert.equal(await service.patch('meeting', data, params), action)
+  }
 })

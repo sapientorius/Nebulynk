@@ -3,7 +3,7 @@
 Stand: 7. September 2026  
 Bewertete Anwendungsversion: `0.5.1`  
 Bewerteter Commit: `baa254c` (`feat: implement default channel membership management and migration`)  
-Status: AP-01 wurde am 7. September 2026 umgesetzt und verifiziert; siehe [Übergabe AP-01](AP_01_HANDOFF.md). AP-02 wurde am 8. September 2026 umgesetzt und verifiziert; siehe [Übergabe AP-02](AP_02_HANDOFF.md). AP-03 wurde am 8. September 2026 im vereinbarten Umfang umgesetzt und lokal verifiziert; siehe [Übergabe AP-03](AP_03_HANDOFF.md). AP-04 bis AP-06 sind weiterhin offen. Die ursprüngliche Bewertung selbst enthielt noch keine Implementierung der Korrekturen.
+Status: AP-01 wurde am 7. September 2026 umgesetzt und verifiziert; siehe [Übergabe AP-01](AP_01_HANDOFF.md). AP-02 wurde am 8. September 2026 umgesetzt und verifiziert; siehe [Übergabe AP-02](AP_02_HANDOFF.md). AP-03 wurde am 8. September 2026 im vereinbarten Umfang umgesetzt und lokal verifiziert; siehe [Übergabe AP-03](AP_03_HANDOFF.md). AP-04 wurde am 8. September 2026 einschließlich AP-04A/B/C umgesetzt und lokal technisch abgenommen; siehe [Übergabe AP-04](AP_04_HANDOFF.md). AP-05 und AP-06 sind weiterhin offen. Die ursprüngliche Bewertung selbst enthielt noch keine Implementierung der Korrekturen.
 
 ## Zweck und Verwendung
 
@@ -112,7 +112,7 @@ Nicht ausgeführt wurden Browser-E2E, allgemeine Lasttests und die vollständige
 | AP-01 | Sehr hoch | Autorisierte, atomare Dateizuordnung bei Nachrichten | Sofort; unabhängig von großen Refactorings | Abgeschlossen, siehe [Übergabe](AP_01_HANDOFF.md) |
 | AP-02 | Hoch | Wiederaufnehmbare, konsistente Erinnerungsverarbeitung | Parallel zu AP-01 bei getrennter Dateizuständigkeit möglich | Abgeschlossen, siehe [Übergabe](AP_02_HANDOFF.md) |
 | AP-03 | Hoch | Statische Analyse, echte Komponententests, PostgreSQL-Integrationstests | Infrastruktur früh; mit AP-01/AP-02 abstimmen | Abgeschlossen, siehe [Übergabe](AP_03_HANDOFF.md) |
-| AP-04 | Mittel bis hoch | Klar abgegrenzte Meeting-, UI- und API-Module | Nach relevanter Verhaltensabsicherung aus AP-03 | Offen |
+| AP-04 | Mittel bis hoch | Klar abgegrenzte Meeting-, UI- und API-Module | Nach relevanter Verhaltensabsicherung aus AP-03 | Abgeschlossen: AP-04A/B/C lokal technisch abgenommen ([Übergabe](AP_04_HANDOFF.md)) |
 | AP-05 | Mittel | Kontrollierter Server-Lebenszyklus und überprüfbare Betriebsannahmen | Mit AP-02 und Backend-Teil von AP-04 abstimmen | Offen |
 | AP-06 | Mittel | Einheitlicher verbindlicher Prüfumfang lokal und in GitHub Actions | Vorhandene Lücken sofort; abschließende Integration nach AP-03 | Offen |
 
@@ -473,11 +473,11 @@ Zu erhaltende Verhaltensverträge:
 
 Abnahmekriterien AP-04A:
 
-- [ ] Die Meeting-Route enthält vorwiegend Ablaufkoordination; Live-Oberfläche, Historie und Einladungen besitzen klare Grenzen.
-- [ ] Wesentliche Header-Dialoge/Aktionen sind nachvollziehbar abgegrenzt.
-- [ ] Für jeden extrahierten Zustand und jede Ressource ist genau ein Besitzer erkennbar.
-- [ ] Relevante Komponenten-, Store- und Browser-E2E-Tests sowie Build sind erfolgreich.
-- [ ] Verhalten und Berechtigungen wurden erhalten; begründete Abweichungen sind separat dokumentiert.
+- [x] Die Meeting-Route enthält vorwiegend Ablaufkoordination; Live-Oberfläche, Historie und Einladungen besitzen klare Grenzen.
+- [x] Wesentliche Header-Dialoge/Aktionen sind nachvollziehbar abgegrenzt.
+- [x] Für jeden extrahierten Zustand und jede Ressource ist genau ein Besitzer erkennbar.
+- [x] Relevante Komponenten-, Store- und Browser-E2E-Tests sowie Build sind erfolgreich.
+- [x] Verhalten und Berechtigungen wurden erhalten; begründete Abweichungen sind separat dokumentiert.
 
 ### Teilpaket AP-04B: Backend-Meeting-Anwendungsfälle
 
@@ -500,11 +500,11 @@ Konkrete Planungsschritte:
 
 Abnahmekriterien AP-04B:
 
-- [ ] Die wesentlichen Meeting-Anwendungsfälle haben klare fachliche Grenzen und benannte Transaktionsverantwortung.
-- [ ] Der Service ist deutlich leichter als Transport-/Registrierungsschicht lesbar.
-- [ ] Antwortformen, Fehlercodes, Membership-Regeln, Gästezugriff und Events bleiben erhalten.
-- [ ] Historienzugriff und Query-Budgets sind weiterhin korrekt.
-- [ ] Backend- und erforderliche PostgreSQL-Integrationstests sind erfolgreich.
+- [x] Die wesentlichen Meeting-Anwendungsfälle haben klare fachliche Grenzen und benannte Transaktionsverantwortung.
+- [x] Der Service ist deutlich leichter als Transport-/Registrierungsschicht lesbar.
+- [x] Antwortformen, Fehlercodes, Membership-Regeln, Gästezugriff und Events bleiben erhalten.
+- [x] Historienzugriff und Query-Budgets sind weiterhin korrekt.
+- [x] Backend- und erforderliche PostgreSQL-Integrationstests sind erfolgreich.
 
 ### Teilpaket AP-04C: API-Client nach Transport, Session und Endpunkten trennen
 
@@ -528,20 +528,20 @@ Konkrete Planungsschritte:
 
 Abnahmekriterien AP-04C:
 
-- [ ] Endpunktgruppen und Auth-/Transportverantwortlichkeiten sind nachvollziehbar getrennt.
-- [ ] Bestehende Client-Konsumenten funktionieren über eine kompatible Fassade.
-- [ ] Mehrere Client-Instanzen teilen keinen versehentlich globalisierten Auth-Zustand.
-- [ ] Refresh, CSRF, Logout, Cleanup, FormData und Basis-URL-Varianten sind durch Verhaltenstests abgesichert.
-- [ ] Frontend-Tests, Build und relevante Auth-/Desktop-/Browser-Abläufe sind überprüft.
+- [x] Endpunktgruppen und Auth-/Transportverantwortlichkeiten sind nachvollziehbar getrennt.
+- [x] Bestehende Client-Konsumenten funktionieren über eine kompatible Fassade.
+- [x] Mehrere Client-Instanzen teilen keinen versehentlich globalisierten Auth-Zustand.
+- [x] Refresh, CSRF, Logout, Cleanup, FormData und Basis-URL-Varianten sind durch Verhaltenstests abgesichert.
+- [x] Frontend-Tests, Build und relevante Auth-/Desktop-/Browser-Abläufe sind überprüft.
 
 ### Gesamtübergabe AP-04
 
 Die drei Teilpakete können getrennt zugewiesen werden. Für AP-04A zuerst die relevanten Tests aus AP-03B bereitstellen, für AP-04B die benötigten Integrationsprüfungen mit AP-03C abstimmen. AP-04C kann mit vorhandenen API-Client-Tests beginnen.
 
-- [ ] Alle zugewiesenen Teilpakete sind mit ihren Abnahmekriterien dokumentiert abgeschlossen.
-- [ ] Die neue Modulstruktur ist in `docs/ARCHITECTURE.md` anhand tatsächlicher Verantwortung beschrieben.
-- [ ] Vorherige Dateigrößen werden nur als Vergleich ergänzt; die Abnahme beruht auf klaren Grenzen und Verhalten.
-- [ ] Offene Teilpakete werden nicht durch den Abschluss einer einzelnen Extraktion verdeckt.
+- [x] Alle zugewiesenen Teilpakete sind mit ihren Abnahmekriterien dokumentiert abgeschlossen.
+- [x] Die neue Modulstruktur ist in `docs/ARCHITECTURE.md` anhand tatsächlicher Verantwortung beschrieben.
+- [x] Vorherige Dateigrößen werden nur als Vergleich ergänzt; die Abnahme beruht auf klaren Grenzen und Verhalten.
+- [x] Offene Teilpakete werden nicht durch den Abschluss einer einzelnen Extraktion verdeckt.
 
 ## AP-05: Server-Lebenszyklus und Betriebsannahmen explizit machen
 

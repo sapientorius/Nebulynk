@@ -7,17 +7,11 @@ describe('static source contract: workspace user pickers stay member-only', () =
     const newDmSource = readFileSync(resolve('src/components/NewDmModal.vue'), 'utf8')
     const memberListSource = readFileSync(resolve('src/components/MemberList.vue'), 'utf8')
     const sidebarSource = readFileSync(resolve('src/components/ChannelSidebar.vue'), 'utf8')
-    const headerSource = readFileSync(resolve('src/components/ChannelHeader.vue'), 'utf8')
-    const meetingViewSource = readFileSync(resolve('src/views/MeetingView.vue'), 'utf8')
 
     expect(newDmSource).toContain('this.sessionStore.getDefaultDirectoryUsers(30)')
     expect(memberListSource).toContain('this.sessionStore.getDefaultDirectoryUsers(20)')
     expect(sidebarSource).toContain('this.sessionStore.getDirectoryUsersByIds(this.newChannel.initial_user_ids)')
     expect(sidebarSource).toContain('this.sessionStore.getDefaultDirectoryUsers(20)')
-    expect(headerSource).toContain('this.sessionStore.getDirectoryUsersByIds(this.scheduleForm.initialUserIds)')
-    expect(headerSource).toContain('this.sessionStore.getDefaultDirectoryUsers(20)')
-    expect(meetingViewSource).toContain('this.sessionStore.getDirectoryUsersByIds(this.inviteUserIds)')
-    expect(meetingViewSource).toContain('this.sessionStore.getDefaultDirectoryUsers(20)')
   })
 
   it('clears stale guest author filters and keeps search author options guest-free', () => {

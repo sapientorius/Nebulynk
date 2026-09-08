@@ -19,20 +19,5 @@ describe('static source contract: SMTP admin settings sources', () => {
     expect(source).toContain('this.adminStore.sendSmtpTestEmail({')
   })
 
-  it('exposes SMTP API helpers and admin-store bindings', () => {
-    const apiSource = readFileSync(resolve('src/lib/api.js'), 'utf8')
-    const storeSource = readFileSync(resolve('src/stores/admin.js'), 'utf8')
 
-    expect(apiSource).toContain("api.get('/smtp-settings')")
-    expect(apiSource).toContain("api.patch('/smtp-settings', payload)")
-    expect(apiSource).toContain("action: 'test_connection'")
-    expect(apiSource).toContain("action: 'send_test_email'")
-
-    expect(storeSource).toContain('const smtpSettings = ref({})')
-    expect(storeSource).toContain('const loadingSmtpSettings = ref(false)')
-    expect(storeSource).toContain('async function refreshSmtpSettings()')
-    expect(storeSource).toContain('async function updateSmtpSettings(payload)')
-    expect(storeSource).toContain('async function testSmtpConnection()')
-    expect(storeSource).toContain('async function sendSmtpTestEmail(payload)')
-  })
 })

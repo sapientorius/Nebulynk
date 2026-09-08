@@ -10,7 +10,8 @@ export async function componentContext(path = '/', routeComponent = null) {
   setActivePinia(pinia)
   setLocale('en')
   const router = createRouter({ history: createMemoryHistory(), routes: [
-    { path: '/meetings/:meetingId', name: 'meeting', component: routeComponent || { render: () => null } },
+    { path: '/meetings/:meetingId', name: 'Meeting', component: routeComponent || { render: () => null } },
+    { path: '/meetings/:meetingId/screenshare', name: 'MeetingScreenShare', component: { render: () => null } },
     { path: '/:pathMatch(.*)*', component: { render: () => null } }
   ] })
   await router.push(path)

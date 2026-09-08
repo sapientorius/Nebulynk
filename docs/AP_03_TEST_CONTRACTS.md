@@ -1,23 +1,31 @@
 # AP-03: Inventar der bisherigen UI-Quelltexttests
 
+AP-04B ergänzt außerhalb dieses UI-Inventars einen Laufzeitersatz in
+`backend/test/security-guards.test.js`: Der Meeting-Vertrag prüft die registrierten
+öffentlichen Methoden, externe Schema-Validierung und den `patch`-Dispatch.
+`backend/test/meetings.notifications.test.js` prüft weiterhin das interne Anlegen
+der Source-Nachricht einschließlich `skipNotifications` und ohne Weitergabe eines
+externen `provider`. Damit entfällt die Bindung an den früheren Ort und die
+Quelltextsignatur von `_createSourceMessage`.
+
 Alle 61 Ausgangsdateien sind erfasst. Die JSON-Begleitdatei enthält jede bisherige Assertion im ursprünglichen Wortlaut, gruppiert nach Testvertrag. `replaced` bezeichnet entfernte Quelltextprüfungen mit Laufzeitersatz, `static-retained` einen ausdrücklich statischen Strukturvertrag und `deferred-runtime` eine noch nicht auf Laufzeit umgestellte Altprüfung. Letztere zählt nicht als Verhaltensnachweis.
 
-Die kritischen Laufzeitvertikalen liegen in `MessageInput.component.test.js`, `MeetingView.component.test.js` und `ChannelHeader.component.test.js`. MeetingView-Altprüfungen bleiben ergänzend explizit statisch; reine CSS-/Symbolvorgaben sind kein Vertrag für AP-04-Refactorings.
+Die kritischen Laufzeitvertikalen liegen in `MessageInput.component.test.js`, `MeetingView.component.test.js` und `ChannelHeader.component.test.js`. AP-04 ersetzt die MeetingView- und ChannelHeader-Altprüfungen durch Komponenten- und Browserprüfungen. Reine CSS-/Symbolvorgaben sind kein Verhaltensvertrag und werden nicht als Pixelvergleich gewertet.
 
 | Ausgangsdatei / Vertrag | Behandlung | Ersatz oder Grenze |
 | --- | --- | --- |
 | admin-smtp-settings.test.js: adds a dedicated SMTP settings panel with save and test actions | deferred-runtime | Laufzeitumstellung zurückgestellt; Altprüfung bleibt ausdrücklich statisch. |
-| admin-smtp-settings.test.js: exposes SMTP API helpers and admin-store bindings | deferred-runtime | Laufzeitumstellung zurückgestellt; Altprüfung bleibt ausdrücklich statisch. |
+| admin-smtp-settings.test.js: exposes SMTP API helpers and admin-store bindings | replaced | AP-04: frontend/test/lib/api-client-boundaries.test.js; frühere Symbol-/CSS-Anforderungen entfallen. |
 | AiSettings.test.js: includes provider management and function assignment controls | deferred-runtime | Laufzeitumstellung zurückgestellt; Altprüfung bleibt ausdrücklich statisch. |
 | AskMeetingPanel.test.js: owns Ask the Meeting history, citation links, and stable submit control | deferred-runtime | Laufzeitumstellung zurückgestellt; Altprüfung bleibt ausdrücklich statisch. |
 | AskMeetingPanel.test.js: submits on Enter while preserving Shift+Enter and composition shortcuts | deferred-runtime | Laufzeitumstellung zurückgestellt; Altprüfung bleibt ausdrücklich statisch. |
 | AskMeetingPanel.test.js: uses shared artifact formatting for citation labels | deferred-runtime | Laufzeitumstellung zurückgestellt; Altprüfung bleibt ausdrücklich statisch. |
-| ChannelHeader.test.js: keeps the meeting call action available for regular and voice channels but not meeting chat channels | deferred-runtime | Laufzeitumstellung zurückgestellt; Altprüfung bleibt ausdrücklich statisch. |
-| ChannelHeader.test.js: moves secondary mobile actions into a dedicated overflow menu while keeping call primary | deferred-runtime | Laufzeitumstellung zurückgestellt; Altprüfung bleibt ausdrücklich statisch. |
-| ChannelHeader.test.js: exposes AI summary actions for presets, custom range, and selection mode inside the overflow menus | deferred-runtime | Laufzeitumstellung zurückgestellt; Altprüfung bleibt ausdrücklich statisch. |
-| ChannelHeader.test.js: groups schedule and past meetings under a shared meetings entry point and keeps past meetings on the shared side panel flow | deferred-runtime | Laufzeitumstellung zurückgestellt; Altprüfung bleibt ausdrücklich statisch. |
-| ChannelHeader.test.js: keeps leave behind the overflow menu instead of the direct desktop action row | deferred-runtime | Laufzeitumstellung zurückgestellt; Altprüfung bleibt ausdrücklich statisch. |
-| ChannelHeader.test.js: loads and saves meeting history access for channels and owner-managed groups | deferred-runtime | Laufzeitumstellung zurückgestellt; Altprüfung bleibt ausdrücklich statisch. |
+| ChannelHeader.test.js: keeps the meeting call action available for regular and voice channels but not meeting chat channels | replaced | AP-04: frontend/test/components/ChannelHeader.component.test.js; frühere Symbol-/CSS-Anforderungen entfallen. |
+| ChannelHeader.test.js: moves secondary mobile actions into a dedicated overflow menu while keeping call primary | replaced | AP-04: frontend/test/components/ChannelHeader.component.test.js; frühere Symbol-/CSS-Anforderungen entfallen. |
+| ChannelHeader.test.js: exposes AI summary actions for presets, custom range, and selection mode inside the overflow menus | replaced | AP-04: frontend/test/components/ChannelHeader.component.test.js; frühere Symbol-/CSS-Anforderungen entfallen. |
+| ChannelHeader.test.js: groups schedule and past meetings under a shared meetings entry point and keeps past meetings on the shared side panel flow | replaced | AP-04: frontend/test/components/ChannelHeader.component.test.js; frühere Symbol-/CSS-Anforderungen entfallen. |
+| ChannelHeader.test.js: keeps leave behind the overflow menu instead of the direct desktop action row | replaced | AP-04: frontend/test/components/ChannelHeader.component.test.js; frühere Symbol-/CSS-Anforderungen entfallen. |
+| ChannelHeader.test.js: loads and saves meeting history access for channels and owner-managed groups | replaced | AP-04: frontend/test/components/ChannelHeader.component.test.js; frühere Symbol-/CSS-Anforderungen entfallen. |
 | ChannelPastMeetingsPanel.test.js: loads past meetings in 4-item windows and reuses the shared meeting summary card | deferred-runtime | Laufzeitumstellung zurückgestellt; Altprüfung bleibt ausdrücklich statisch. |
 | ChannelSidebar.test.js: navigates via router instead of mutating channel state directly on sidebar selection | deferred-runtime | Laufzeitumstellung zurückgestellt; Altprüfung bleibt ausdrücklich statisch. |
 | ChannelSidebar.test.js: uses persisted disclosure sections and keeps header actions separate from toggles | deferred-runtime | Laufzeitumstellung zurückgestellt; Altprüfung bleibt ausdrücklich statisch. |
@@ -142,25 +150,25 @@ Die kritischen Laufzeitvertikalen liegen in `MessageInput.component.test.js`, `M
 | MeetingInviteView.test.js: lets signed-in members open the meeting directly and validates guest display names | deferred-runtime | Laufzeitumstellung zurückgestellt; Altprüfung bleibt ausdrücklich statisch. |
 | MeetingsOverviewView.test.js: loads dedicated overview buckets and renders meeting action cards in a responsive grid | deferred-runtime | Laufzeitumstellung zurückgestellt; Altprüfung bleibt ausdrücklich statisch. |
 | MeetingsOverviewView.test.js: keeps cards clickable while join routes through the meeting store and past meetings can load more without losing mini-summary cards | deferred-runtime | Laufzeitumstellung zurückgestellt; Altprüfung bleibt ausdrücklich statisch. |
-| MeetingView.test.js: does not render the ended-meeting group chat CTA anymore | deferred-runtime | Laufzeitumstellung zurückgestellt; Altprüfung bleibt ausdrücklich statisch. |
-| MeetingView.test.js: uses a focus layout with overlay chat while screen share is maximized | static-retained | Nur Struktur/Quelltext, keine Interaktion. |
-| MeetingView.test.js: uses an adaptive live stage for video-focused and share-focused meeting layouts | static-retained | Nur Struktur/Quelltext, keine Interaktion. |
-| MeetingView.test.js: uses generic ui store screen share state while preserving meeting behavior | deferred-runtime | Laufzeitumstellung zurückgestellt; Altprüfung bleibt ausdrücklich statisch. |
-| MeetingView.test.js: animates the share trigger dot only while an active share is hidden | deferred-runtime | Laufzeitumstellung zurückgestellt; Altprüfung bleibt ausdrücklich statisch. |
-| MeetingView.test.js: offers a publish-quality selector before starting a screen share | deferred-runtime | Laufzeitumstellung zurückgestellt; Altprüfung bleibt ausdrücklich statisch. |
-| MeetingView.test.js: renders meeting video only for an active connected meeting call | deferred-runtime | Laufzeitumstellung zurückgestellt; Altprüfung bleibt ausdrücklich statisch. |
-| MeetingView.test.js: moves mobile meeting actions and video management into compact overflow surfaces | static-retained | Nur Struktur/Quelltext, keine Interaktion. |
-| MeetingView.test.js: delegates artifact rendering to focused components while preserving tabs and events | static-retained | Nur Struktur/Quelltext, keine Interaktion. |
-| MeetingView.test.js: keeps the compact ended-meeting artifact menu unchanged while only restyling the header overflow menu | static-retained | Nur Struktur/Quelltext, keine Interaktion. |
-| MeetingView.test.js: shows the compact ended-meeting action menu as a wide mobile bottom sheet | static-retained | Nur Struktur/Quelltext, keine Interaktion. |
-| MeetingView.test.js: keeps store mutations, share side effects, and summary payload assembly in the view | static-retained | Nur Struktur/Quelltext, keine Interaktion. |
-| MeetingView.test.js: shows attended participants, uses ended meeting engagement counts, and prepends a meeting link in shared summaries | deferred-runtime | Laufzeitumstellung zurückgestellt; Altprüfung bleibt ausdrücklich statisch. |
-| MeetingView.test.js: tracks mobile layout and switches ended-meeting surfaces for evidence navigation | static-retained | Nur Struktur/Quelltext, keine Interaktion. |
-| MeetingView.test.js: delegates member-panel toggling to the shared workspace shell | static-retained | Nur Struktur/Quelltext, keine Interaktion. |
-| MeetingView.test.js: clears the active meeting context only when navigating away from meeting routes | deferred-runtime | Laufzeitumstellung zurückgestellt; Altprüfung bleibt ausdrücklich statisch. |
-| MeetingView.test.js: supports scheduled meeting controls, guest links, and ICS downloads | deferred-runtime | Laufzeitumstellung zurückgestellt; Altprüfung bleibt ausdrücklich statisch. |
-| MeetingView.test.js: hides ended-meeting in-app summary sharing for guest users while keeping the member flow guarded in the view | deferred-runtime | Laufzeitumstellung zurückgestellt; Altprüfung bleibt ausdrücklich statisch. |
-| MeetingView.test.js: renders the policy denial state for restricted direct meeting URLs | deferred-runtime | Laufzeitumstellung zurückgestellt; Altprüfung bleibt ausdrücklich statisch. |
+| MeetingView.test.js: does not render the ended-meeting group chat CTA anymore | replaced | AP-04: frontend/test/views/MeetingView.component.test.js; frontend/test/e2e/meeting-screen-share.spec.js; frontend/test/e2e/core-paths.spec.js; frühere Symbol-/CSS-Anforderungen entfallen. |
+| MeetingView.test.js: uses a focus layout with overlay chat while screen share is maximized | replaced | AP-04: frontend/test/views/MeetingView.component.test.js; frontend/test/e2e/meeting-screen-share.spec.js; frontend/test/e2e/core-paths.spec.js; frühere Symbol-/CSS-Anforderungen entfallen. |
+| MeetingView.test.js: uses an adaptive live stage for video-focused and share-focused meeting layouts | replaced | AP-04: frontend/test/views/MeetingView.component.test.js; frontend/test/e2e/meeting-screen-share.spec.js; frontend/test/e2e/core-paths.spec.js; frühere Symbol-/CSS-Anforderungen entfallen. |
+| MeetingView.test.js: uses generic ui store screen share state while preserving meeting behavior | replaced | AP-04: frontend/test/views/MeetingView.component.test.js; frontend/test/e2e/meeting-screen-share.spec.js; frontend/test/e2e/core-paths.spec.js; frühere Symbol-/CSS-Anforderungen entfallen. |
+| MeetingView.test.js: animates the share trigger dot only while an active share is hidden | replaced | AP-04: frontend/test/views/MeetingView.component.test.js; frontend/test/e2e/meeting-screen-share.spec.js; frontend/test/e2e/core-paths.spec.js; frühere Symbol-/CSS-Anforderungen entfallen. |
+| MeetingView.test.js: offers a publish-quality selector before starting a screen share | replaced | AP-04: frontend/test/views/MeetingView.component.test.js; frontend/test/e2e/meeting-screen-share.spec.js; frontend/test/e2e/core-paths.spec.js; frühere Symbol-/CSS-Anforderungen entfallen. |
+| MeetingView.test.js: renders meeting video only for an active connected meeting call | replaced | AP-04: frontend/test/views/MeetingView.component.test.js; frontend/test/e2e/meeting-screen-share.spec.js; frontend/test/e2e/core-paths.spec.js; frühere Symbol-/CSS-Anforderungen entfallen. |
+| MeetingView.test.js: moves mobile meeting actions and video management into compact overflow surfaces | replaced | AP-04: frontend/test/views/MeetingView.component.test.js; frontend/test/e2e/meeting-screen-share.spec.js; frontend/test/e2e/core-paths.spec.js; frühere Symbol-/CSS-Anforderungen entfallen. |
+| MeetingView.test.js: delegates artifact rendering to focused components while preserving tabs and events | replaced | AP-04: frontend/test/views/MeetingView.component.test.js; frontend/test/e2e/meeting-screen-share.spec.js; frontend/test/e2e/core-paths.spec.js; frühere Symbol-/CSS-Anforderungen entfallen. |
+| MeetingView.test.js: keeps the compact ended-meeting artifact menu unchanged while only restyling the header overflow menu | replaced | AP-04: frontend/test/views/MeetingView.component.test.js; frontend/test/e2e/meeting-screen-share.spec.js; frontend/test/e2e/core-paths.spec.js; frühere Symbol-/CSS-Anforderungen entfallen. |
+| MeetingView.test.js: shows the compact ended-meeting action menu as a wide mobile bottom sheet | replaced | AP-04: frontend/test/views/MeetingView.component.test.js; frontend/test/e2e/meeting-screen-share.spec.js; frontend/test/e2e/core-paths.spec.js; frühere Symbol-/CSS-Anforderungen entfallen. |
+| MeetingView.test.js: keeps store mutations, share side effects, and summary payload assembly in the view | replaced | AP-04: frontend/test/views/MeetingView.component.test.js; frontend/test/e2e/meeting-screen-share.spec.js; frontend/test/e2e/core-paths.spec.js; frühere Symbol-/CSS-Anforderungen entfallen. |
+| MeetingView.test.js: shows attended participants, uses ended meeting engagement counts, and prepends a meeting link in shared summaries | replaced | AP-04: frontend/test/views/MeetingView.component.test.js; frontend/test/e2e/meeting-screen-share.spec.js; frontend/test/e2e/core-paths.spec.js; frühere Symbol-/CSS-Anforderungen entfallen. |
+| MeetingView.test.js: tracks mobile layout and switches ended-meeting surfaces for evidence navigation | replaced | AP-04: frontend/test/views/MeetingView.component.test.js; frontend/test/e2e/meeting-screen-share.spec.js; frontend/test/e2e/core-paths.spec.js; frühere Symbol-/CSS-Anforderungen entfallen. |
+| MeetingView.test.js: delegates member-panel toggling to the shared workspace shell | replaced | AP-04: frontend/test/views/MeetingView.component.test.js; frontend/test/e2e/meeting-screen-share.spec.js; frontend/test/e2e/core-paths.spec.js; frühere Symbol-/CSS-Anforderungen entfallen. |
+| MeetingView.test.js: clears the active meeting context only when navigating away from meeting routes | replaced | AP-04: frontend/test/views/MeetingView.component.test.js; frontend/test/e2e/meeting-screen-share.spec.js; frontend/test/e2e/core-paths.spec.js; frühere Symbol-/CSS-Anforderungen entfallen. |
+| MeetingView.test.js: supports scheduled meeting controls, guest links, and ICS downloads | replaced | AP-04: frontend/test/views/MeetingView.component.test.js; frontend/test/e2e/meeting-screen-share.spec.js; frontend/test/e2e/core-paths.spec.js; frühere Symbol-/CSS-Anforderungen entfallen. |
+| MeetingView.test.js: hides ended-meeting in-app summary sharing for guest users while keeping the member flow guarded in the view | replaced | AP-04: frontend/test/views/MeetingView.component.test.js; frontend/test/e2e/meeting-screen-share.spec.js; frontend/test/e2e/core-paths.spec.js; frühere Symbol-/CSS-Anforderungen entfallen. |
+| MeetingView.test.js: renders the policy denial state for restricted direct meeting URLs | replaced | AP-04: frontend/test/views/MeetingView.component.test.js; frontend/test/e2e/meeting-screen-share.spec.js; frontend/test/e2e/core-paths.spec.js; frühere Symbol-/CSS-Anforderungen entfallen. |
 | PasswordResetViews.test.js: adds a forgot-password link to the login view | deferred-runtime | Laufzeitumstellung zurückgestellt; Altprüfung bleibt ausdrücklich statisch. |
 | PasswordResetViews.test.js: supports a second-factor verification step in the login view | deferred-runtime | Laufzeitumstellung zurückgestellt; Altprüfung bleibt ausdrücklich statisch. |
 | PasswordResetViews.test.js: adds a passkey login action to the login view | deferred-runtime | Laufzeitumstellung zurückgestellt; Altprüfung bleibt ausdrücklich statisch. |
@@ -174,7 +182,7 @@ Die kritischen Laufzeitvertikalen liegen in `MessageInput.component.test.js`, `M
 | SelfRegistrationViews.test.js: uses activation-specific confirmation copy after a confirmed email link | deferred-runtime | Laufzeitumstellung zurückgestellt; Altprüfung bleibt ausdrücklich statisch. |
 | SelfRegistrationViews.test.js: provides admin registration and security settings with pending-account actions | deferred-runtime | Laufzeitumstellung zurückgestellt; Altprüfung bleibt ausdrücklich statisch. |
 | SelfRegistrationViews.test.js: registers public registration and confirmation routes | deferred-runtime | Laufzeitumstellung zurückgestellt; Altprüfung bleibt ausdrücklich statisch. |
-| SettingsView.test.js: adds a dedicated security tab with a password change form | deferred-runtime | Laufzeitumstellung zurückgestellt; Altprüfung bleibt ausdrücklich statisch. |
+| SettingsView.test.js: adds a dedicated security tab with a password change form | replaced | AP-04: frontend/test/components/SettingsSecurity.component.test.js; frontend/test/e2e/settings-security.spec.js; frühere Symbol-/CSS-Anforderungen entfallen. |
 | SettingsView.test.js: adds a permission-gated archived channels tab with restore actions | deferred-runtime | Laufzeitumstellung zurückgestellt; Altprüfung bleibt ausdrücklich statisch. |
 | SettingsView.test.js: adds a dedicated video settings tab with camera and background controls | deferred-runtime | Laufzeitumstellung zurückgestellt; Altprüfung bleibt ausdrücklich statisch. |
 | SettingsView.test.js: switches settings navigation to a mobile drawer layout | static-retained | Nur Struktur/Quelltext, keine Interaktion. |
@@ -186,3 +194,5 @@ Die kritischen Laufzeitvertikalen liegen in `MessageInput.component.test.js`, `M
 | WorkspaceShell.test.js: keeps channels and meetings under one authenticated parent shell | deferred-runtime | Laufzeitumstellung zurückgestellt; Altprüfung bleibt ausdrücklich statisch. |
 | WorkspaceShell.test.js: owns the shared top bar, mobile drawers, and global overlays for both workspace contexts | deferred-runtime | Laufzeitumstellung zurückgestellt; Altprüfung bleibt ausdrücklich statisch. |
 | WorkspaceShell.test.js: reduces the workspace chrome for guest sessions while owning the floating guest voice dock | deferred-runtime | Laufzeitumstellung zurückgestellt; Altprüfung bleibt ausdrücklich statisch. |
+
+AP-04 ergänzt außerdem SMTP-Fassadenwechsel, FormData-Transport, Aktivierungsgenerationen, unabhängige Klingel-Runtimes, verspätete Such-/Evidenzantworten und Sicherheitsformulare. Die historischen Assertions bleiben in der JSON-Datei zur Nachverfolgung erhalten. Der FormData-Anteil aus `video-backgrounds.test.js` wird durch `api-form-data.test.js` geprüft; die unveränderten Store-Quelltextprüfungen bleiben zurückgestellt.

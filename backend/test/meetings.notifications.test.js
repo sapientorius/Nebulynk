@@ -137,7 +137,8 @@ test('meetings notifications: source message is created with skipNotifications f
   await service._createSourceMessage({
     meetingId: 'meeting-1',
     sourceChannel: { id: 'source-1' },
-    user: { id: 'user-1' }
+    user: { id: 'user-1' },
+    provider: 'rest'
   })
 
   assert.deepEqual(createCall, {

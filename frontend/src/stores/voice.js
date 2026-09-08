@@ -1,5 +1,6 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
+import { createVoiceLiveKitCallbacks } from '../lib/voice-livekit-callbacks.js'
 import api from '../lib/api.js'
 import {
   applyScreenShareViewQuality as applyLivekitScreenShareViewQuality,
@@ -185,11 +186,10 @@ export const useVoiceStore = defineStore('voice', () => {
   }
 
   function setupVoiceCallbacks() {
-    setCallbacks({
-      onActiveSpeakersChanged(speakerIds) {
-        activeSpeakers.value = speakerIds
-      },
-      onDisconnected() {
+    setCallbacks(createVoiceLiveKitCallbacks({
+      getChannelId: () => channelId.value,
+      setActiveSpeakers: ids => { activeSpeakers.value = ids },
+      resetDisconnectedMedia() {
         connected.value = false
         activeSpeakers.value = []
         clearScreenShares(channelId.value)
@@ -202,55 +202,16 @@ export const useVoiceStore = defineStore('voice', () => {
         cameraError.value = null
         backgroundBlurError.value = null
       },
-      onScreenShareStarted(payload) {
-        const targetChannelId = channelId.value
-        if (!targetChannelId) return
-        upsertScreenShare(targetChannelId, payload)
-        if (!payload?.isLocal) {
-          applyScreenShareViewQuality(normalizeScreenSharePayload(payload))
-        }
-      },
-      onScreenShareStopped(payload) {
-        const targetChannelId = channelId.value
-        if (!targetChannelId) return
-        removeScreenShare(targetChannelId, payload?.participantId || null)
-      },
-      onCameraStarted(payload) {
-        const targetChannelId = channelId.value
-        if (!targetChannelId) return
-        upsertCameraTrack(targetChannelId, payload)
-        if (payload?.isLocal) {
-          cameraEnabled.value = true
-          backgroundBlurApplied.value = hasBackgroundBlurEnabled()
-          activeCameraDeviceId.value = getActiveVideoInputDevice() || activeCameraDeviceId.value || null
-          updateSelfParticipantState(targetChannelId, { is_video_enabled: true })
-        }
-      },
-      onCameraStopped(payload) {
-        const targetChannelId = channelId.value
-        if (!targetChannelId) return
-        clearCameraTrack(targetChannelId, payload?.participantId || null)
-        if (payload?.isLocal) {
-          cameraEnabled.value = false
-          backgroundBlurApplied.value = false
-          activeCameraDeviceId.value = null
-          updateSelfParticipantState(targetChannelId, { is_video_enabled: false })
-        }
-      },
-      onCameraPublished(payload) {
-        const targetChannelId = channelId.value
-        if (!targetChannelId) return
-        upsertCameraTrack(targetChannelId, payload)
-        if (!payload?.isLocal) {
-          applyRemoteCameraSubscriptionPreference(payload?.participantId || null)
-        }
-      },
-      onCameraUnpublished(payload) {
-        const targetChannelId = channelId.value
-        if (!targetChannelId) return
-        removeCameraTrack(targetChannelId, payload?.participantId || null)
+      upsertScreenShare, removeScreenShare, upsertCameraTrack, clearCameraTrack, removeCameraTrack,
+      configureIncomingShare: payload => applyScreenShareViewQuality(normalizeScreenSharePayload(payload)),
+      configureIncomingCamera: applyRemoteCameraSubscriptionPreference,
+      setLocalCameraPublished(targetChannelId, enabled) {
+        cameraEnabled.value = enabled
+        backgroundBlurApplied.value = enabled && hasBackgroundBlurEnabled()
+        activeCameraDeviceId.value = enabled ? getActiveVideoInputDevice() || activeCameraDeviceId.value || null : null
+        updateSelfParticipantState(targetChannelId, { is_video_enabled: enabled })
       }
-    })
+    }))
   }
 
   function persistScreenSharePublishQuality(value) {

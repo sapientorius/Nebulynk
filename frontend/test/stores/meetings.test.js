@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useMeetingsStore } from '../../src/stores/meetings.js'
+import { createPinia } from 'pinia'
 
 const apiMock = vi.hoisted(() => ({
   get: vi.fn(),
@@ -97,6 +98,64 @@ vi.mock('../../src/stores/notifications.js', () => ({
 }))
 
 describe('meetings store', () => {
+  it.each(['reset', '$dispose'])('does not restart ringing from an invitation response after %s', async action => {
+    vi.useFakeTimers()
+    let resolve
+    apiMock.get.mockReturnValue(new Promise(done => { resolve = done }))
+    const store = useMeetingsStore()
+    const invitation = store.handleMeetingInvited({ meetingId: 'pending', meetingStatus: 'active' })
+    store[action]()
+    resolve({ data: { id: 'pending', status: 'active', participants: [] } })
+    await invitation
+    expect(store.incomingCalls).toEqual([])
+    expect(store.meetings).toEqual([])
+    expect(sfxMock.playSfx).not.toHaveBeenCalled()
+    expect(vi.getTimerCount()).toBe(0)
+  })
+  it('keeps the latest activation when meeting responses arrive in reverse order', async () => {
+    const store = useMeetingsStore(createPinia())
+    let resolveFirst
+    apiMock.get.mockImplementation(path => path === '/meetings/first'
+      ? new Promise(resolve => { resolveFirst = resolve })
+      : Promise.resolve({ data: { id: 'second', chat_channel_id: 'chat-second' } }))
+    const first = store.setActive('first')
+    await store.setActive('second')
+    resolveFirst({ data: { id: 'first', chat_channel_id: 'chat-first' } })
+    expect(await first).toBeNull()
+    expect(store.activeMeeting.id).toBe('second')
+    expect(channelsStoreMock.select.mock.calls.map(args => args[0])).toEqual(['chat-second'])
+  })
+
+  it.each(['clearActive', 'reset'])('invalidates an outstanding activation on %s', async action => {
+    const store = useMeetingsStore(createPinia())
+    let release
+    apiMock.get.mockImplementation(() => new Promise(resolve => { release = resolve }))
+    const loading = store.setActive('first')
+    store[action]()
+    release({ data: { id: 'first', chat_channel_id: 'chat-first' } })
+    expect(await loading).toBeNull()
+    expect(store.activeMeeting).toBeNull()
+    expect(channelsStoreMock.select).not.toHaveBeenCalled()
+  })
+
+  it('owns ringing timers per store and releases them on disposal', async () => {
+    vi.useFakeTimers()
+    const first = useMeetingsStore(createPinia())
+    const second = useMeetingsStore(createPinia())
+    apiMock.get.mockImplementation(path => Promise.resolve({ data: { id: path.split('/').pop(), status: 'active' } }))
+    await first.handleMeetingInvited({ meetingId: 'one', meetingStatus: 'active' })
+    await second.handleMeetingInvited({ meetingId: 'two', meetingStatus: 'active' })
+    expect(vi.getTimerCount()).toBe(4)
+    first.$dispose()
+    expect(vi.getTimerCount()).toBe(2)
+    sfxMock.playSfx.mockClear()
+    await vi.advanceTimersByTimeAsync(4000)
+    expect(sfxMock.playSfx).toHaveBeenCalledTimes(1)
+    second.reset()
+    expect(vi.getTimerCount()).toBe(0)
+    second.$dispose()
+  })
+
   beforeEach(() => {
     apiMock.get.mockReset()
     apiMock.post.mockReset()
@@ -259,7 +318,7 @@ describe('meetings store', () => {
 
     expect(meeting.id).toBe('meeting-active-open')
     expect(notificationsStoreMock.markMeetingInviteRead).toHaveBeenCalledWith('meeting-active-open')
-    expect(channelsStoreMock.select).toHaveBeenCalledWith('meeting-channel-active-open')
+    expect(channelsStoreMock.select).toHaveBeenCalledWith('meeting-channel-active-open', { isCurrent: expect.any(Function) })
   })
 
   it('loadOverviewBuckets fetches grouped overview payloads, probes for more past meetings, and merges visible results into the cache', async () => {

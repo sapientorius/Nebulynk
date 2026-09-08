@@ -22,10 +22,10 @@
         ]
       },
       {
-        "title": "exposes SMTP API helpers and admin-store bindings",
-        "disposition": "deferred-runtime",
-        "replacement": null,
-        "reason": "Kept as a legacy source check; runtime conversion outside the selected critical behavior remains deferred.",
+      "title": "exposes SMTP API helpers and admin-store bindings",
+        "disposition": "replaced",
+        "replacement": "frontend/test/lib/api-client-boundaries.test.js",
+        "reason": "AP-04: Verhalten wird an echten Komponenten bzw. API-Transport geprüft. Frühere Anforderungen an Methodennamen, Importpfade und Zustandsbesitz in der Ursprungsdatei entfallen; reine CSS-/Pixelvorgaben werden damit nicht als Laufzeitnachweis behauptet.",
         "assertions": [
           "expect(apiSource).toContain(\"api.get('/smtp-settings')\")",
           "expect(apiSource).toContain(\"api.patch('/smtp-settings', payload)\")",
@@ -113,10 +113,10 @@
     "sourcePath": "frontend/test/components/ChannelHeader.test.js",
     "tests": [
       {
-        "title": "keeps the meeting call action available for regular and voice channels but not meeting chat channels",
-        "disposition": "deferred-runtime",
-        "replacement": null,
-        "reason": "Kept as a legacy source check; runtime conversion outside the selected critical behavior remains deferred.",
+      "title": "keeps the meeting call action available for regular and voice channels but not meeting chat channels",
+        "disposition": "replaced",
+        "replacement": "frontend/test/components/ChannelHeader.component.test.js",
+        "reason": "AP-04: Verhalten wird an echten Komponenten bzw. API-Transport geprüft. Frühere Anforderungen an Methodennamen, Importpfade und Zustandsbesitz in der Ursprungsdatei entfallen; reine CSS-/Pixelvorgaben werden damit nicht als Laufzeitnachweis behauptet.",
         "assertions": [
           "expect(source).toContain(\"import { getPresenceStatusColor } from '../lib/user-presence.js'\")",
           "expect(source).toContain('return getPresenceStatusColor(this.dmDisplayInfo.badgeStatus || this.dmDisplayInfo.status)')",
@@ -126,10 +126,10 @@
         ]
       },
       {
-        "title": "moves secondary mobile actions into a dedicated overflow menu while keeping call primary",
-        "disposition": "deferred-runtime",
-        "replacement": null,
-        "reason": "Kept as a legacy source check; runtime conversion outside the selected critical behavior remains deferred.",
+      "title": "moves secondary mobile actions into a dedicated overflow menu while keeping call primary",
+        "disposition": "replaced",
+        "replacement": "frontend/test/components/ChannelHeader.component.test.js",
+        "reason": "AP-04: Verhalten wird an echten Komponenten bzw. API-Transport geprüft. Frühere Anforderungen an Methodennamen, Importpfade und Zustandsbesitz in der Ursprungsdatei entfallen; reine CSS-/Pixelvorgaben werden damit nicht als Laufzeitnachweis behauptet.",
         "assertions": [
           "expect(source).toContain('v-if=\"!isMobileLayout\"')",
           "expect(source).toContain('v-else class=\"channel-header-actions mobile-actions\"')",
@@ -153,10 +153,10 @@
         ]
       },
       {
-        "title": "exposes AI summary actions for presets, custom range, and selection mode inside the overflow menus",
-        "disposition": "deferred-runtime",
-        "replacement": null,
-        "reason": "Kept as a legacy source check; runtime conversion outside the selected critical behavior remains deferred.",
+      "title": "exposes AI summary actions for presets, custom range, and selection mode inside the overflow menus",
+        "disposition": "replaced",
+        "replacement": "frontend/test/components/ChannelHeader.component.test.js",
+        "reason": "AP-04: Verhalten wird an echten Komponenten bzw. API-Transport geprüft. Frühere Anforderungen an Methodennamen, Importpfade und Zustandsbesitz in der Ursprungsdatei entfallen; reine CSS-/Pixelvorgaben werden damit nicht als Laufzeitnachweis behauptet.",
         "assertions": [
           "expect(source).toContain('data-testid=\"channel-header-summary-toggle\"')",
           "expect(source).toContain('data-testid=\"channel-header-summary-actions\"')",
@@ -173,10 +173,10 @@
         ]
       },
       {
-        "title": "groups schedule and past meetings under a shared meetings entry point and keeps past meetings on the shared side panel flow",
-        "disposition": "deferred-runtime",
-        "replacement": null,
-        "reason": "Kept as a legacy source check; runtime conversion outside the selected critical behavior remains deferred.",
+      "title": "groups schedule and past meetings under a shared meetings entry point and keeps past meetings on the shared side panel flow",
+        "disposition": "replaced",
+        "replacement": "frontend/test/components/ChannelHeader.component.test.js",
+        "reason": "AP-04: Verhalten wird an echten Komponenten bzw. API-Transport geprüft. Frühere Anforderungen an Methodennamen, Importpfade und Zustandsbesitz in der Ursprungsdatei entfallen; reine CSS-/Pixelvorgaben werden damit nicht als Laufzeitnachweis behauptet.",
         "assertions": [
           "expect(source).toContain(\"ui.views.schedule_meeting\")",
           "expect(source).toContain(\"ui.views.meeting_language\")",
@@ -206,10 +206,10 @@
         ]
       },
       {
-        "title": "keeps leave behind the overflow menu instead of the direct desktop action row",
-        "disposition": "deferred-runtime",
-        "replacement": null,
-        "reason": "Kept as a legacy source check; runtime conversion outside the selected critical behavior remains deferred.",
+      "title": "keeps leave behind the overflow menu instead of the direct desktop action row",
+        "disposition": "replaced",
+        "replacement": "frontend/test/components/ChannelHeader.component.test.js",
+        "reason": "AP-04: Verhalten wird an echten Komponenten bzw. API-Transport geprüft. Frühere Anforderungen an Methodennamen, Importpfade und Zustandsbesitz in der Ursprungsdatei entfallen; reine CSS-/Pixelvorgaben werden damit nicht als Laufzeitnachweis behauptet.",
         "assertions": [
           "expect(source).toContain('data-testid=\"channel-header-overflow-trigger\"')",
           "expect(source).toContain('data-testid=\"leave-current-channel\"')",
@@ -219,10 +219,10 @@
         ]
       },
       {
-        "title": "loads and saves meeting history access for channels and owner-managed groups",
-        "disposition": "deferred-runtime",
-        "replacement": null,
-        "reason": "Kept as a legacy source check; runtime conversion outside the selected critical behavior remains deferred.",
+      "title": "loads and saves meeting history access for channels and owner-managed groups",
+        "disposition": "replaced",
+        "replacement": "frontend/test/components/ChannelHeader.component.test.js",
+        "reason": "AP-04: Verhalten wird an echten Komponenten bzw. API-Transport geprüft. Frühere Anforderungen an Methodennamen, Importpfade und Zustandsbesitz in der Ursprungsdatei entfallen; reine CSS-/Pixelvorgaben werden damit nicht als Laufzeitnachweis behauptet.",
         "assertions": [
           "expect(source).toContain('data-testid=\"channel-meeting-history-access\"')",
           "expect(source).toContain('membership?.role === \\'owner\\'')",
@@ -2674,10 +2674,10 @@
     "sourcePath": "frontend/test/views/MeetingView.test.js",
     "tests": [
       {
-        "title": "does not render the ended-meeting group chat CTA anymore",
-        "disposition": "deferred-runtime",
-        "replacement": null,
-        "reason": "Kept as a legacy source check; runtime conversion outside the selected critical behavior remains deferred.",
+      "title": "does not render the ended-meeting group chat CTA anymore",
+        "disposition": "replaced",
+        "replacement": "frontend/test/views/MeetingView.component.test.js; frontend/test/e2e/meeting-screen-share.spec.js; frontend/test/e2e/core-paths.spec.js",
+        "reason": "AP-04: Verhalten wird an echten Komponenten bzw. API-Transport geprüft. Frühere Anforderungen an Methodennamen, Importpfade und Zustandsbesitz in der Ursprungsdatei entfallen; reine CSS-/Pixelvorgaben werden damit nicht als Laufzeitnachweis behauptet.",
         "assertions": [
           "expect(source).not.toContain('ui.views.create_group_chat')",
           "expect(source).not.toContain('canCreateGroupFromMeeting')",
@@ -2685,10 +2685,10 @@
         ]
       },
       {
-        "title": "uses a focus layout with overlay chat while screen share is maximized",
-        "disposition": "static-retained",
-        "replacement": null,
-        "reason": "Structural/render-source convention only; does not claim executed user behavior.",
+      "title": "uses a focus layout with overlay chat while screen share is maximized",
+        "disposition": "replaced",
+        "replacement": "frontend/test/views/MeetingView.component.test.js; frontend/test/e2e/meeting-screen-share.spec.js; frontend/test/e2e/core-paths.spec.js",
+        "reason": "AP-04: Verhalten wird an echten Komponenten bzw. API-Transport geprüft. Frühere Anforderungen an Methodennamen, Importpfade und Zustandsbesitz in der Ursprungsdatei entfallen; reine CSS-/Pixelvorgaben werden damit nicht als Laufzeitnachweis behauptet.",
         "assertions": [
           "expect(source).toContain(\"v-if=\\\"meeting && !shareMaximized\\\"\")",
           "expect(source).toContain('v-if=\"shouldShowMeetingContentArea\"')",
@@ -2703,10 +2703,10 @@
         ]
       },
       {
-        "title": "uses an adaptive live stage for video-focused and share-focused meeting layouts",
-        "disposition": "static-retained",
-        "replacement": null,
-        "reason": "Structural/render-source convention only; does not claim executed user behavior.",
+      "title": "uses an adaptive live stage for video-focused and share-focused meeting layouts",
+        "disposition": "replaced",
+        "replacement": "frontend/test/views/MeetingView.component.test.js; frontend/test/e2e/meeting-screen-share.spec.js; frontend/test/e2e/core-paths.spec.js",
+        "reason": "AP-04: Verhalten wird an echten Komponenten bzw. API-Transport geprüft. Frühere Anforderungen an Methodennamen, Importpfade und Zustandsbesitz in der Ursprungsdatei entfallen; reine CSS-/Pixelvorgaben werden damit nicht als Laufzeitnachweis behauptet.",
         "assertions": [
           "expect(source).toContain('data-testid=\"meeting-live-stage\"')",
           "expect(source).toContain(':class=\"meetingStageMode\"')",
@@ -2724,10 +2724,10 @@
         ]
       },
       {
-        "title": "uses generic ui store screen share state while preserving meeting behavior",
-        "disposition": "deferred-runtime",
-        "replacement": null,
-        "reason": "Kept as a legacy source check; runtime conversion outside the selected critical behavior remains deferred.",
+      "title": "uses generic ui store screen share state while preserving meeting behavior",
+        "disposition": "replaced",
+        "replacement": "frontend/test/views/MeetingView.component.test.js; frontend/test/e2e/meeting-screen-share.spec.js; frontend/test/e2e/core-paths.spec.js",
+        "reason": "AP-04: Verhalten wird an echten Komponenten bzw. API-Transport geprüft. Frühere Anforderungen an Methodennamen, Importpfade und Zustandsbesitz in der Ursprungsdatei entfallen; reine CSS-/Pixelvorgaben werden damit nicht als Laufzeitnachweis behauptet.",
         "assertions": [
           "expect(source).toContain(\"return this.uiStore.screenSharePanelVisible || (this.hasActiveShare && !this.uiStore.hideScreenSharePanel)\")",
           "expect(controlsSource).toContain('this.uiStore.openScreenSharePanel()')",
@@ -2738,10 +2738,10 @@
         ]
       },
       {
-        "title": "animates the share trigger dot only while an active share is hidden",
-        "disposition": "deferred-runtime",
-        "replacement": null,
-        "reason": "Kept as a legacy source check; runtime conversion outside the selected critical behavior remains deferred.",
+      "title": "animates the share trigger dot only while an active share is hidden",
+        "disposition": "replaced",
+        "replacement": "frontend/test/views/MeetingView.component.test.js; frontend/test/e2e/meeting-screen-share.spec.js; frontend/test/e2e/core-paths.spec.js",
+        "reason": "AP-04: Verhalten wird an echten Komponenten bzw. API-Transport geprüft. Frühere Anforderungen an Methodennamen, Importpfade und Zustandsbesitz in der Ursprungsdatei entfallen; reine CSS-/Pixelvorgaben werden damit nicht als Laufzeitnachweis behauptet.",
         "assertions": [
           "expect(source).toContain(':share-hidden=\"isShareHidden\"')",
           "expect(source).toContain(\"isShareHidden()\")",
@@ -2752,10 +2752,10 @@
         ]
       },
       {
-        "title": "offers a publish-quality selector before starting a screen share",
-        "disposition": "deferred-runtime",
-        "replacement": null,
-        "reason": "Kept as a legacy source check; runtime conversion outside the selected critical behavior remains deferred.",
+      "title": "offers a publish-quality selector before starting a screen share",
+        "disposition": "replaced",
+        "replacement": "frontend/test/views/MeetingView.component.test.js; frontend/test/e2e/meeting-screen-share.spec.js; frontend/test/e2e/core-paths.spec.js",
+        "reason": "AP-04: Verhalten wird an echten Komponenten bzw. API-Transport geprüft. Frühere Anforderungen an Methodennamen, Importpfade und Zustandsbesitz in der Ursprungsdatei entfallen; reine CSS-/Pixelvorgaben werden damit nicht als Laufzeitnachweis behauptet.",
         "assertions": [
           "expect(source).toContain('<ScreenShareControls')",
           "expect(source).toContain('test-id-prefix=\"meeting\"')",
@@ -2766,10 +2766,10 @@
         ]
       },
       {
-        "title": "renders meeting video only for an active connected meeting call",
-        "disposition": "deferred-runtime",
-        "replacement": null,
-        "reason": "Kept as a legacy source check; runtime conversion outside the selected critical behavior remains deferred.",
+      "title": "renders meeting video only for an active connected meeting call",
+        "disposition": "replaced",
+        "replacement": "frontend/test/views/MeetingView.component.test.js; frontend/test/e2e/meeting-screen-share.spec.js; frontend/test/e2e/core-paths.spec.js",
+        "reason": "AP-04: Verhalten wird an echten Komponenten bzw. API-Transport geprüft. Frühere Anforderungen an Methodennamen, Importpfade und Zustandsbesitz in der Ursprungsdatei entfallen; reine CSS-/Pixelvorgaben werden damit nicht als Laufzeitnachweis behauptet.",
         "assertions": [
           "expect(source).toContain(\"const MeetingVideoGrid = defineAsyncComponent(() => import('../components/MeetingVideoGrid.vue'))\")",
           "expect(source).toContain('<MeetingVideoGrid')",
@@ -2793,10 +2793,10 @@
         ]
       },
       {
-        "title": "moves mobile meeting actions and video management into compact overflow surfaces",
-        "disposition": "static-retained",
-        "replacement": null,
-        "reason": "Structural/render-source convention only; does not claim executed user behavior.",
+      "title": "moves mobile meeting actions and video management into compact overflow surfaces",
+        "disposition": "replaced",
+        "replacement": "frontend/test/views/MeetingView.component.test.js; frontend/test/e2e/meeting-screen-share.spec.js; frontend/test/e2e/core-paths.spec.js",
+        "reason": "AP-04: Verhalten wird an echten Komponenten bzw. API-Transport geprüft. Frühere Anforderungen an Methodennamen, Importpfade und Zustandsbesitz in der Ursprungsdatei entfallen; reine CSS-/Pixelvorgaben werden damit nicht als Laufzeitnachweis behauptet.",
         "assertions": [
           "expect(source).toContain('data-testid=\"meeting-mobile-overflow-trigger\"')",
           "expect(source).toContain('data-testid=\"meeting-mobile-overflow-menu\"')",
@@ -2827,10 +2827,10 @@
         ]
       },
       {
-        "title": "delegates artifact rendering to focused components while preserving tabs and events",
-        "disposition": "static-retained",
-        "replacement": null,
-        "reason": "Structural/render-source convention only; does not claim executed user behavior.",
+      "title": "delegates artifact rendering to focused components while preserving tabs and events",
+        "disposition": "replaced",
+        "replacement": "frontend/test/views/MeetingView.component.test.js; frontend/test/e2e/meeting-screen-share.spec.js; frontend/test/e2e/core-paths.spec.js",
+        "reason": "AP-04: Verhalten wird an echten Komponenten bzw. API-Transport geprüft. Frühere Anforderungen an Methodennamen, Importpfade und Zustandsbesitz in der Ursprungsdatei entfallen; reine CSS-/Pixelvorgaben werden damit nicht als Laufzeitnachweis behauptet.",
         "assertions": [
           "expect(source).toContain(\"const MeetingSummaryPanel = defineAsyncComponent(() => import('../components/MeetingSummaryPanel.vue'))\")",
           "expect(source).toContain(\"const MeetingTranscriptPanel = defineAsyncComponent(() => import('../components/MeetingTranscriptPanel.vue'))\")",
@@ -2875,10 +2875,10 @@
         ]
       },
       {
-        "title": "keeps the compact ended-meeting artifact menu unchanged while only restyling the header overflow menu",
-        "disposition": "static-retained",
-        "replacement": null,
-        "reason": "Structural/render-source convention only; does not claim executed user behavior.",
+      "title": "keeps the compact ended-meeting artifact menu unchanged while only restyling the header overflow menu",
+        "disposition": "replaced",
+        "replacement": "frontend/test/views/MeetingView.component.test.js; frontend/test/e2e/meeting-screen-share.spec.js; frontend/test/e2e/core-paths.spec.js",
+        "reason": "AP-04: Verhalten wird an echten Komponenten bzw. API-Transport geprüft. Frühere Anforderungen an Methodennamen, Importpfade und Zustandsbesitz in der Ursprungsdatei entfallen; reine CSS-/Pixelvorgaben werden damit nicht als Laufzeitnachweis behauptet.",
         "assertions": [
           "expect(source).toContain('data-testid=\"meeting-ended-actions-menu\"')",
           "expect(source).toContain('data-testid=\"meeting-ended-action-summary\"')",
@@ -2893,10 +2893,10 @@
         ]
       },
       {
-        "title": "shows the compact ended-meeting action menu as a wide mobile bottom sheet",
-        "disposition": "static-retained",
-        "replacement": null,
-        "reason": "Structural/render-source convention only; does not claim executed user behavior.",
+      "title": "shows the compact ended-meeting action menu as a wide mobile bottom sheet",
+        "disposition": "replaced",
+        "replacement": "frontend/test/views/MeetingView.component.test.js; frontend/test/e2e/meeting-screen-share.spec.js; frontend/test/e2e/core-paths.spec.js",
+        "reason": "AP-04: Verhalten wird an echten Komponenten bzw. API-Transport geprüft. Frühere Anforderungen an Methodennamen, Importpfade und Zustandsbesitz in der Ursprungsdatei entfallen; reine CSS-/Pixelvorgaben werden damit nicht als Laufzeitnachweis behauptet.",
         "assertions": [
           "expect(source).toContain('data-testid=\"meeting-ended-actions-sheet\"')",
           "expect(source).toContain('data-testid=\"meeting-ended-actions-sheet-close\"')",
@@ -2912,10 +2912,10 @@
         ]
       },
       {
-        "title": "keeps store mutations, share side effects, and summary payload assembly in the view",
-        "disposition": "static-retained",
-        "replacement": null,
-        "reason": "Structural/render-source convention only; does not claim executed user behavior.",
+      "title": "keeps store mutations, share side effects, and summary payload assembly in the view",
+        "disposition": "replaced",
+        "replacement": "frontend/test/views/MeetingView.component.test.js; frontend/test/e2e/meeting-screen-share.spec.js; frontend/test/e2e/core-paths.spec.js",
+        "reason": "AP-04: Verhalten wird an echten Komponenten bzw. API-Transport geprüft. Frühere Anforderungen an Methodennamen, Importpfade und Zustandsbesitz in der Ursprungsdatei entfallen; reine CSS-/Pixelvorgaben werden damit nicht als Laufzeitnachweis behauptet.",
         "assertions": [
           "expect(source).toContain('triggerSummaryGeneration(options = {})')",
           "expect(source).toContain('triggerTranscriptGeneration(options = {})')",
@@ -2934,10 +2934,10 @@
         ]
       },
       {
-        "title": "shows attended participants, uses ended meeting engagement counts, and prepends a meeting link in shared summaries",
-        "disposition": "deferred-runtime",
-        "replacement": null,
-        "reason": "Kept as a legacy source check; runtime conversion outside the selected critical behavior remains deferred.",
+      "title": "shows attended participants, uses ended meeting engagement counts, and prepends a meeting link in shared summaries",
+        "disposition": "replaced",
+        "replacement": "frontend/test/views/MeetingView.component.test.js; frontend/test/e2e/meeting-screen-share.spec.js; frontend/test/e2e/core-paths.spec.js",
+        "reason": "AP-04: Verhalten wird an echten Komponenten bzw. API-Transport geprüft. Frühere Anforderungen an Methodennamen, Importpfade und Zustandsbesitz in der Ursprungsdatei entfallen; reine CSS-/Pixelvorgaben werden damit nicht als Laufzeitnachweis behauptet.",
         "assertions": [
           "expect(source).toContain('meetingVoiceParticipants() {')",
           "expect(source).toContain('visibleMeetingParticipants()')",
@@ -2951,10 +2951,10 @@
         ]
       },
       {
-        "title": "tracks mobile layout and switches ended-meeting surfaces for evidence navigation",
-        "disposition": "static-retained",
-        "replacement": null,
-        "reason": "Structural/render-source convention only; does not claim executed user behavior.",
+      "title": "tracks mobile layout and switches ended-meeting surfaces for evidence navigation",
+        "disposition": "replaced",
+        "replacement": "frontend/test/views/MeetingView.component.test.js; frontend/test/e2e/meeting-screen-share.spec.js; frontend/test/e2e/core-paths.spec.js",
+        "reason": "AP-04: Verhalten wird an echten Komponenten bzw. API-Transport geprüft. Frühere Anforderungen an Methodennamen, Importpfade und Zustandsbesitz in der Ursprungsdatei entfallen; reine CSS-/Pixelvorgaben werden damit nicht als Laufzeitnachweis behauptet.",
         "assertions": [
           "expect(source).toContain(\"import { observeMobileLayout, readIsMobileLayout } from '../lib/mobile-layout.js'\")",
           "expect(source).toContain('isMobileLayout: readIsMobileLayout()')",
@@ -2986,10 +2986,10 @@
         ]
       },
       {
-        "title": "delegates member-panel toggling to the shared workspace shell",
-        "disposition": "static-retained",
-        "replacement": null,
-        "reason": "Structural/render-source convention only; does not claim executed user behavior.",
+      "title": "delegates member-panel toggling to the shared workspace shell",
+        "disposition": "replaced",
+        "replacement": "frontend/test/views/MeetingView.component.test.js; frontend/test/e2e/meeting-screen-share.spec.js; frontend/test/e2e/core-paths.spec.js",
+        "reason": "AP-04: Verhalten wird an echten Komponenten bzw. API-Transport geprüft. Frühere Anforderungen an Methodennamen, Importpfade und Zustandsbesitz in der Ursprungsdatei entfallen; reine CSS-/Pixelvorgaben werden damit nicht als Laufzeitnachweis behauptet.",
         "assertions": [
           "expect(source).toContain('emits: [\\'toggle-members\\']')",
           "expect(source).toContain('@click=\"$emit(\\'toggle-members\\')\"')",
@@ -2998,10 +2998,10 @@
         ]
       },
       {
-        "title": "clears the active meeting context only when navigating away from meeting routes",
-        "disposition": "deferred-runtime",
-        "replacement": null,
-        "reason": "Kept as a legacy source check; runtime conversion outside the selected critical behavior remains deferred.",
+      "title": "clears the active meeting context only when navigating away from meeting routes",
+        "disposition": "replaced",
+        "replacement": "frontend/test/views/MeetingView.component.test.js; frontend/test/e2e/meeting-screen-share.spec.js; frontend/test/e2e/core-paths.spec.js",
+        "reason": "AP-04: Verhalten wird an echten Komponenten bzw. API-Transport geprüft. Frühere Anforderungen an Methodennamen, Importpfade und Zustandsbesitz in der Ursprungsdatei entfallen; reine CSS-/Pixelvorgaben werden damit nicht als Laufzeitnachweis behauptet.",
         "assertions": [
           "expect(source).toContain(\"shouldPreserveMeetingContextRoute(route)\")",
           "expect(source).toContain(\"return route?.name === 'Meeting' || route?.name === 'MeetingScreenShare'\")",
@@ -3010,10 +3010,10 @@
         ]
       },
       {
-        "title": "supports scheduled meeting controls, guest links, and ICS downloads",
-        "disposition": "deferred-runtime",
-        "replacement": null,
-        "reason": "Kept as a legacy source check; runtime conversion outside the selected critical behavior remains deferred.",
+      "title": "supports scheduled meeting controls, guest links, and ICS downloads",
+        "disposition": "replaced",
+        "replacement": "frontend/test/views/MeetingView.component.test.js; frontend/test/e2e/meeting-screen-share.spec.js; frontend/test/e2e/core-paths.spec.js",
+        "reason": "AP-04: Verhalten wird an echten Komponenten bzw. API-Transport geprüft. Frühere Anforderungen an Methodennamen, Importpfade und Zustandsbesitz in der Ursprungsdatei entfallen; reine CSS-/Pixelvorgaben werden damit nicht als Laufzeitnachweis behauptet.",
         "assertions": [
           "expect(source).toContain(\"CloseOutline\")",
           "expect(source).toContain(\"EllipsisHorizontalOutline as MoreIcon\")",
@@ -3063,10 +3063,10 @@
         ]
       },
       {
-        "title": "hides ended-meeting in-app summary sharing for guest users while keeping the member flow guarded in the view",
-        "disposition": "deferred-runtime",
-        "replacement": null,
-        "reason": "Kept as a legacy source check; runtime conversion outside the selected critical behavior remains deferred.",
+      "title": "hides ended-meeting in-app summary sharing for guest users while keeping the member flow guarded in the view",
+        "disposition": "replaced",
+        "replacement": "frontend/test/views/MeetingView.component.test.js; frontend/test/e2e/meeting-screen-share.spec.js; frontend/test/e2e/core-paths.spec.js",
+        "reason": "AP-04: Verhalten wird an echten Komponenten bzw. API-Transport geprüft. Frühere Anforderungen an Methodennamen, Importpfade und Zustandsbesitz in der Ursprungsdatei entfallen; reine CSS-/Pixelvorgaben werden damit nicht als Laufzeitnachweis behauptet.",
         "assertions": [
           "expect(source).toContain(':can-share-in-app=\"canShareSummaryInApp\"')",
           "expect(source).toContain('canShareSummaryInApp()')",
@@ -3076,10 +3076,10 @@
         ]
       },
       {
-        "title": "renders the policy denial state for restricted direct meeting URLs",
-        "disposition": "deferred-runtime",
-        "replacement": null,
-        "reason": "Kept as a legacy source check; runtime conversion outside the selected critical behavior remains deferred.",
+      "title": "renders the policy denial state for restricted direct meeting URLs",
+        "disposition": "replaced",
+        "replacement": "frontend/test/views/MeetingView.component.test.js; frontend/test/e2e/meeting-screen-share.spec.js; frontend/test/e2e/core-paths.spec.js",
+        "reason": "AP-04: Verhalten wird an echten Komponenten bzw. API-Transport geprüft. Frühere Anforderungen an Methodennamen, Importpfade und Zustandsbesitz in der Ursprungsdatei entfallen; reine CSS-/Pixelvorgaben werden damit nicht als Laufzeitnachweis behauptet.",
         "assertions": [
           "expect(source).toContain('v-if=\"isMeetingContentRestricted\"')",
           "expect(source).toContain('data-testid=\"meeting-access-restricted\"')",
@@ -3289,10 +3289,10 @@
     "sourcePath": "frontend/test/views/SettingsView.test.js",
     "tests": [
       {
-        "title": "adds a dedicated security tab with a password change form",
-        "disposition": "deferred-runtime",
-        "replacement": null,
-        "reason": "Kept as a legacy source check; runtime conversion outside the selected critical behavior remains deferred.",
+      "title": "adds a dedicated security tab with a password change form",
+        "disposition": "replaced",
+        "replacement": "frontend/test/components/SettingsSecurity.component.test.js; frontend/test/e2e/settings-security.spec.js",
+        "reason": "AP-04: Verhalten wird an echten Komponenten bzw. API-Transport geprüft. Frühere Anforderungen an Methodennamen, Importpfade und Zustandsbesitz in der Ursprungsdatei entfallen; reine CSS-/Pixelvorgaben werden damit nicht als Laufzeitnachweis behauptet.",
         "assertions": [
           "expect(source).toContain(\"key: 'security'\")",
           "expect(source).toContain(\"activeTab === 'security'\")",

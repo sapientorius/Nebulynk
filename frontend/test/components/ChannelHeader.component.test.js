@@ -3,7 +3,7 @@ import { DOMWrapper, flushPromises } from '@vue/test-utils'
 import { nextTick } from 'vue'
 import ChannelHeader from '../../src/components/ChannelHeader.vue'
 import MeetingHistoryAccessSelect from '../../src/components/MeetingHistoryAccessSelect.vue'
-import { componentContext } from '../helpers/mount-component.js'
+import { componentContext, deferred } from '../helpers/mount-component.js'
 import { useChannelsStore, useSessionStore, useUiStore, useMessageSummariesStore } from '../../src/stores/index.js'
 import api from '../../src/lib/api.js'
 
@@ -104,4 +104,26 @@ it('selection mode is activated by its menu action', async () => {
   await body().get('.summary-select').trigger('click')
   await flushPromises()
   expect(useMessageSummariesStore().selectionMode).toBe(true)
+})
+
+it('leaves from the confirmation and navigates after the request completes', async () => {
+  const pending = deferred()
+  vi.spyOn(channels, 'leaveChannel').mockImplementation(async () => { await pending.promise; channels.channels = [] })
+  await render()
+  await click('channel-header-overflow-trigger')
+  await click('leave-current-channel')
+  await click('confirm-leave-channel')
+  expect(channels.leaveChannel).toHaveBeenCalledWith('a')
+  pending.resolve()
+  await flushPromises()
+  expect(context.router.currentRoute.value.path).toBe('/channels')
+})
+
+it('archives through the extracted settings dialog', async () => {
+  await render()
+  await click('channel-header-overflow-trigger')
+  await click('channel-header-settings')
+  await body().findAll('button').find(button => button.text() === 'Archive channel').trigger('click')
+  await flushPromises()
+  expect(api.patch).toHaveBeenCalledWith('/channels/a', { is_archived: true })
 })

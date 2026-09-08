@@ -405,7 +405,7 @@ export const useChannelsStore = defineStore('channels', () => {
     return true
   }
 
-  async function select(channelId) {
+  async function select(channelId, { isCurrent = () => true } = {}) {
     const messagesStore = useMessagesStore()
     const previousChannelId = activeChannelId.value
     const selectedChannel = channels.value.find((channel) => channel.id === channelId)
@@ -414,6 +414,7 @@ export const useChannelsStore = defineStore('channels', () => {
     if (previousChannelId && previousChannelId !== channelId) {
       await flushReadWatermark(previousChannelId).catch(() => {})
     }
+    if (!isCurrent()) return
 
     activeChannelId.value = channelId
     members.value = []
