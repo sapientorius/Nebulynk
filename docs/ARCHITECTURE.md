@@ -87,7 +87,8 @@ repository and integration adapters. It retains Feathers registration,
 authentication, schema validation and `patch` dispatch. Only `find`, `get`,
 `create` and `patch` are externally registered. Existing internal method delegates
 preserve the service's test and extension seams without moving domain ownership
-back into the transport layer. See [AP-04 handoff](AP_04_HANDOFF.md) for verification.
+back into the transport layer. See the [project review summary](PROJECT_REVIEW_SUMMARY.md)
+for verification.
 
 Application cases own transactions and pass `trx` explicitly to repository
 operations. Repositories do not start nested transactions. Creation retains the

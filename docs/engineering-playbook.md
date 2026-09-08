@@ -137,10 +137,10 @@ mount helper with real Pinia, router, translations and Naive UI providers.
 Mock external requests/devices, not the handler or store decision being tested.
 Clean up mounted trees, listeners, timers and owned object URLs.
 
-Source assertions establish only static conventions. The complete inventory and
-replacement/defer decisions are in [AP-03 test contracts](AP_03_TEST_CONTRACTS.md),
-with original assertions in its JSON companion. DOM tests prove component
-interactions, not browser layout, cookie sessions or actual media delivery.
+Source assertions establish only static conventions and are not runtime proof.
+The review's replacement/defer boundary is summarized in the [project review
+summary](PROJECT_REVIEW_SUMMARY.md). DOM tests prove component interactions,
+not browser layout, cookie sessions or actual media delivery.
 Playwright remains necessary for those browser flows. The screenshare browser
 test uses a synthetic canvas MediaStream and fake LiveKit, not a media-capacity
 or real-device acceptance test.
@@ -210,5 +210,5 @@ rtk proxy npm run test:e2e --workspace=frontend -- --project=onboarding --grep '
 
 For reminders, replace the final filter with `mobile message reminders`. That
 browser test covers mobile layout, save, reload, reschedule with the same ID,
-and cancellation surviving a reload. See [AP-02 handoff](AP_02_HANDOFF.md) for
-the consistency boundary, upgrade procedure, and verification evidence.
+and cancellation surviving a reload. See the [project review summary](PROJECT_REVIEW_SUMMARY.md)
+for the consistency boundary and remaining delivery limits.
