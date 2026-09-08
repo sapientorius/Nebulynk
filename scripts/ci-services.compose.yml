@@ -1,0 +1,43 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: isolated-ci-password
+      POSTGRES_DB: postgres
+    ports:
+      - "127.0.0.1::5432"
+    volumes:
+      - database:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U postgres -d postgres"]
+      interval: 2s
+      timeout: 3s
+      retries: 45
+  redis:
+    image: redis:7.4.7-alpine3.21
+    ports:
+      - "127.0.0.1::6379"
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 2s
+      timeout: 3s
+      retries: 45
+  garage:
+    image: dxflrs/garage:v2.3.0
+    environment:
+      GARAGE_RPC_SECRET: "0000000000000000000000000000000000000000000000000000000000000000"
+      GARAGE_DEFAULT_ACCESS_KEY: nebulynk
+      GARAGE_DEFAULT_SECRET_KEY: integration-storage-secret
+      GARAGE_DEFAULT_BUCKET: nebulynk-files
+    command: /garage server --single-node --default-bucket
+    ports:
+      - "127.0.0.1::3900"
+    volumes:
+      - ../garage.toml:/etc/garage.toml:ro
+      - garage_meta:/var/lib/garage/meta
+      - garage_data:/var/lib/garage/data
+volumes:
+  database:
+  garage_meta:
+  garage_data:

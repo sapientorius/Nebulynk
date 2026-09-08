@@ -1,6 +1,7 @@
 import { defineConfig } from '@playwright/test'
 import {
   backendPort,
+  frontendPort,
   backendUrl,
   frontendUrl,
   shouldUsePreviewFrontend,
@@ -9,9 +10,10 @@ import {
 } from './test/e2e/test-urls.js'
 
 const isCI = !!process.env.CI
+const strictCI = process.env.NEBULYNK_CI_STRICT === 'true'
 const postgresDb = process.env.E2E_POSTGRES_DB || 'nebulynk_e2e'
 const frontendServeCommand = shouldUsePreviewFrontend
-  ? 'npm run e2e:security:serve'
+  ? `npm run e2e:security:serve -- --port ${frontendPort}`
   : 'npm run e2e:dev'
 const screenshotsSpec = /screenshots\.spec\.js$/
 const corePathsSpec = /core-paths\.spec\.js$/
@@ -24,7 +26,7 @@ export default defineConfig({
   },
   fullyParallel: false,
   workers: 1,
-  retries: isCI ? 1 : 0,
+  retries: strictCI ? 0 : (isCI ? 1 : 0),
   projects: [
     {
       name: 'onboarding',
@@ -58,7 +60,7 @@ export default defineConfig({
           command: 'npm run e2e:backend --prefix ..',
           url: resolveBackendUrl('/platform'),
           timeout: 180_000,
-          reuseExistingServer: !isCI,
+          reuseExistingServer: !isCI && !strictCI,
           env: {
             ...process.env,
             BACKEND_PORT: backendPort,
@@ -71,7 +73,7 @@ export default defineConfig({
           command: frontendServeCommand,
           url: frontendUrl,
           timeout: 180_000,
-          reuseExistingServer: !isCI,
+          reuseExistingServer: !isCI && !strictCI,
           env: {
             ...process.env,
             VITE_API_URL: backendUrl,

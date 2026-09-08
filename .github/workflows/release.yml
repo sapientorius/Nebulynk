@@ -26,23 +26,12 @@ jobs:
           git fetch origin stable
           git merge-base --is-ancestor "$GITHUB_SHA" origin/stable
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Validate release metadata and tag
-        run: npm run release:validate
-
-      - name: Run release CI
-        run: npm run ci
+  checks:
+    needs: validate
+    uses: ./.github/workflows/ci.yml
 
   sign-and-publish:
-    needs: validate
+    needs: [validate, checks]
     runs-on: ubuntu-latest
     environment: release-production
     permissions:

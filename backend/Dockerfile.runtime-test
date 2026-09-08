@@ -6,5 +6,7 @@ COPY backend/package.json ./backend/package.json
 RUN npm ci --workspace=backend
 COPY backend ./backend
 RUN test -f backend/test/helpers/postgres-test-db.js && test -f backend/test/runtime.test.js
+RUN chown -R node:node /app
+USER node
 WORKDIR /app/backend
 CMD ["node", "scripts/runtime-benchmark-client.mjs"]

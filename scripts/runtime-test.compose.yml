@@ -67,6 +67,8 @@ services:
       timeout: 3s
       retries: 60
   generator:
+    # Match the report owner on Linux; Docker Desktop uses the node default.
+    user: "${AP05_TEST_UID:-1000}:${AP05_TEST_GID:-1000}"
     build:
       context: ..
       dockerfile: backend/Dockerfile.runtime-test

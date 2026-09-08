@@ -291,13 +291,9 @@ test('registers both Plesk Nginx hook variants and keeps domain routing scoped',
 })
 
 async function canRunDocker() {
-  if (process.platform !== 'linux') {
-    return false
-  }
-
   try {
-    await execFileAsync('docker', ['info'], { timeout: 10000 })
-    return true
+    const { stdout } = await execFileAsync('docker', ['info', '--format', '{{.OSType}}'], { timeout: 10000 })
+    return stdout.trim() === 'linux'
   } catch {
     return false
   }
@@ -306,7 +302,10 @@ async function canRunDocker() {
 async function runCleanupFixture({ composeExit = 0, remaining = false, symlink = false } = {}) {
   const fixtureRoot = await mkdtemp(path.join(os.tmpdir(), 'nebulynk-plesk-cleanup-'))
   const fakeDockerPath = path.join(fixtureRoot, 'docker')
-  const helperPath = repositoryPath('plesk-extension', 'sbin', 'nebulynk-plesk')
+  const helperPath = path.join(fixtureRoot, 'nebulynk-plesk')
+  // Execute Linux shell source independently of Windows checkout line endings.
+  await writeFile(helperPath, (await readFile(repositoryPath('plesk-extension', 'sbin', 'nebulynk-plesk'), 'utf8')).replace(/\r\n/g, '\n'))
+  await chmod(helperPath, 0o755)
 
   await writeFile(fakeDockerPath, `#!/bin/sh
 set -eu
@@ -363,6 +362,7 @@ fi
     return await execFileAsync('docker', [
       'run',
       '--rm',
+      ...(process.env.PLESK_FIXTURE_OWNER ? ['--label', `nebulynk.ci=${process.env.PLESK_FIXTURE_OWNER}`] : []),
       '--network=none',
       '--mount',
       `type=bind,source=${helperPath},target=/usr/local/bin/nebulynk-plesk,readonly`,
@@ -384,6 +384,7 @@ fi
 
 test('fails closed before deleting the deployment when cleanup cannot be verified', async (t) => {
   if (!await canRunDocker()) {
+    assert.notEqual(process.env.NEBULYNK_CI_STRICT, 'true', 'Full CI requires a Linux Docker daemon; Plesk cleanup must not skip')
     t.skip('requires a Linux Docker daemon')
     return
   }

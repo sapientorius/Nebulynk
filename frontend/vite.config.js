@@ -1,4 +1,5 @@
 import { fileURLToPath, URL } from 'node:url'
+import { dirname } from 'node:path'
 
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
@@ -75,6 +76,10 @@ const previewSecurityHeaders = {
 }
 
 export default defineConfig({
+  // Full CI must not load developer VITE_* values from frontend/.env files.
+  envDir: process.env.NEBULYNK_CI_STRICT === 'true'
+    ? dirname(process.env.NEBULYNK_ENV_FILE)
+    : undefined,
   plugins: [
     selfHostedLivekitTrackProcessorAssetsPlugin(),
     markdownItLinkifyInteropPlugin(),

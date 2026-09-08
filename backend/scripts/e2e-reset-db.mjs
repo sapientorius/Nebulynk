@@ -4,7 +4,7 @@ import { Client } from 'pg'
 import dotenv from 'dotenv'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
-dotenv.config({ path: resolve(__dirname, '../../.env') })
+dotenv.config({ path: process.env.NEBULYNK_ENV_FILE || resolve(__dirname, '../../.env') })
 
 const host = process.env.POSTGRES_HOST || '127.0.0.1'
 const port = Number(process.env.POSTGRES_PORT) || 5433

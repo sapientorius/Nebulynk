@@ -1,0 +1,33 @@
+title = "Nebulynk source and history scan"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "generic-api-key"
+
+  # Exact synthetic credentials in isolated, non-provider test harnesses only.
+  # AND preserves detection of any other secret at these same paths.
+  [[rules.allowlists]]
+  description = "AP-01 disposable HTTP/JWT fixture"
+  condition = "AND"
+  paths = ['''(^|/)backend/integration/messages-create\.postgres\.test\.js$''']
+  regexes = ['''^synthetic-ap01-jwt-secret$''']
+
+  [[rules.allowlists]]
+  description = "AP-02 disposable HTTP/JWT fixture"
+  condition = "AND"
+  paths = ['''(^|/)backend/integration/message-reminders\.postgres\.test\.js$''']
+  regexes = ['''^synthetic-ap02-jwt-secret$''']
+
+  [[rules.allowlists]]
+  description = "AP-04 disposable meeting fixture"
+  condition = "AND"
+  paths = ['''(^|/)backend/integration/meeting-lifecycle\.postgres\.test\.js$''']
+  regexes = ['''^synthetic-ap04-secret$''']
+
+  [[rules.allowlists]]
+  description = "AP-05 non-provider LiveKit fixture"
+  condition = "AND"
+  paths = ['''(^|/)scripts/runtime-test\.compose\.yml$''']
+  regexes = ['''^isolated-ap05$''']

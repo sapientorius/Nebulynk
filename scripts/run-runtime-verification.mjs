@@ -14,7 +14,12 @@ const project = `nebulynk-ap05-${randomBytes(6).toString('hex')}`
 const results = resolve(root, 'output', 'ap05', project)
 await mkdir(results, { recursive: true })
 await writeFile(resolve(results, 'empty.env'), '')
-const env = { ...process.env, AP05_RESULTS_DIR: results.replaceAll('\\', '/') }
+const env = {
+  ...process.env,
+  AP05_RESULTS_DIR: results.replaceAll('\\', '/'),
+  AP05_TEST_UID: String(process.getuid?.() ?? 1000),
+  AP05_TEST_GID: String(process.getgid?.() ?? 1000)
+}
 const composeArgs = ['compose', '--env-file', resolve(results, 'empty.env'), '-p', project, '-f', resolve(root, 'scripts/runtime-test.compose.yml')]
 function docker(args, { quiet = false, allowFailure = false } = {}) {
   return new Promise((resolveCommand, reject) => {

@@ -12,7 +12,7 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 const execFileAsync = promisify(execFile)
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const composeFile = path.join(repositoryRoot, 'scripts', 'plesk-garage-integration.compose.yml')
-const projectName = `nebulynk-plesk-sigv4-${process.pid}`
+const projectName = process.env.PLESK_GARAGE_PROJECT || `nebulynk-plesk-sigv4-${process.pid}`
 const shouldRun = process.env.PLESK_GARAGE_INTEGRATION === '1'
 
 async function reserveTcpPort() {
@@ -31,6 +31,7 @@ async function reserveTcpPort() {
 async function dockerCompose(args, port) {
   return execFileAsync('docker', [
     'compose',
+    ...(process.env.NEBULYNK_ENV_FILE ? ['--env-file', process.env.NEBULYNK_ENV_FILE] : []),
     '--project-name', projectName,
     '--file', composeFile,
     ...args
@@ -62,7 +63,7 @@ async function waitFor(check, { timeoutMs = 90_000, intervalMs = 1_000 } = {}) {
 }
 
 test('proxies signed Garage upload and download through /files/', { skip: !shouldRun }, async () => {
-  const port = await reserveTcpPort()
+  const port = process.env.EDGE_TEST_PORT || await reserveTcpPort()
   const endpoint = `http://127.0.0.1:${port}`
   const client = new S3Client({
     endpoint,
@@ -106,6 +107,7 @@ test('proxies signed Garage upload and download through /files/', { skip: !shoul
     assert.equal(response.status, 200)
     assert.equal(await response.text(), body)
   } finally {
-    await dockerCompose(['down', '--volumes', '--remove-orphans'], port).catch(() => {})
+    client.destroy()
+    await dockerCompose(['down', '--volumes', '--remove-orphans'], port)
   }
 })

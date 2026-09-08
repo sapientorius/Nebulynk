@@ -51,10 +51,10 @@ npm run build:frontend
 npm run test:e2e
 ```
 
-Run the existing local pipeline as well:
+The quick, infrastructure-free product check is:
 
 ```bash
-npm run ci
+npm run ci:core
 ```
 
 `lint` is semantic ESLint/Vue analysis. Frontend tests include separate Node and
@@ -64,10 +64,22 @@ PostgreSQL integration requires a disposable PostgreSQL 17 instance, an explicit
 Missing infrastructure fails the integration suite rather than skipping it.
 See the [engineering playbook](docs/engineering-playbook.md) for isolated setup.
 
-The current `ci` aggregate does not include PostgreSQL integration, browser E2E
-or all GitHub security scans. Its success is not a full CI acceptance result;
-run and report relevant additional checks separately. Normal commands need no
-RTK installation; explicit `:rtk` variants are available for local use.
+Full acceptance uses `npm run ci`: core, PostgreSQL integration, Plesk/Garage,
+the complete browser suite, and security. Use Node 22 (at least 22.12), run
+`npm ci`, install Chromium with
+`npm exec --workspace=frontend playwright install --with-deps chromium`, and
+start Docker with a Linux engine and Compose. Integration and browser groups
+create disposable services automatically; do not configure them with developer
+database credentials. Security also requires Git, complete Git history, and
+network access for the audit, scanner images and vulnerability database.
+Missing prerequisites or failed cleanup fail acceptance rather than skipping.
+
+Each group is independently runnable: `ci:core`, `ci:integration`, `ci:plesk`,
+`ci:e2e`, and `ci:security`. `ci:core` success alone is not full acceptance.
+Normal commands need no RTK; each group has a `:rtk` counterpart calling the
+same normal script. GitHub and release validation use these same groups.
+See the [engineering playbook](docs/engineering-playbook.md#full-ci-contract)
+for diagnostics, scan scope and the required GitHub status.
 
 If a local machine cannot run a check, include the attempted command, the reason
 it could not run, and the closest focused fallback in the pull request.

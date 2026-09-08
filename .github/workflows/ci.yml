@@ -4,187 +4,120 @@ on:
   push:
     branches: ['**']
   pull_request:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   validate:
+    name: Core
     runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Lint
-        run: npm run lint
-
-      - name: Validate release catalog and synchronized versions
-        run: npm run release:validate
-
-      - name: Backend tests
-        run: npm run test:backend
-
-      - name: Frontend tests
-        run: npm run test:frontend
-
-      - name: Frontend build
-        run: npm run build:frontend
-
-      - name: Build and validate Plesk extension
-        run: npm run plesk:package && npm run plesk:package:check && npm run test:plesk && npm run test:plesk:garage
-
-  postgres-integration:
-    runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:17-alpine
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: postgres
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd="pg_isready -U postgres -d postgres"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=5
-    env:
-      NEBULYNK_TEST_POSTGRES_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
-      NEBULYNK_TEST_POSTGRES_ISOLATED: 'true'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: 'npm'
+          cache: npm
       - run: npm ci
-      - run: npm run test:backend:integration
+      - run: npm run ci:core
+
+  postgres-integration:
+    name: PostgreSQL integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run ci:integration
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: postgres-diagnostics
+          path: output/ci/
+          if-no-files-found: ignore
+
+  plesk:
+    name: Plesk and Garage
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run ci:plesk
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: plesk-diagnostics
+          path: output/ci/
+          if-no-files-found: ignore
 
   security:
+    name: Security
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pull-requests: write
+    timeout-minutes: 30
     steps:
-      - name: Checkout
-        uses: actions/checkout@v6
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+          persist-credentials: false
+      - uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Dependency audit
-        run: npm run security:deps
-
-      - name: Secret scan
-        uses: gitleaks/gitleaks-action@v3
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Filesystem vulnerability and config scan
-        uses: aquasecurity/trivy-action@v0.36.0
+          cache: npm
+      - run: npm ci
+      - run: npm run ci:security
+      - uses: actions/upload-artifact@v4
+        if: always()
         with:
-          scan-type: fs
-          scan-ref: .
-          scanners: vuln,misconfig
-          severity: HIGH,CRITICAL
-          ignore-unfixed: true
-          exit-code: '1'
+          name: security-diagnostics
+          path: |
+            output/ci/**/commands.log
+            output/ci/**/gitleaks-*.json
+            output/ci/**/trivy.json
+          if-no-files-found: ignore
 
   e2e:
-    runs-on: ubuntu-latest
+    name: Browser E2E
     needs: validate
-    services:
-      postgres:
-        image: postgres:17-alpine
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: postgres
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd="pg_isready -U postgres -d postgres"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=5
-    env:
-      POSTGRES_HOST: 127.0.0.1
-      POSTGRES_PORT: 5432
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_ADMIN_DB: postgres
-      E2E_POSTGRES_DB: nebulynk_e2e
-      E2E_USE_PREVIEW_FRONTEND: 'true'
-      STORAGE_S3_ENDPOINT: http://127.0.0.1:3900
-      STORAGE_S3_PUBLIC_ENDPOINT: http://127.0.0.1:3900
-      STORAGE_S3_ACCESS_KEY: nebulynk
-      STORAGE_S3_SECRET_KEY: nebulynk_dev_password
-      STORAGE_S3_BUCKET: nebulynk-files
-      STORAGE_S3_REGION: us-east-1
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Start S3-compatible storage
-        run: |
-          docker run --detach \
-            --name nebulynk-garage \
-            --hostname garage \
-            --publish 3900:3900 \
-            --env GARAGE_RPC_SECRET=0000000000000000000000000000000000000000000000000000000000000000 \
-            --env GARAGE_DEFAULT_ACCESS_KEY=nebulynk \
-            --env GARAGE_DEFAULT_SECRET_KEY=nebulynk_dev_password \
-            --env GARAGE_DEFAULT_BUCKET=nebulynk-files \
-            --volume "$GITHUB_WORKSPACE/garage.toml:/etc/garage.toml:ro" \
-            dxflrs/garage:v2.3.0 \
-            /garage server --single-node --default-bucket
-
-          for attempt in {1..30}; do
-            if curl --silent --output /dev/null http://127.0.0.1:3900/; then
-              exit 0
-            fi
-            sleep 1
-          done
-
-          docker logs nebulynk-garage
-          exit 1
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Install Playwright browser
-        run: npm exec --workspace=frontend playwright install --with-deps chromium
-
-      - name: Run frontend e2e
-        run: npm run test:e2e --workspace=frontend
-
-      - name: Upload Playwright artifacts
+          cache: npm
+      - run: npm ci
+      - run: npm exec --workspace=frontend playwright install --with-deps chromium
+      - run: npm run ci:e2e
+      - uses: actions/upload-artifact@v4
         if: always()
-        uses: actions/upload-artifact@v4
         with:
           name: playwright-artifacts
           path: |
             frontend/playwright-report
             frontend/test-results
+            output/ci/
           if-no-files-found: ignore
+
+  required:
+    name: CI required
+    if: always()
+    needs: [validate, postgres-integration, plesk, security, e2e]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every mandatory group to succeed
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          node -e 'const results = JSON.parse(process.env.RESULTS); for (const [name, job] of Object.entries(results)) { console.log(name + ": " + job.result); if (job.result !== "success") process.exitCode = 1; }'

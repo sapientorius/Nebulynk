@@ -7,7 +7,7 @@ import dotenv from 'dotenv'
 import { fileURLToPath } from 'url'
 import { dirname, resolve } from 'path'
 const __dirname = dirname(fileURLToPath(import.meta.url))
-dotenv.config({ path: resolve(__dirname, '../../.env') })
+dotenv.config({ path: process.env.NEBULYNK_ENV_FILE || resolve(__dirname, '../../.env') })
 
 import { logger } from './logger.js'
 import { createRuntime } from './lib/runtime.js'

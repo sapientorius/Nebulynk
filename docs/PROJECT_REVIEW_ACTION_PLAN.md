@@ -3,7 +3,7 @@
 Stand: 7. September 2026  
 Bewertete Anwendungsversion: `0.5.1`  
 Bewerteter Commit: `baa254c` (`feat: implement default channel membership management and migration`)  
-Status: AP-01 wurde am 7. September 2026 umgesetzt und verifiziert; siehe [Übergabe AP-01](AP_01_HANDOFF.md). AP-02 wurde am 8. September 2026 umgesetzt und verifiziert; siehe [Übergabe AP-02](AP_02_HANDOFF.md). AP-03 wurde am 8. September 2026 im vereinbarten Umfang umgesetzt und lokal verifiziert; siehe [Übergabe AP-03](AP_03_HANDOFF.md). AP-04 wurde am 8. September 2026 einschließlich AP-04A/B/C umgesetzt und lokal technisch abgenommen; siehe [Übergabe AP-04](AP_04_HANDOFF.md). AP-05 wurde am 8. September 2026 umgesetzt, hinsichtlich Lifecycle abgenommen und mit dokumentierter lokaler Lastgrenze gemessen; siehe [Übergabe AP-05](AP_05_HANDOFF.md) und [Basisbericht](AP_05_BASELINE.md). AP-06 bleibt offen. Die ursprüngliche Bewertung selbst enthielt noch keine Implementierung der Korrekturen.
+Status: AP-01 wurde am 7. September 2026 umgesetzt und verifiziert; siehe [Übergabe AP-01](AP_01_HANDOFF.md). AP-02 wurde am 8. September 2026 umgesetzt und verifiziert; siehe [Übergabe AP-02](AP_02_HANDOFF.md). AP-03 wurde am 8. September 2026 im vereinbarten Umfang umgesetzt und lokal verifiziert; siehe [Übergabe AP-03](AP_03_HANDOFF.md). AP-04 wurde am 8. September 2026 einschließlich AP-04A/B/C umgesetzt und lokal technisch abgenommen; siehe [Übergabe AP-04](AP_04_HANDOFF.md). AP-05 wurde am 8. September 2026 umgesetzt, hinsichtlich Lifecycle abgenommen und mit dokumentierter lokaler Lastgrenze gemessen; siehe [Übergabe AP-05](AP_05_HANDOFF.md) und [Basisbericht](AP_05_BASELINE.md). AP-06 wurde am 8. September 2026 umgesetzt und vollständig lokal verifiziert; die GitHub-Abnahme bleibt offen, siehe [Übergabe AP-06](AP_06_HANDOFF.md). Die ursprüngliche Bewertung selbst enthielt noch keine Implementierung der Korrekturen.
 
 ## Zweck und Verwendung
 
@@ -114,7 +114,7 @@ Nicht ausgeführt wurden Browser-E2E, allgemeine Lasttests und die vollständige
 | AP-03 | Hoch | Statische Analyse, echte Komponententests, PostgreSQL-Integrationstests | Infrastruktur früh; mit AP-01/AP-02 abstimmen | Abgeschlossen, siehe [Übergabe](AP_03_HANDOFF.md) |
 | AP-04 | Mittel bis hoch | Klar abgegrenzte Meeting-, UI- und API-Module | Nach relevanter Verhaltensabsicherung aus AP-03 | Abgeschlossen: AP-04A/B/C lokal technisch abgenommen ([Übergabe](AP_04_HANDOFF.md)) |
 | AP-05 | Mittel | Kontrollierter Server-Lebenszyklus und überprüfbare Betriebsannahmen | Mit AP-02 und Backend-Teil von AP-04 abstimmen | Abgeschlossen; lokale Lastgrenze dokumentiert, siehe [AP-05](AP_05_HANDOFF.md) |
-| AP-06 | Mittel | Einheitlicher verbindlicher Prüfumfang lokal und in GitHub Actions | Vorhandene Lücken sofort; abschließende Integration nach AP-03 | Offen |
+| AP-06 | Mittel | Einheitlicher verbindlicher Prüfumfang lokal und in GitHub Actions | Vorhandene Lücken sofort; abschließende Integration nach AP-03 | Lokal umgesetzt und verifiziert; GitHub-Abnahme offen ([Übergabe](AP_06_HANDOFF.md)) |
 
 AP-01 und AP-02 dürfen nicht auf einen vollständigen Umbau der Testlandschaft warten. Sie müssen die nötigen gezielten Regressionstests selbst mitbringen. AP-03 kann deren Infrastruktur anschließend vereinheitlichen.
 
@@ -693,13 +693,20 @@ Schnelle Prüfungen dürfen weiterhin separat ausführbar sein. Ihr Erfolg darf 
 
 ### Abnahme und Übergabe
 
-- [ ] Ein vollständiger, verbindlicher Prüfumfang ist dokumentiert.
-- [ ] i18n, Dokploy-Template und Release-/Versionsvalidierung sind auf beiden relevanten Wegen enthalten.
-- [ ] Lint, Unit-/Komponenten-, Datenbank- und Browser-Tests verwenden gemeinsame fachliche Einstiegspunkte.
-- [ ] Security- und Plesk-/Garage-Prüfungen sind erhalten und klar eingeordnet.
-- [ ] Fehlende Infrastruktur oder eine fehlschlagende Pflichtprüfung können nicht als vollständiger Erfolg erscheinen.
-- [ ] Normale und `:rtk`-Scripts sowie Contributor-Dokumentation sind konsistent.
-- [ ] Tatsächlich ausgeführte lokale/CI-Prüfungen sind getrennt von nur geprüfter Konfiguration ausgewiesen.
+- [x] Ein vollständiger, verbindlicher Prüfumfang ist dokumentiert.
+- [x] i18n, Dokploy-Template und Release-/Versionsvalidierung sind auf beiden relevanten Wegen enthalten.
+- [x] Lint, Unit-/Komponenten-, Datenbank- und Browser-Tests verwenden gemeinsame fachliche Einstiegspunkte.
+- [x] Security- und Plesk-/Garage-Prüfungen sind erhalten und klar eingeordnet.
+- [x] Fehlende Infrastruktur oder eine fehlschlagende Pflichtprüfung können nicht als vollständiger Erfolg erscheinen.
+- [x] Normale und `:rtk`-Scripts sowie Contributor-Dokumentation sind konsistent.
+- [x] Tatsächlich ausgeführte lokale/CI-Prüfungen sind getrennt von nur geprüfter Konfiguration ausgewiesen.
+
+Lokaler Stand am 8. September 2026: Der vollständige `npm run ci`-Pfad unter
+Node 22 ist erfolgreich, einschließlich aller 39 Browserfälle und Security.
+Die Konfiguration wurde zusätzlich mit actionlint geprüft. Der tatsächliche
+GitHub-Actions-Lauf dieses Arbeitsstands bleibt als externe Verifikation offen;
+AP-06 wird daher noch nicht als vollständig abgeschlossen geführt.
+Details und Diagnoseevidenz stehen in der [Übergabe AP-06](AP_06_HANDOFF.md).
 
 ## Abschlussprotokoll je Instanz
 
