@@ -3,7 +3,7 @@
 Stand: 7. September 2026  
 Bewertete Anwendungsversion: `0.5.1`  
 Bewerteter Commit: `baa254c` (`feat: implement default channel membership management and migration`)  
-Status: AP-01 wurde am 7. September 2026 umgesetzt und verifiziert; siehe [Übergabe AP-01](AP_01_HANDOFF.md). AP-02 bis AP-06 sind weiterhin offen. Die ursprüngliche Bewertung selbst enthielt noch keine Implementierung der Korrekturen.
+Status: AP-01 wurde am 7. September 2026 umgesetzt und verifiziert; siehe [Übergabe AP-01](AP_01_HANDOFF.md). AP-02 wurde am 8. September 2026 umgesetzt und verifiziert; siehe [Übergabe AP-02](AP_02_HANDOFF.md). AP-03 bis AP-06 sind weiterhin offen. Die ursprüngliche Bewertung selbst enthielt noch keine Implementierung der Korrekturen.
 
 ## Zweck und Verwendung
 
@@ -110,7 +110,7 @@ Nicht ausgeführt wurden Browser-E2E, allgemeine Lasttests und die vollständige
 | Paket | Priorität | Ergebnis | Empfohlene Reihenfolge | Status |
 | --- | --- | --- | --- | --- |
 | AP-01 | Sehr hoch | Autorisierte, atomare Dateizuordnung bei Nachrichten | Sofort; unabhängig von großen Refactorings | Abgeschlossen, siehe [Übergabe](AP_01_HANDOFF.md) |
-| AP-02 | Hoch | Wiederaufnehmbare, konsistente Erinnerungsverarbeitung | Parallel zu AP-01 bei getrennter Dateizuständigkeit möglich | Offen |
+| AP-02 | Hoch | Wiederaufnehmbare, konsistente Erinnerungsverarbeitung | Parallel zu AP-01 bei getrennter Dateizuständigkeit möglich | Abgeschlossen, siehe [Übergabe](AP_02_HANDOFF.md) |
 | AP-03 | Hoch | Statische Analyse, echte Komponententests, PostgreSQL-Integrationstests | Infrastruktur früh; mit AP-01/AP-02 abstimmen | Offen |
 | AP-04 | Mittel bis hoch | Klar abgegrenzte Meeting-, UI- und API-Module | Nach relevanter Verhaltensabsicherung aus AP-03 | Offen |
 | AP-05 | Mittel | Kontrollierter Server-Lebenszyklus und überprüfbare Betriebsannahmen | Mit AP-02 und Backend-Teil von AP-04 abstimmen | Offen |
@@ -211,6 +211,10 @@ Dieses Paket besitzt die Nachrichtenkorrektur. Es soll nicht gleichzeitig den ge
 
 ## AP-02: Erinnerungen gegen Abbrüche und Teilfehler absichern
 
+Umgesetzt und verifiziert am 8. September 2026. Die folgenden Befunde beschreiben
+den Ausgangsstand. Aktueller Zustandsvertrag, Migration 071, Nachweise und
+vereinbarte Zustellgrenzen stehen in der [Übergabe AP-02](AP_02_HANDOFF.md).
+
 ### Problem und fachlicher Kontext
 
 Erinnerungen werden in `message_reminders` gespeichert. Der Hintergrundprozessor sucht fällige Einträge im Zustand `active`, setzt sie auf `processing`, prüft den Zugriff auf die Nachricht, legt eine Zeile in `notifications` an und setzt anschließend die Erinnerung auf `delivered`. Nicht mehr zugängliche Nachrichten führen zu `cancelled`.
@@ -225,7 +229,7 @@ Zwei voneinander unabhängige Fehler sind bestätigt:
 - [Prozessor](../backend/src/services/message-reminders/processor.js): `processDueMessageReminders`, `canReadMessage`.
 - [Reminder-Service](../backend/src/services/message-reminders/message-reminders.js): `create`, `patch`, `remove`, `ALLOWED_FIND_STATUSES`.
 - [Bestehende Migration](../backend/migrations/057_message_reminders.js): partieller Unique-Index nur für `status = 'active'`.
-- [Prozessortests](../backend/test/message-reminders.processor.test.js), [Service-Tests](../backend/test/message-reminders.service.test.js).
+- [Prozessor- und Service-Integrationstests](../backend/integration/message-reminders.postgres.test.js): ersetzen die früheren Memory-DB-Tests.
 - [Scheduler](../backend/src/app.js): `messageReminderProcessing`, Intervall alle 30 Sekunden und initialer Prozessordurchlauf.
 - [Benachrichtigungs-Dispatcher](../backend/src/lib/notification-side-effects.js): `enqueue`, `drain`, `flush`.
 - [Frontend-Store](../frontend/src/stores/message-reminders.js) und [Store-Tests](../frontend/test/stores/message-reminders.test.js).
@@ -272,12 +276,12 @@ Diese Garantie betrifft zunächst die Datenbank. Eine exakt einmalige Zustellung
 
 ### Abnahme und Übergabe
 
-- [ ] Beide bestätigten Fehlerfälle sind geschlossen und dauerhaft getestet.
-- [ ] Transaktions- und Konkurrenzverhalten ist mit PostgreSQL nachgewiesen.
-- [ ] Bestandsdaten im Zustand `processing` haben eine dokumentierte Behandlung.
-- [ ] Frontend-Verträge und die fachlichen Zustände der Service-API bleiben verständlich und kompatibel oder werden gezielt migriert.
-- [ ] Datenbankgarantie und Push-/Socket-Zustellgarantie sind getrennt beschrieben.
-- [ ] Falls das Scheduler-Interface geändert wurde, ist der Übergabevertrag für AP-05 dokumentiert.
+- [x] Beide bestätigten Fehlerfälle sind geschlossen und dauerhaft getestet.
+- [x] Transaktions- und Konkurrenzverhalten ist mit PostgreSQL nachgewiesen.
+- [x] Bestandsdaten im Zustand `processing` haben eine dokumentierte Behandlung.
+- [x] Frontend-Verträge und die fachlichen Zustände der Service-API bleiben verständlich und kompatibel oder werden gezielt migriert.
+- [x] Datenbankgarantie und Push-/Socket-Zustellgarantie sind getrennt beschrieben.
+- [x] Falls das Scheduler-Interface geändert wurde, ist der Übergabevertrag für AP-05 dokumentiert. Der Aufruf bleibt kompatibel; die injizierbare Uhr ist dokumentiert.
 
 ## AP-03: Aussagekraft der Qualitätsprüfungen erhöhen
 

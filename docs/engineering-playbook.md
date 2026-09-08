@@ -38,10 +38,11 @@ npm run test:e2e
 Document material limitations in the pull request when a relevant check cannot
 run locally.
 
-### PostgreSQL message integration
+### PostgreSQL message and reminder integration
 
 `npm run test:backend:integration` runs the message attachment, transaction,
-concurrency, forwarding, HTTP/JWT, and Socket.IO regression suite. The backend
+concurrency, forwarding, HTTP/JWT, and Socket.IO regression suite, plus reminder
+delivery, concurrent service changes, access policies, and recovery migrations. The backend
 workspace equivalent is `npm run test:integration --workspace=backend`. Both
 have explicit `:rtk` variants; the normal scripts do not require RTK.
 
@@ -70,7 +71,13 @@ Never point this suite or the separate `e2e:reset-db` script at a development
 or production database. Integration tests live under `backend/integration/`,
 separately from the existing backend unit-test glob. The current `npm run ci`
 does not include this new integration suite or browser E2E; run these explicitly
-when changing the message-create contract.
+when changing the message-create or reminder contracts.
+
+Reminder tests terminate a worker connection in the disposable test database;
+the test role must be allowed to terminate its own worker backend. Upgrade tests
+create another isolated database at migration 070 before applying migration 071.
+The old memory-only reminder tests have moved into this suite: they no longer
+pretend to exercise rollback or locking in the unit-test database double.
 
 The integration suite uses real PostgreSQL locks and deferred commit failures,
 the registered message service, and real authentication and transports. S3
@@ -84,3 +91,8 @@ the nested root npm script does not consume the Playwright arguments:
 ```powershell
 rtk proxy npm run test:e2e --workspace=frontend -- --project=onboarding --grep 'setup and first login|invite accept flow|messaging path|forwarding a file message' --workers=1 --retries=0
 ```
+
+For reminders, replace the final filter with `mobile message reminders`. That
+browser test covers mobile layout, save, reload, reschedule with the same ID,
+and cancellation surviving a reload. See [AP-02 handoff](AP_02_HANDOFF.md) for
+the consistency boundary, upgrade procedure, and verification evidence.

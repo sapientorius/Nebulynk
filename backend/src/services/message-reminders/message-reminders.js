@@ -1,19 +1,20 @@
 import { authenticate } from '@feathersjs/authentication'
 import { createId } from '@paralleldrive/cuid2'
 import { validate } from '../../schemas/validators.js'
-import { badRequest, forbidden, notFound } from '../../lib/errors.js'
+import { badRequest, notFound } from '../../lib/errors.js'
+import { assertReminderAccess } from './access.js'
 import { createSchema, patchSchema } from './message-reminders.schema.js'
 
 const ACTIVE_STATUS = 'active'
 const ALLOWED_FIND_STATUSES = new Set(['active', 'delivered', 'cancelled'])
 
-function normalizeFutureDate(value) {
+function normalizeFutureDate(value, now) {
   const date = new Date(value)
   if (!Number.isFinite(date.getTime())) {
     throw badRequest('api.message_reminders.invalid_remind_at', {}, 'Ungueltige Erinnerungszeit')
   }
 
-  if (date.getTime() <= Date.now()) {
+  if (date.getTime() <= now.getTime()) {
     throw badRequest('api.message_reminders.remind_at_must_be_future', {}, 'Erinnerungszeit muss in der Zukunft liegen')
   }
 
@@ -32,41 +33,19 @@ export class MessageRemindersService {
   constructor(options) {
     this.options = options
     this.generateId = options.generateId || createId
+    this.clock = options.clock || (() => new Date())
   }
 
   get db() {
     return this.options.Model
   }
 
-  async assertReadableMessage(messageId, params = {}) {
+  async assertReadableMessage(messageId, params = {}, db = this.db, now = this.clock()) {
     if (!messageId || typeof messageId !== 'string') {
       throw badRequest('api.message_reminders.message_id_required', {}, 'message_id ist erforderlich')
     }
 
-    const message = await this.db('messages')
-      .where('id', messageId)
-      .whereNull('deleted_at')
-      .first()
-
-    if (!message) {
-      throw notFound('api.messages.message_not_found', {}, 'Nachricht nicht gefunden')
-    }
-
-    const user = params.user
-    if (!user?.id) {
-      throw forbidden('api.channels.membership_required', { channel_id: message.channel_id }, 'You are not a member of this channel')
-    }
-
-    if (user.is_admin) return message
-
-    const membership = await this.db('channel_members')
-      .where({ channel_id: message.channel_id, user_id: user.id })
-      .first()
-
-    if (!membership) {
-      throw forbidden('api.channels.membership_required', { channel_id: message.channel_id }, 'You are not a member of this channel')
-    }
-
+    const { message } = await assertReminderAccess(db, { messageId, userId: params.user?.id, now })
     return message
   }
 
@@ -94,48 +73,33 @@ export class MessageRemindersService {
   }
 
   async create(data, params = {}) {
-    const userId = params.user.id
-    const remindAt = normalizeFutureDate(data.remind_at)
-    const message = await this.assertReadableMessage(data.message_id, params)
-    const now = new Date().toISOString()
+    return this.db.transaction(async (trx) => {
+      const userId = params.user.id
+      const time = this.clock()
+      const remindAt = normalizeFutureDate(data.remind_at, time)
+      const message = await this.assertReadableMessage(data.message_id, params, trx, time)
+      const now = time.toISOString()
 
-    const existing = await this.db('message_reminders')
-      .where({ user_id: userId, message_id: message.id, status: ACTIVE_STATUS })
-      .first()
-
-    if (existing) {
-      await this.db('message_reminders')
-        .where('id', existing.id)
-        .update({
-          channel_id: message.channel_id,
-          remind_at: remindAt,
-          updated_at: now
-        })
-
-      return {
-        ...existing,
+      const reminder = {
+        id: this.generateId(),
+        user_id: userId,
+        message_id: message.id,
         channel_id: message.channel_id,
         remind_at: remindAt,
+        status: ACTIVE_STATUS,
+        notification_id: null,
+        delivered_at: null,
+        cancelled_at: null,
+        created_at: now,
         updated_at: now
       }
-    }
 
-    const reminder = {
-      id: this.generateId(),
-      user_id: userId,
-      message_id: message.id,
-      channel_id: message.channel_id,
-      remind_at: remindAt,
-      status: ACTIVE_STATUS,
-      notification_id: null,
-      delivered_at: null,
-      cancelled_at: null,
-      created_at: now,
-      updated_at: now
-    }
-
-    await this.db('message_reminders').insert(reminder)
-    return reminder
+      const [result] = await trx('message_reminders').insert(reminder)
+        .onConflict(trx.raw("(user_id, message_id) WHERE status = 'active'"))
+        .merge({ channel_id: message.channel_id, remind_at: remindAt, updated_at: now })
+        .returning('*')
+      return result
+    })
   }
 
   async patch(id, data, params = {}) {
@@ -143,23 +107,26 @@ export class MessageRemindersService {
       throw badRequest('api.message_reminders.id_required', {}, 'Reminder-ID ist erforderlich')
     }
 
-    const userId = params.user.id
-    const remindAt = normalizeFutureDate(data.remind_at)
-    const existing = await this.db('message_reminders').where('id', id).first()
-    if (!existing || existing.user_id !== userId || existing.status !== ACTIVE_STATUS) {
-      throw notFound('api.message_reminders.not_found', {}, 'Erinnerung nicht gefunden')
-    }
+    return this.db.transaction(async (trx) => {
+      const userId = params.user.id
+      const time = this.clock()
+      const remindAt = normalizeFutureDate(data.remind_at, time)
+      const existing = await trx('message_reminders').where('id', id).forUpdate().first()
+      if (!existing || existing.user_id !== userId || existing.status !== ACTIVE_STATUS) {
+        throw notFound('api.message_reminders.not_found', {}, 'Erinnerung nicht gefunden')
+      }
 
-    const message = await this.assertReadableMessage(existing.message_id, params)
-    const now = new Date().toISOString()
-    const patch = {
-      channel_id: message.channel_id,
-      remind_at: remindAt,
-      updated_at: now
-    }
+      const message = await this.assertReadableMessage(existing.message_id, params, trx, time)
+      const now = time.toISOString()
+      const patch = {
+        channel_id: message.channel_id,
+        remind_at: remindAt,
+        updated_at: now
+      }
 
-    await this.db('message_reminders').where('id', id).update(patch)
-    return { ...existing, ...patch }
+      await trx('message_reminders').where('id', id).update(patch)
+      return { ...existing, ...patch }
+    })
   }
 
   async remove(id, params = {}) {
@@ -167,23 +134,26 @@ export class MessageRemindersService {
       throw badRequest('api.message_reminders.id_required', {}, 'Reminder-ID ist erforderlich')
     }
 
-    const userId = params.user.id
-    const existing = await this.db('message_reminders').where('id', id).first()
-    if (!existing || existing.user_id !== userId || existing.status !== ACTIVE_STATUS) {
-      throw notFound('api.message_reminders.not_found', {}, 'Erinnerung nicht gefunden')
-    }
+    return this.db.transaction(async (trx) => {
+      const userId = params.user.id
+      const existing = await trx('message_reminders').where('id', id).forUpdate().first()
+      if (!existing || existing.user_id !== userId || existing.status !== ACTIVE_STATUS) {
+        throw notFound('api.message_reminders.not_found', {}, 'Erinnerung nicht gefunden')
+      }
 
-    await this.assertReadableMessage(existing.message_id, params)
+      const time = this.clock()
+      await this.assertReadableMessage(existing.message_id, params, trx, time)
 
-    const now = new Date().toISOString()
-    const patch = {
-      status: 'cancelled',
-      cancelled_at: now,
-      updated_at: now
-    }
+      const now = time.toISOString()
+      const patch = {
+        status: 'cancelled',
+        cancelled_at: now,
+        updated_at: now
+      }
 
-    await this.db('message_reminders').where('id', id).update(patch)
-    return { ...existing, ...patch }
+      await trx('message_reminders').where('id', id).update(patch)
+      return { ...existing, ...patch }
+    })
   }
 }
 

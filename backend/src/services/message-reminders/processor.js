@@ -1,123 +1,73 @@
 import { createId } from '@paralleldrive/cuid2'
 import { logger } from '../../logger.js'
-
-function reminderNotificationTitle(user) {
-  return user?.preferred_locale === 'de' ? 'Erinnerung' : 'Reminder'
-}
-
-async function canReadMessage(db, reminder) {
-  const message = await db('messages')
-    .where('id', reminder.message_id)
-    .whereNull('deleted_at')
-    .first()
-
-  if (!message) return null
-
-  const user = await db('users').where('id', reminder.user_id).first()
-  if (!user) return null
-  if (user.is_admin) return { message, user }
-
-  const membership = await db('channel_members')
-    .where({ channel_id: message.channel_id, user_id: reminder.user_id })
-    .first()
-
-  if (!membership) return null
-  return { message, user }
-}
+import { assertReminderAccess, isReminderAccessDenied } from './access.js'
 
 export async function processDueMessageReminders(app, {
-  now = new Date(),
+  now,
+  clock = () => new Date(),
   limit = 100,
   generateId = createId,
   log = logger
 } = {}) {
   const db = app.get('postgresqlClient')
-  const nowIso = now.toISOString()
-
+  const currentTime = () => now === undefined ? clock() : now
   const dueReminders = await db('message_reminders')
     .where('status', 'active')
-    .where('remind_at', '<=', nowIso)
-    .orderBy('remind_at', 'asc')
-    .limit(limit)
-
-  if (dueReminders.length === 0) {
-    return { processed: 0, delivered: 0, skipped: 0 }
-  }
-
-  const deliveredNotifications = []
+    .where('remind_at', '<=', currentTime().toISOString())
+    .orderBy('remind_at', 'asc').orderBy('id', 'asc').limit(limit).select('id')
   let delivered = 0
   let skipped = 0
 
-  for (const reminder of dueReminders) {
-    const processingAt = new Date().toISOString()
-    const claimed = await db('message_reminders')
-      .where({ id: reminder.id, status: 'active' })
-      .update({ status: 'processing', updated_at: processingAt })
-
-    if (claimed === 0) continue
-
+  for (const candidate of dueReminders) {
+    let outcome
     try {
-      const access = await canReadMessage(db, reminder)
-      if (!access) {
-        await db('message_reminders')
-          .where('id', reminder.id)
-          .update({
-            status: 'cancelled',
-            cancelled_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
+      outcome = await db.transaction(async (trx) => {
+        const reminder = await trx('message_reminders').where('id', candidate.id)
+          .forUpdate().skipLocked().first()
+        const processingTime = currentTime()
+        const timestamp = processingTime.toISOString()
+        if (!reminder || reminder.status !== 'active' || new Date(reminder.remind_at) > processingTime) return null
+        let access
+        try {
+          access = await assertReminderAccess(trx, {
+            messageId: reminder.message_id, userId: reminder.user_id, now: processingTime
           })
-        skipped++
-        continue
-      }
-
-      const notification = {
-        id: generateId(),
-        user_id: reminder.user_id,
-        type: 'message_reminder',
-        message_id: access.message.id,
-        channel_id: access.message.channel_id,
-        actor_id: null,
-        actor_display_name: reminderNotificationTitle(access.user),
-        message_snippet: (access.message.content || '').slice(0, 120),
-        is_read: false,
-        created_at: new Date().toISOString(),
-        meeting_id: null
-      }
-
-      await db('notifications').insert(notification)
-      await db('message_reminders')
-        .where('id', reminder.id)
-        .update({
-          status: 'delivered',
-          notification_id: notification.id,
-          delivered_at: notification.created_at,
-          updated_at: notification.created_at
+        } catch (error) {
+          if (!isReminderAccessDenied(error)) throw error
+          await trx('message_reminders').where('id', reminder.id).update({
+            status: 'cancelled', cancelled_at: timestamp, updated_at: timestamp
+          })
+          return { cancelled: true }
+        }
+        const notification = {
+          id: generateId(), user_id: reminder.user_id, type: 'message_reminder',
+          message_id: access.message.id, channel_id: access.message.channel_id,
+          actor_id: null,
+          actor_display_name: access.user.preferred_locale === 'de' ? 'Erinnerung' : 'Reminder',
+          message_snippet: (access.message.content || '').slice(0, 120),
+          is_read: false, created_at: timestamp, meeting_id: null
+        }
+        await trx('notifications').insert(notification)
+        await trx('message_reminders').where('id', reminder.id).update({
+          status: 'delivered', notification_id: notification.id,
+          delivered_at: timestamp, updated_at: timestamp
         })
-
-      deliveredNotifications.push(notification)
-      delivered++
-    } catch (error) {
-      await db('message_reminders')
-        .where('id', reminder.id)
-        .update({
-          status: 'active',
-          updated_at: new Date().toISOString()
-        })
-        .catch(() => {})
-      log.error('Message reminder processing failed', {
-        reminderId: reminder.id,
-        error: error.message
+        return { notification }
       })
+    } catch (error) {
+      log.error('Message reminder processing failed', { reminderId: candidate.id, error: error.message })
+      continue
+    }
+    if (outcome?.cancelled) skipped++
+    if (outcome?.notification) {
+      delivered++
+      // Commit is complete. Best-effort dispatch must never reset database state.
+      try {
+        await app.get('notificationSideEffectsDispatcher')?.enqueue([outcome.notification])
+      } catch (error) {
+        log.error('Message reminder dispatch failed', { reminderId: candidate.id, error: error.message })
+      }
     }
   }
-
-  if (deliveredNotifications.length > 0) {
-    app.get('notificationSideEffectsDispatcher')?.enqueue(deliveredNotifications)
-  }
-
-  return {
-    processed: dueReminders.length,
-    delivered,
-    skipped
-  }
+  return { processed: dueReminders.length, delivered, skipped }
 }

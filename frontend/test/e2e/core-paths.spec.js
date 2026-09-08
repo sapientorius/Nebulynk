@@ -648,9 +648,43 @@ test.describe('P2-02 core e2e paths', () => {
     await page.keyboard.press('Escape')
     await expect(datePanel).toBeHidden()
 
+    const savedResponse = page.waitForResponse((response) =>
+      response.request().method() === 'POST' && new URL(response.url()).pathname === '/message-reminders')
     await reminderSheet.getByTestId('message-reminder-option-1h').click()
+    const saved = await savedResponse
+    expect(saved.status()).toBe(201)
+    const reminder = await saved.json()
+    expect(reminder.status).toBe('active')
     await expect(reminderSheet).toBeHidden()
     await expectNoHorizontalOverflow(page)
+
+    await page.reload()
+    const indicator = page.getByTestId('message-reminder-indicator')
+    await expect(indicator).toBeVisible()
+    await messageRow.hover()
+    await messageRow.getByTestId('message-action-overflow').click()
+    await overflowMenu.getByTestId('message-action-remind').click()
+    await expect(reminderSheet.locator('.reminder-current')).toBeVisible()
+    const shiftedResponse = page.waitForResponse((response) =>
+      response.request().method() === 'PATCH' && new URL(response.url()).pathname === `/message-reminders/${reminder.id}`)
+    await reminderSheet.getByTestId('message-reminder-option-4h').click()
+    const shifted = await shiftedResponse
+    expect(shifted.status()).toBe(200)
+    const shiftedReminder = await shifted.json()
+    expect(shiftedReminder.id).toBe(reminder.id)
+    expect(new Date(shiftedReminder.remind_at).getTime()).toBeGreaterThan(new Date(reminder.remind_at).getTime())
+    await expect(reminderSheet).toBeHidden()
+    await indicator.click()
+    const removedResponse = page.waitForResponse((response) =>
+      response.request().method() === 'DELETE' && new URL(response.url()).pathname === `/message-reminders/${reminder.id}`)
+    await page.getByTestId('message-reminder-indicator-remove').click()
+    const removed = await removedResponse
+    expect(removed.status()).toBe(200)
+    expect((await removed.json()).status).toBe('cancelled')
+    await expect(indicator).toBeHidden()
+    await page.reload()
+    await expect(page.locator('.message-item').last()).toBeVisible()
+    await expect(indicator).toBeHidden()
   })
 
   test('top-bar user menu supports status, profile, settings, admin visibility, and logout', async ({ page }) => {

@@ -1,9 +1,10 @@
 import knex from 'knex'
 import { createId } from '@paralleldrive/cuid2'
 import { fileURLToPath } from 'node:url'
+import { readdir } from 'node:fs/promises'
 
 // Never load the application .env or knexfile: this URL must identify a test instance.
-export async function createPostgresTestDb() {
+export async function createPostgresTestDb({ migrationTarget } = {}) {
   const connection = process.env.NEBULYNK_TEST_POSTGRES_URL
   if (!connection) {
     throw new Error('NEBULYNK_TEST_POSTGRES_URL must explicitly identify an isolated PostgreSQL test instance')
@@ -35,7 +36,18 @@ export async function createPostgresTestDb() {
       pool: { min: 0, max: 8 },
       acquireConnectionTimeout: 10000
     })
-    await db.migrate.latest({ directory: fileURLToPath(new URL('../../migrations/', import.meta.url)) })
+    const migrationConfig = { directory: fileURLToPath(new URL('../../migrations/', import.meta.url)) }
+    if (migrationTarget) {
+      const names = (await readdir(migrationConfig.directory)).filter((name) => name.endsWith('.js')).sort()
+      if (!names.includes(migrationTarget)) throw new Error('Unknown test migration target')
+      await db.migrate.latest({ migrationSource: {
+        getMigrations: async () => names.filter((name) => name <= migrationTarget),
+        getMigrationName: (name) => name,
+        getMigration: (name) => import(new URL(`../../migrations/${name}`, import.meta.url).href)
+      } })
+    } else {
+      await db.migrate.latest(migrationConfig)
+    }
     return { db, close }
   } catch (error) {
     await close()

@@ -36,6 +36,24 @@ notification records, and the sender's read position commit together. Realtime
 events and notification delivery start only after that commit. Push delivery
 is best effort; it does not provide an exactly-once delivery guarantee.
 
+### Message reminders
+
+Reminder creation and changes require current access to the non-deleted
+message. Only the owner can list or change their reminders. The worker checks
+the current account state and the same channel/meeting-history read policy
+again when processing a due reminder. Disabled or unapproved accounts and
+expired guests cannot receive a new reminder notification, including admins
+with disabled accounts. Missing access cancels the reminder; database failures
+leave it retryable.
+
+Each reminder's notification insert and delivered status commit in one locked
+transaction. Concurrent delivery, rescheduling, and cancellation respect that
+lock. A completed reminder cannot be rescheduled or cancelled; these requests
+return the existing not-found error. Creating a new reminder after completion
+creates a new ID. Push and socket dispatch happen after commit and remain best
+effort: an interruption can lose these transient signals while the In-App
+notification remains stored. There is no persistent delivery outbox.
+
 ### Past meeting content
 
 Public and private channels and group chats store a `meeting_history_access`
