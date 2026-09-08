@@ -138,7 +138,7 @@ test.describe('browser security validation', () => {
     })
     await login(page, admin)
 
-    const authResult = await getAuthFromBrowserSession(page)
+    const authResult = await getAuthFromBrowserSession(page, admin)
     const channelId = await resolveDefaultPublicChannelId(page, authResult.accessToken)
     expect(channelId).toBeTruthy()
 
@@ -193,7 +193,7 @@ test.describe('browser security validation', () => {
     await page.getByTestId('profile-avatar-crop-apply').click()
     await page.getByTestId('profile-save').click()
 
-    const authResult = await getAuthFromBrowserSession(page)
+    const authResult = await getAuthFromBrowserSession(page, admin)
     await expect.poll(async () => {
       const user = await fetchUserById(page, authResult.accessToken, authResult.user.id)
       return user?.avatar_url || null
@@ -299,7 +299,7 @@ test.describe('browser security validation', () => {
     })
     await login(page, admin)
 
-    const authResult = await getAuthFromBrowserSession(page)
+    const authResult = await getAuthFromBrowserSession(page, admin)
     const voiceChannelName = `browser-security-voice-${runId}`
     await createVoiceChannel(page, authResult.accessToken, voiceChannelName)
 

@@ -91,6 +91,24 @@ describe('message visibility helpers', () => {
     expect(pendingMessageIds).toEqual({ 'message-pending': true })
   })
 
+  it('does not queue visible notifications while the app is backgrounded', () => {
+    const onVisibleMessageIds = vi.fn()
+    const onPendingChange = vi.fn()
+
+    handleMessageVisibilityEntries({
+      entries: [{
+        isIntersecting: true,
+        target: { dataset: { messageId: 'message-backgrounded' } }
+      }],
+      isForegroundVisible: () => false,
+      onVisibleMessageIds,
+      onPendingChange
+    })
+
+    expect(onVisibleMessageIds).not.toHaveBeenCalled()
+    expect(onPendingChange).not.toHaveBeenCalled()
+  })
+
   it('syncs observed message elements without re-observing stale rows', () => {
     const observe = vi.fn()
     const unobserve = vi.fn()

@@ -73,7 +73,10 @@ test.describe('i18n defaults and user locale', () => {
       password: effectiveAdminPassword
     })
 
-    const adminAuth = await getAuthFromBrowserSession(page)
+    const adminAuth = await getAuthFromBrowserSession(page, {
+      email: effectiveAdminEmail,
+      password: effectiveAdminPassword
+    })
     const accessToken = adminAuth.accessToken
     expect(accessToken).toBeTruthy()
 
@@ -132,7 +135,10 @@ test.describe('i18n defaults and user locale', () => {
       password: invitePassword
     })
 
-    const invitedAuth = await getAuthFromBrowserSession(invitePage)
+    const invitedAuth = await getAuthFromBrowserSession(invitePage, {
+      email: inviteEmail,
+      password: invitePassword
+    })
     const invitedUser = invitedAuth.user
 
     expect(invitedUser?.preferred_locale).toBe('de')

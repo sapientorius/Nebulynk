@@ -38,7 +38,7 @@ test.describe('settings security password change', () => {
     })
 
     await login(page, adminCredentials)
-    const adminAuth = await getAuthFromBrowserSession(page)
+    const adminAuth = await getAuthFromBrowserSession(page, adminCredentials)
     const accessToken = adminAuth?.accessToken
     if (!accessToken) {
       throw new Error('Missing admin access token for member invite flow')

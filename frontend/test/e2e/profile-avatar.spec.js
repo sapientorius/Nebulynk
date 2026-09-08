@@ -112,7 +112,10 @@ test.describe('profile avatar flow', () => {
     await page.getByTestId('profile-avatar-crop-apply').click()
     await page.getByTestId('profile-save').click()
 
-    const authResult = await getAuthFromBrowserSession(page)
+    const authResult = await getAuthFromBrowserSession(page, {
+      email: effectiveAdminEmail,
+      password: effectiveAdminPassword
+    })
 
     await expect.poll(async () => {
       const user = await fetchUserById(page, authResult.accessToken, authResult.user.id)
@@ -232,7 +235,10 @@ test.describe('profile avatar flow', () => {
     await page.getByTestId('profile-avatar-crop-apply').click()
     await page.getByTestId('profile-save').click()
 
-    const webcamAuth = await getAuthFromBrowserSession(page)
+    const webcamAuth = await getAuthFromBrowserSession(page, {
+      email: effectiveAdminEmail,
+      password: effectiveAdminPassword
+    })
 
     await expect.poll(async () => {
       const user = await fetchUserById(page, webcamAuth.accessToken, webcamAuth.user.id)

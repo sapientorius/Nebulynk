@@ -504,15 +504,17 @@ export default {
       window.cancelAnimationFrame(this.autoReadForegroundRecheckFrame)
       this.autoReadForegroundRecheckFrame = null
     },
+    isNotificationAutoReadForegroundVisible() {
+      if (typeof document === 'undefined') return false
+      return isAppForegroundVisible({
+        targetDocument: document,
+        hasWindowFocus: typeof document.hasFocus === 'function' ? document.hasFocus() : true
+      })
+    },
     scheduleForegroundVisibleNotificationAutoReadRecheck() {
       if (typeof window === 'undefined' || typeof document === 'undefined') return
       if (this.autoReadForegroundRecheckScheduled) return
-      if (!isAppForegroundVisible({
-        targetDocument: document,
-        hasWindowFocus: typeof document.hasFocus === 'function' ? document.hasFocus() : true
-      })) {
-        return
-      }
+      if (!this.isNotificationAutoReadForegroundVisible()) return
 
       this.autoReadForegroundRecheckScheduled = true
       this.$nextTick(() => {
@@ -533,6 +535,8 @@ export default {
       }, NOTIFICATION_AUTO_READ_DEBOUNCE_MS)
     },
     queueForegroundVisibleMessageNotifications() {
+      if (!this.isNotificationAutoReadForegroundVisible()) return
+
       const messageIds = collectVisibleViewportMessageIds({
         listEl: this.$refs.messageList,
         observedMessageElements: this.observedMessageElements,
@@ -548,6 +552,8 @@ export default {
       this.queueVisibleMessageNotifications(messageIds)
     },
     queueVisibleMessageNotifications(messageIds = []) {
+      if (!this.isNotificationAutoReadForegroundVisible()) return
+
       const uniqueMessageIds = [...new Set((messageIds || []).filter(Boolean))]
       if (uniqueMessageIds.length === 0) return
 
@@ -651,6 +657,7 @@ export default {
         entries,
         getSeenMessageIds: () => this.autoReadSeenMessageIds,
         getPendingMessageIds: () => this.autoReadPendingMessageIds,
+        isForegroundVisible: () => this.isNotificationAutoReadForegroundVisible(),
         onVisibleMessageIds: (messageIds) => this.queueVisibleMessageNotifications(messageIds),
         onPendingChange: (nextPending) => {
           this.autoReadPendingMessageIds = nextPending

@@ -63,10 +63,13 @@ export function handleMessageVisibilityEntries({
   entries,
   getSeenMessageIds,
   getPendingMessageIds,
+  isForegroundVisible = () => true,
   onVisibleMessageIds,
   onSeen,
   onPendingChange
 }) {
+  if (!isForegroundVisible()) return
+
   const seenMessageIds = getSeenMessageIds?.() || {}
   const pendingMessageIds = getPendingMessageIds?.() || {}
   const nextPending = { ...pendingMessageIds }

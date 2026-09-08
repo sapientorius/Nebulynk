@@ -305,18 +305,18 @@ async function getErrorMessages(page) {
   return page.evaluate(() => window.__e2eErrorMessages || [])
 }
 
-async function getCurrentUserId(page) {
-  const authResult = await getAuthFromBrowserSession(page)
+async function getCurrentUserId(page, credentials) {
+  const authResult = await getAuthFromBrowserSession(page, credentials)
   return authResult?.user?.id || null
 }
 
-async function getAccessToken(page) {
-  const authResult = await getAuthFromBrowserSession(page)
+async function getAccessToken(page, credentials) {
+  const authResult = await getAuthFromBrowserSession(page, credentials)
   return authResult?.accessToken || null
 }
 
-async function getAuthResult(page) {
-  return getAuthFromBrowserSession(page)
+async function getAuthResult(page, credentials) {
+  return getAuthFromBrowserSession(page, credentials)
 }
 
 async function expectNoHorizontalOverflow(page) {
@@ -1048,7 +1048,10 @@ test.describe('P2-02 core e2e paths', () => {
         throw new Error('Missing admin access token for meeting invite API call')
       }
 
-      const memberId = await getCurrentUserId(memberPage)
+      const memberId = await getCurrentUserId(memberPage, {
+        email: inviteEmail,
+        password: invitePassword
+      })
       if (!memberId) {
         throw new Error('Missing member id after member authentication')
       }
@@ -1312,7 +1315,10 @@ test.describe('P2-02 core e2e paths', () => {
         password: invitePassword
       })
 
-      const memberId = await getCurrentUserId(memberPage)
+      const memberId = await getCurrentUserId(memberPage, {
+        email: inviteEmail,
+        password: invitePassword
+      })
       if (!memberId) {
         throw new Error('Missing member id from localStorage user payload')
       }
@@ -1556,7 +1562,10 @@ test.describe('P2-02 core e2e paths', () => {
         password: invitePassword
       })
 
-      const memberId = await getCurrentUserId(memberPage)
+      const memberId = await getCurrentUserId(memberPage, {
+        email: inviteEmail,
+        password: invitePassword
+      })
       if (!memberId) {
         throw new Error('Missing member id from localStorage user payload')
       }
@@ -1660,7 +1669,10 @@ test.describe('P2-02 core e2e paths', () => {
         password: invitePassword
       })
 
-      const memberId = await getCurrentUserId(memberPage)
+      const memberId = await getCurrentUserId(memberPage, {
+        email: inviteEmail,
+        password: invitePassword
+      })
       if (!memberId) {
         throw new Error('Missing member id from localStorage user payload')
       }
@@ -1758,7 +1770,10 @@ test.describe('P2-02 core e2e paths', () => {
         password: invitePassword
       })
 
-      const memberId = await getCurrentUserId(memberPage)
+      const memberId = await getCurrentUserId(memberPage, {
+        email: inviteEmail,
+        password: invitePassword
+      })
       if (!memberId) {
         throw new Error('Missing member id from localStorage user payload')
       }
@@ -1936,7 +1951,10 @@ test.describe('P2-02 core e2e paths', () => {
     await expect(page).toHaveURL(new RegExp(`/channels/${voiceChannelId}$`))
     await expect(page.getByTestId('voice-controls')).toBeHidden()
 
-    const selfUserId = await getCurrentUserId(page)
+    const selfUserId = await getCurrentUserId(page, {
+      email: adminEmail,
+      password: adminPassword
+    })
     if (!selfUserId) {
       throw new Error('Could not resolve current user id from localStorage payload')
     }

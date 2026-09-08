@@ -102,7 +102,10 @@ test.describe('message draft persistence', () => {
     await ensureAdmin(page)
     await login(page)
 
-    const adminAuth = await getAuthFromBrowserSession(page)
+    const adminAuth = await getAuthFromBrowserSession(page, {
+      email: effectiveAdminEmail,
+      password: effectiveAdminPassword
+    })
     const accessToken = adminAuth.accessToken
     expect(accessToken).toBeTruthy()
 

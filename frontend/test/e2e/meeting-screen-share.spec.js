@@ -22,7 +22,7 @@ test('meeting screenshare maximization and chat overlay reset after navigation',
   await page.getByTestId('login-submit').click()
   await expect(page).toHaveURL(/\/channels\/[^/?#]+$/)
   await expect(page.getByTestId('message-input-textarea')).toBeVisible()
-  const auth = await getAuthFromBrowserSession(page)
+  const auth = await getAuthFromBrowserSession(page, credentials)
   const response = await page.request.post(resolveBackendUrl('/channels'), {
     headers: { Authorization: `Bearer ${auth.accessToken}` },
     data: { name: `share-${Date.now()}`, type: 'private' }

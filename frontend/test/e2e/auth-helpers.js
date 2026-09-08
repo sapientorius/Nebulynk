@@ -18,24 +18,41 @@ export async function loginViaApi(request, { email, password, remember = false }
   return response.json()
 }
 
-function readCookieValue(cookieString, cookieName) {
-  return String(cookieString || '')
-    .split(';')
-    .map((entry) => entry.trim())
-    .find((entry) => entry.startsWith(`${cookieName}=`))
-    ?.slice(cookieName.length + 1) || null
+export function readCookieValue(cookieString, cookieName) {
+  let matchedValue = null
+
+  for (const entry of String(cookieString || '').split(';')) {
+    const trimmed = entry.trim()
+    if (!trimmed) continue
+
+    const separatorIndex = trimmed.indexOf('=')
+    const key = separatorIndex === -1 ? trimmed : trimmed.slice(0, separatorIndex)
+    if (key !== cookieName) continue
+
+    const rawValue = separatorIndex === -1 ? '' : trimmed.slice(separatorIndex + 1)
+    matchedValue = rawValue
+  }
+
+  return matchedValue
 }
 
 export async function getAuthFromBrowserSession(page, {
-  csrfCookieName = 'nebulynk_csrf_token'
+  csrfCookieName = 'nebulynk_csrf_token',
+  email = null,
+  password = null
 } = {}) {
+  if (email && password) {
+    return loginViaApi(page.request, { email, password })
+  }
+
   const cookieString = await page.evaluate(() => document.cookie || '')
   const csrfToken = readCookieValue(cookieString, csrfCookieName)
   if (!csrfToken) {
     throw new Error(`Missing CSRF cookie "${csrfCookieName}" in browser session.`)
   }
 
-  const response = await page.request.post(resolveBackendUrl('/auth/session/refresh'), {
+  const refreshUrl = resolveBackendUrl('/auth/session/refresh')
+  const response = await page.request.post(refreshUrl, {
     headers: {
       'X-CSRF-Token': decodeURIComponent(csrfToken)
     },

@@ -133,7 +133,7 @@ test.describe('voice recorder e2e', () => {
     })
     await login(page, admin)
 
-    const authResult = await getAuthFromBrowserSession(page)
+    const authResult = await getAuthFromBrowserSession(page, admin)
     const accessToken = authResult.accessToken
     expect(accessToken).toBeTruthy()
     const channelId = await resolveDefaultPublicChannelId(page, accessToken)
