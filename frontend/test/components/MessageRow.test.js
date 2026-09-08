@@ -18,7 +18,7 @@ describe('static source contract: MessageRow', () => {
   it('keeps row UI concerns in the row while emitting side effects upward', () => {
     const source = readFileSync(resolve('src/components/MessageRow.vue'), 'utf8')
 
-    expect(source).toContain('components: { ReactionBar, FilePreview, MessageActions, MeetingActionCard, MessageReminderIndicator, UserAvatar }')
+    expect(source).toContain('components: { ReactionBar, FilePreview, MessageActions, MeetingActionCard, CallHistoryEntry, MessageReminderIndicator, UserAvatar }')
     expect(source).toContain("@mouseenter=\"$emit('hover', message.id)\"")
     expect(source).toContain("@mouseleave=\"$emit('message-leave')\"")
     expect(source).toContain("@popover-change=\"$emit('popover-change', $event)\"")

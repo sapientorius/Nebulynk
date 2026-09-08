@@ -446,6 +446,7 @@ import ChannelLeaveAction from './channels/ChannelLeaveAction.vue'
 import { PinOutline as PinIcon, CreateOutline as CreateIcon, CallOutline as CallIcon, EllipsisHorizontalOutline as MoreIcon, NotificationsOutline as NotifAllIcon, NotificationsOffOutline as NotifOffIcon, AtOutline as NotifMentionsIcon, SettingsOutline as SettingsIcon, VolumeHighOutline as VolumeHighIcon, EarthOutline as EarthIcon, LockClosedOutline as LockClosedIcon, ExitOutline as ExitIcon, PeopleOutline as MembersIcon, TimeOutline as PastMeetingsIcon, SparklesOutline as SparklesIcon, ChevronDownOutline as ChevronDownIcon, ChevronUpOutline as ChevronUpIcon } from '@vicons/ionicons5'
 import { useSessionStore, useChannelsStore, useDmsStore, useMeetingsStore, useMessagesStore, useUiStore, useNotificationsStore, useVoiceStore } from '../stores/index.js'
 import { playSfx, SFX_EVENTS } from '../lib/sfx.js'
+import { useMeetingCallsStore } from '../stores/meeting-calls.js'
 import { observeMobileLayout, readIsMobileLayout } from '../lib/mobile-layout.js'
 import { getPresenceStatusColor } from '../lib/user-presence.js'
 import UserAvatar from './UserAvatar.vue'
@@ -754,6 +755,10 @@ async startOrJoinMeetingCall() {
         const meetingStartTitle = this.resolveMeetingStartTitle()
 
         if (!meeting || meeting.status !== 'active') {
+          if (['dm', 'group'].includes(this.channel.type) && !useDmsStore().isNotesChannel(this.channel)) {
+            await useMeetingCallsStore().start(this.channel.id, meetingStartTitle)
+            return
+          }
           meeting = await this.meetingsStore.startFromChannel(
             this.channel.id,
             [],

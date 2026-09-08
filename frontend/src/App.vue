@@ -30,6 +30,7 @@ import { isDesktopManagerWindow, isLocalDesktopAppOrigin } from './lib/runtime.j
 import { useThemeStore } from './stores/index.js'
 
 const IncomingCallOverlay = defineAsyncComponent(() => import('./components/IncomingCallOverlay.vue'))
+const MeetingCallOverlay = defineAsyncComponent(() => import('./components/MeetingCallOverlay.vue'))
 const DesktopWorkspaceBootstrap = defineAsyncComponent(() => import('./components/DesktopWorkspaceBootstrap.vue'))
 
 const AppContent = defineComponent({
@@ -49,7 +50,8 @@ const AppContent = defineComponent({
 
     return h('div', { class: 'app-shell' }, [
       h(RouterView),
-      h(IncomingCallOverlay)
+      h(IncomingCallOverlay),
+      h(MeetingCallOverlay)
     ])
   }
 })

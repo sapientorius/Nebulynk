@@ -409,6 +409,10 @@ export function setupRealtimeListeners(socket, {
     handleIncomingNotification(notification)
   })
 
+  socket.on('meeting-calls changed', ({ id }) => {
+    import('./meeting-calls.js').then(({ useMeetingCallsStore }) => useMeetingCallsStore().load(id)).catch(() => {})
+  })
+
   socket.on('meetings created', (meeting) => {
     meetingsStore?.handleMeetingCreated(meeting)
   })
@@ -423,6 +427,7 @@ export function setupRealtimeListeners(socket, {
 
   socket.on('meetings ended', (payload) => {
     meetingsStore?.handleMeetingEnded(payload)
+    import('./meeting-calls.js').then(({ useMeetingCallsStore }) => useMeetingCallsStore().refresh()).catch(() => {})
   })
 
   socket.on('meetings artifacts-queued', (payload) => {

@@ -43,6 +43,7 @@ import { useNotificationsStore } from './notifications.js'
 import { useVoiceStore } from './voice.js'
 import { useUiStore } from './ui.js'
 import { useMeetingsStore } from './meetings.js'
+import { useMeetingCallsStore } from './meeting-calls.js'
 import { useVoiceMessageArtifactsStore } from './voice-message-artifacts.js'
 import { useMessageSummariesStore } from './message-summaries.js'
 import { usePlatformUpdatesStore } from './platform-updates.js'
@@ -519,6 +520,7 @@ export const useSessionStore = defineStore('session', () => {
         if (authenticatedSocket !== socket) return
         presenceSyncPending.value = true
         await refreshPresence().catch(() => {})
+        await useMeetingCallsStore().refresh().catch(() => {})
         await Promise.resolve(voiceStore.reconnectIfNeeded()).catch(() => {})
         foregroundResumeSync.requestSync('socket-authenticated', {
           immediate: true,
@@ -548,6 +550,7 @@ export const useSessionStore = defineStore('session', () => {
 
     // Keep meeting channels/topic metadata in store after channel refreshes.
     await meetingsStore.refresh(true)
+    await useMeetingCallsStore().refresh().catch(() => {})
 
     await voiceStore.reconnectIfNeeded()
   }
@@ -838,6 +841,7 @@ export const useSessionStore = defineStore('session', () => {
     voiceStore.reset()
     uiStore.reset()
     meetingsStore.reset()
+    useMeetingCallsStore().reset()
     messageSummariesStore.reset()
     usePlatformUpdatesStore().reset()
     reset()

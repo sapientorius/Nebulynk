@@ -97,9 +97,9 @@ async function makeApp(t, { transports = false } = {}) {
   if (transports) {
     // Only these services' publishers are needed; the production channel configuration is used unchanged.
     for (const name of ['channels', 'channel-members', 'roles', 'role-permissions', 'user-roles', 'invites', 'voice',
-      'meetings', 'voice-message-artifacts', 'message-summaries', 'reactions', 'pinned-messages', 'notifications']) {
+      'meetings', 'meeting-calls', 'voice-message-artifacts', 'message-summaries', 'reactions', 'pinned-messages', 'notifications']) {
       app.use(name, { async find() { return [] } }, {
-        events: ['created', 'participant-joined', 'participant-left', 'participant-updated', 'invited',
+        events: ['created', 'changed', 'participant-joined', 'participant-left', 'participant-updated', 'invited',
           'joined', 'ended', 'artifacts-queued', 'artifacts-updated', 'recording-state-updated']
       })
     }

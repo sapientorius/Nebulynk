@@ -14,6 +14,7 @@ function buildNotificationUrl(notification) {
 }
 
 function buildPushTitle(notification, user) {
+  if (notification.type === 'meeting_call') return bt(user?.preferred_locale, 'push.callTitle', { actor: notification.actor_display_name })
   if (notification.type === 'message_reminder') {
     return bt(user?.preferred_locale, 'push.reminderTitle')
   }

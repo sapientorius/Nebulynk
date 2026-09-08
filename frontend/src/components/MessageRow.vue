@@ -110,6 +110,7 @@
           @open="$emit('open-meeting', meetingCard.meetingId)"
           @join="$emit('join-meeting-call', meetingCard.meetingId)"
         />
+        <CallHistoryEntry v-else-if="message.call_id && ['expired', 'declined', 'cancelled'].includes(message.call_outcome)" :message="message" />
         <template v-else-if="hasTextContent">
           <div
             class="message-body"
@@ -151,6 +152,7 @@ import ReactionBar from './ReactionBar.vue'
 import FilePreview from './FilePreview.vue'
 import MessageActions from './MessageActions.vue'
 import MeetingActionCard from './MeetingActionCard.vue'
+import CallHistoryEntry from './CallHistoryEntry.vue'
 import MessageReminderIndicator from './MessageReminderIndicator.vue'
 import UserAvatar from './UserAvatar.vue'
 import { getCurrentLocale } from '../lib/i18n.js'
@@ -168,7 +170,7 @@ function escapeHtml(text) {
 
 export default {
   name: 'MessageRow',
-  components: { ReactionBar, FilePreview, MessageActions, MeetingActionCard, MessageReminderIndicator, UserAvatar },
+  components: { ReactionBar, FilePreview, MessageActions, MeetingActionCard, CallHistoryEntry, MessageReminderIndicator, UserAvatar },
   props: {
     message: { type: Object, required: true },
     grouped: { type: Boolean, default: false },

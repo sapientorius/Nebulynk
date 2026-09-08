@@ -37,6 +37,7 @@ import { configureOwnerSponsorshipPromptRoutes } from './routes/owner-sponsorshi
 import { configurePlatformUpdateRoutes } from './routes/platform-updates.js'
 import { configureSystemInfoRoutes } from './routes/system-info.js'
 import { endExpiredIdleMeetings } from './services/meetings/idle-timeout.js'
+import { expireMeetingCalls } from './services/meeting-calls/meeting-calls.js'
 import { endOverdueScheduledMeetings } from './services/meetings/overdue-scheduled.js'
 import { processPendingMeetingTranscripts } from './services/meetings/transcript-processor.js'
 import { processPendingMeetingSummaries } from './services/meetings/summary-processor.js'
@@ -328,6 +329,8 @@ app.hooks({
           logger.error('Presence auto-away sweep failed:', { error: error.message })
         }
       }, intervalMs: 60_000 })
+
+      runtime.register({ name: 'meeting-calls', run: () => expireMeetingCalls(app), intervalMs: 1000, immediate: true })
 
       // Periodic cleanup: end active meetings after 10 minutes without participants.
       runtime.register({ name: 'meeting-idle', run: async () => {

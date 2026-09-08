@@ -77,6 +77,10 @@ to `voice-livekit-callbacks.js`, passing explicit state actions.
 
 ## Backend meeting extraction and transaction order
 
+Direct and group chat calls use a separate, server-timed signaling phase before
+meeting creation. See [Calling before a meeting starts](meeting-call-signaling.md)
+for the API, transaction boundaries, Notes exception and recovery behavior.
+
 `MeetingsService` composes the meeting domain's join, creation, invitation,
 metadata, completion and artifact application cases with the read/access services,
 repository and integration adapters. It retains Feathers registration,

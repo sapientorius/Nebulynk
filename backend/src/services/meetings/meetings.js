@@ -393,6 +393,14 @@ export const meetings = (app) => {
     before: {
       create: [validate(createSchema)],
       patch: [validate(patchSchema)]
+    },
+    after: {
+      patch: [async context => {
+        if (context.data.action === 'join' && context.app.services['meeting-calls']) {
+          await context.app.service('meeting-calls').recordJoin(context.id, context.params.user.id)
+        }
+        return context
+      }]
     }
   })
 }

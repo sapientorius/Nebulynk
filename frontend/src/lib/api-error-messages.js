@@ -183,6 +183,10 @@ export const apiErrorMessages = {
       },
       meetings: {
         authentication_required: 'Authentication required',
+        call_required: 'Please start the call again so the other person can accept first.',
+        call_unavailable: 'Call is no longer available',
+        call_source_invalid: 'This channel starts meetings directly',
+        call_no_recipients: 'There are no other participants to call',
         cancel_forbidden: 'Only the host or an admin can cancel this meeting',
         cancel_only_scheduled: 'Only scheduled meetings can be cancelled',
         decline_only_invited_allowed: 'Only invited participants can decline this call',
@@ -637,6 +641,10 @@ export const apiErrorMessages = {
       },
       meetings: {
         authentication_required: 'Authentifizierung erforderlich',
+        call_required: 'Bitte den Anruf neu starten, damit die andere Person zuerst annehmen kann.',
+        call_unavailable: 'Anruf nicht mehr verfügbar',
+        call_source_invalid: 'Dieser Kanal startet Meetings direkt',
+        call_no_recipients: 'Keine weiteren Teilnehmer für diesen Anruf',
         cancel_forbidden: 'Nur Host oder Admin kann dieses Meeting absagen',
         cancel_only_scheduled: 'Nur geplante Meetings koennen abgesagt werden',
         decline_only_invited_allowed: 'Nur eingeladene Teilnehmer koennen den Anruf ablehnen',

@@ -48,6 +48,12 @@ const baseMessages = {
       profile: 'Profile',
       notes: 'Notes'
     },
+    calls: {
+      notification: 'Call',
+      ringing: 'Calling …', ready: 'Meeting started', open: 'Open meeting',
+      expired: 'Call not answered', declined: 'Call declined', cancelled: 'Call cancelled',
+      retry: 'Call again', unavailable: 'Call is no longer available'
+    },
     errors: {
       unexpected: 'Something went wrong'
     },
@@ -928,6 +934,12 @@ const baseMessages = {
       login: 'Einloggen',
       profile: 'Profil',
       notes: 'Notizen'
+    },
+    calls: {
+      notification: 'Anruf',
+      ringing: 'Ruft an …', ready: 'Meeting gestartet', open: 'Meeting öffnen',
+      expired: 'Anruf nicht angenommen', declined: 'Anruf abgelehnt', cancelled: 'Anruf abgebrochen',
+      retry: 'Erneut anrufen', unavailable: 'Anruf nicht mehr verfügbar'
     },
     errors: {
       unexpected: 'Ein unerwarteter Fehler ist aufgetreten'

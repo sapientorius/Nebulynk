@@ -924,6 +924,7 @@ export default {
       if (index === 0) return false
       const curr = this.messages[index]
       const prev = this.messages[index - 1]
+      if (curr.call_id || prev.call_id) return false
       if (curr.user_id !== prev.user_id) return false
       const diff = new Date(curr.created_at) - new Date(prev.created_at)
       return diff < 5 * 60 * 1000

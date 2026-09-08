@@ -189,6 +189,9 @@ vi.mock('../../src/stores/ui.js', () => ({
 vi.mock('../../src/stores/meetings.js', () => ({
   useMeetingsStore: () => meetingsStoreMock
 }))
+vi.mock('../../src/stores/meeting-calls.js', () => ({
+  useMeetingCallsStore: () => ({ refresh: vi.fn().mockResolvedValue(undefined), reset: vi.fn() })
+}))
 
 function resetMocks() {
   apiMock.get.mockReset()

@@ -245,6 +245,7 @@ export default {
       return !!this.meetingInviteCardsByNotificationId[notif.id]
     },
     notificationSnippet(notif) {
+      if (notif?.type === 'meeting_call') return this.$t('calls.notification')
       return toPlainMessageSnippet(notif?.message_snippet || '', { maxLength: 160 })
     },
     syncMeetingInviteCards() {

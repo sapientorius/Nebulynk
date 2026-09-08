@@ -361,7 +361,7 @@ test('upgrade from 070 recovers legacy processing deterministically and down nev
   await reminder({ ...old, id: 'linked', message_id: 'linked', notification_id: 'linked-notification' }, client)
   await reminder({ ...old, id: 'timestamp', message_id: 'timestamp', delivered_at: now }, client)
   await reminder({ ...old, id: 'orphan', message_id: 'orphan' }, client)
-  const [, migrated] = await client.migrate.latest({ directory: fileURLToPath(new URL('../migrations/', import.meta.url)) })
+  const [, migrated] = await client.migrate.up({ directory: fileURLToPath(new URL('../migrations/', import.meta.url)), name: '071_message_reminder_recovery.js' })
   assert.deepEqual(migrated, ['071_message_reminder_recovery.js'])
   const rows = Object.fromEntries((await client('message_reminders')).map((row) => [row.id, row]))
   assert.equal(rows.older.status, 'cancelled')

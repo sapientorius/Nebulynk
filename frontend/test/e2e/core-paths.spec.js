@@ -397,7 +397,7 @@ test.describe('P2-02 core e2e paths', () => {
       await page.getByTestId('setup-submit').click()
 
       await expect(page.getByTestId('setup-go-login')).toBeVisible()
-      await writeSharedState({ adminEmail, adminPassword })
+      await writeSharedState({ adminEmail, adminPassword, inviteEmail, invitePassword })
       await page.getByTestId('setup-go-login').click()
     } else {
       const sharedState = await readSharedState()

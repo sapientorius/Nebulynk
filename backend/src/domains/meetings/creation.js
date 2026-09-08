@@ -23,7 +23,7 @@ function buildDefaultJoinWindow(scheduledStartAt) {
   return new Date(date.getTime() - (10 * 60 * 1000)).toISOString()
 }
 
-export async function create({ repository, reads, authorization, effects, getNow, createId }, data, params) {
+export async function create({ repository, reads, authorization, effects, getNow, createId }, data, params, callContext = null) {
   const user = params.user
   const userId = user.id
   const sourceChannelId = data.source_channel_id
@@ -44,6 +44,14 @@ export async function create({ repository, reads, authorization, effects, getNow
   }
 
   const sourceChannel = await authorization._assertCanUseSourceChannel(sourceChannelId, user)
+  if (!isScheduledMeeting && !callContext && params.provider && ['dm', 'group'].includes(sourceChannel.type)) {
+    const others = await repository.createFindChannelMembers({ sourceChannelId, userId })
+    const isNotes = sourceChannel.type === 'dm' && sourceChannel.name === 'notes'
+      && sourceChannel.created_by === userId && others.length === 0
+    if (!isNotes) {
+      throw badRequest('api.meetings.call_required', {}, 'Bitte den Anruf neu starten, damit die andere Person zuerst annehmen kann.')
+    }
+  }
   const sourceChannelTopic = reads._normalizeLabel(sourceChannel.topic)
   const sourceChannelName = reads._normalizeLabel(sourceChannel.name)
   const sourceNameForDefaultTitle = (sourceChannel.type === 'dm' || sourceChannel.type === 'group')
@@ -83,7 +91,8 @@ export async function create({ repository, reads, authorization, effects, getNow
   let created = false
   let reusedMeetingId = null
 
-  await repository.transaction(async (trx) => {
+  const runTransaction = callContext ? callback => callback(callContext.trx) : (...args) => repository.transaction(...args)
+  await runTransaction(async (trx) => {
     await repository.createLockChannels({ trx, sourceChannelId })
 
     if (!isScheduledMeeting) {
@@ -150,7 +159,7 @@ export async function create({ repository, reads, authorization, effects, getNow
       })
     }
 
-    if (inviteeIds.length === 0) {
+    if (inviteeIds.length === 0 || callContext) {
       notificationRows = []
       return
     }
@@ -177,31 +186,34 @@ export async function create({ repository, reads, authorization, effects, getNow
     return reads.get(reusedMeetingId, params)
   }
 
-  effects._joinConnectionsToChannel(chatChannelId, allParticipantIds)
+  const publish = async () => {
+    effects._joinConnectionsToChannel(chatChannelId, allParticipantIds)
+    effects._emitNotificationEvents(notificationRows)
 
-  effects._emitNotificationEvents(notificationRows)
+    if (inviteeIds.length > 0 && !callContext) {
+      effects.emitMeeting('invited', {
+        meetingId,
+        chatChannelId,
+        sourceChannelId,
+        sourceChannelName: sourceChannel.name,
+        sourceChannelDisplayName: sourceChannelDisplayName || null,
+        meetingTitle: title,
+        meetingStatus: initialStatus,
+        userIds: inviteeIds,
+        invitedBy: userId
+      })
+    }
 
-  if (inviteeIds.length > 0) {
-    effects.emitMeeting('invited', {
-      meetingId,
-      chatChannelId,
-      sourceChannelId,
-      sourceChannelName: sourceChannel.name,
-      sourceChannelDisplayName: sourceChannelDisplayName || null,
-      meetingTitle: title,
-      meetingStatus: initialStatus,
-      userIds: inviteeIds,
-      invitedBy: userId
-    })
+    if (!isScheduledMeeting && !callContext) {
+      await effects._createSourceMessage({ meetingId, sourceChannel, user })
+    }
   }
 
-  if (!isScheduledMeeting) {
-    await effects._createSourceMessage({
-      meetingId,
-      sourceChannel,
-      user
-    })
+  if (callContext) {
+    callContext.afterCommit.push(publish)
+    return { id: meetingId, chat_channel_id: chatChannelId, created_new: true }
   }
+  await publish()
 
   return reads.get(meetingId, params)
 }

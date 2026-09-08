@@ -87,6 +87,8 @@ export const channels = (app) => {
   app.service('voice').publish('participant-updated', (data) => app.channel(`channel/${data.channelId}`))
 
   // Meetings -> room updates to meeting channel, invites to target users
+  app.service('meeting-calls').publish(() => null)
+  app.service('meeting-calls').publish('changed', data => data.userIds.map(id => app.channel(`user/${id}`)))
   app.service('meetings').publish('created', (data) => app.channel(`channel/${data.chat_channel_id}`))
   app.service('meetings').publish('invited', (data) => {
     const targetChannels = (data.userIds || []).map((userId) => app.channel(`user/${userId}`))

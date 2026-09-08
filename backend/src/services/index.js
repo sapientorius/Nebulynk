@@ -27,6 +27,7 @@ import { pushSubscriptions } from './push-subscriptions/push-subscriptions.js'
 import { dms } from './dms/dms.js'
 import { voice } from './voice/voice.js'
 import { meetings } from './meetings/meetings.js'
+import { meetingCalls } from './meeting-calls/meeting-calls.js'
 import { meetingQuestions } from './meeting-questions/meeting-questions.js'
 import { voiceMessageArtifacts } from './voice-message-artifacts/voice-message-artifacts.js'
 import { messageSummaries } from './message-summaries/message-summaries.js'
@@ -73,6 +74,7 @@ export const services = (app) => {
   app.configure(dms)
   app.configure(voice)
   app.configure(meetings)
+  app.configure(meetingCalls)
   app.configure(meetingQuestions)
   app.configure(voiceMessageArtifacts)
   app.configure(messageSummaries)
