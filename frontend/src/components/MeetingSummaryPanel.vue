@@ -247,7 +247,7 @@
           class="summary-item"
           data-testid="meeting-summary-topic"
         >
-          <div class="summary-item-text">
+          <div class="summary-item-text summary-topic-text">
             <strong>{{ chapter.title }}</strong>
             <span v-if="chapter.summary" class="summary-item-inline-text">{{ chapter.summary }}</span>
           </div>
@@ -642,6 +642,12 @@ export default {
   gap: 8px;
   line-height: 1.45;
   font-size: 13px;
+}
+
+.summary-topic-text {
+  align-items: stretch;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .summary-item-inline-text {

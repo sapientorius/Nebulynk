@@ -74,4 +74,13 @@ describe('static source contract: MeetingSummaryPanel', () => {
     expect(source).toContain("formatEvidenceLabel(evidence, this.$t)")
     expect(source).toContain("@click=\"$emit('open-evidence', evidence)\"")
   })
+
+  it('stacks topic titles above their summaries without changing other summary item layouts', () => {
+    const source = readFileSync(resolve('src/components/MeetingSummaryPanel.vue'), 'utf8')
+
+    expect(source).toContain('class="summary-item-text summary-topic-text"')
+    expect(source).toContain('.summary-topic-text {')
+    expect(source).toContain('align-items: stretch;')
+    expect(source).toContain('flex-direction: column;')
+  })
 })
