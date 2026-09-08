@@ -14,6 +14,8 @@ import { badRequest, forbidden } from '../../lib/errors.js'
 import { copyStoredFile, deleteFile } from '../../lib/storage.js'
 import { sanitizeFilesForExternal } from '../../lib/file-response.js'
 import { createId } from '@paralleldrive/cuid2'
+import { logger } from '../../logger.js'
+import { messageCreateTransaction } from './messages.create-transaction.js'
 import { extractInternalMessageReference } from '../../domains/messages/message-links.js'
 import {
   removeMessageSearchDocuments,
@@ -302,6 +304,7 @@ export class MessagesService extends KnexService {
 
     const storageClient = this.options.app?.get('storageClient')
     const duplicatedFiles = []
+    let rejectedInsertFileId
 
     try {
       for (const sourceFile of sourceFiles) {
@@ -327,31 +330,46 @@ export class MessagesService extends KnexService {
           targetKey: duplicatedFile.storage_key,
           targetBucket: duplicatedFile.bucket
         })
-        await this.repository.createFile(duplicatedFile)
         duplicatedFiles.push(duplicatedFile)
+        try {
+          await this.repository.createFile(duplicatedFile)
+        } catch (error) {
+          // A PostgreSQL data/constraint rejection proves this insert did not commit.
+          // Connection failures do not: retain an object if its DB outcome is unknown.
+          if (/^(22|23)[A-Z0-9]{3}$/.test(error.code || '')) rejectedInsertFileId = duplicatedId
+          throw error
+        }
       }
 
       return duplicatedFiles
     } catch (error) {
-      await this.cleanupDuplicatedForwardFiles(duplicatedFiles)
+      await this.cleanupDuplicatedForwardFiles(duplicatedFiles, rejectedInsertFileId)
       throw error
     }
   }
 
-  async cleanupDuplicatedForwardFiles(files) {
+  async cleanupDuplicatedForwardFiles(files, rejectedInsertFileId) {
     if (!Array.isArray(files) || files.length === 0) return
 
     const storageClient = this.options.app?.get('storageClient')
-    await this.repository.deleteFilesByIds(files.map((file) => file.id))
-
     for (const file of files) {
       try {
+        const deletedRows = await this.repository.deleteUnboundForwardFile(file)
+        if (deletedRows.length === 0) {
+          const existing = await this.repository.findFileById(file.id)
+          if (existing) continue
+          if (file.id !== rejectedInsertFileId) {
+            logger.warn('Retaining a forward copy after an uncertain database insert', { fileId: file.id })
+            continue
+          }
+        }
+        const releasedFile = deletedRows[0] || file
         await deleteFile(storageClient, {
-          key: file.storage_key,
-          bucket: file.bucket
+          key: releasedFile.storage_key,
+          bucket: releasedFile.bucket
         })
-      } catch {
-        // Best effort cleanup after failed forward operations.
+      } catch (error) {
+        logger.warn('Failed to clean up a forward file copy', { fileId: file.id, error: error.message })
       }
     }
   }
@@ -474,13 +492,14 @@ export class MessagesService extends KnexService {
   async attachMessagePreviews(messages, params = {}) {
     const data = asArray(messages)
     if (data.length === 0) return
+    const db = params.transaction?.trx || this.options.Model
 
     const replyIds = [...new Set(data.map((message) => message.reply_to_message_id).filter(Boolean))]
     const forwardIds = [...new Set(data.map((message) => message.forward_source_message_id).filter(Boolean))]
 
     const [replyMessages, forwardMessages] = await Promise.all([
-      this.repository.findMessagesByIdsWithAuthor(replyIds),
-      this.repository.findMessagesByIdsWithAuthor(forwardIds)
+      this.repository.findMessagesByIdsWithAuthor(replyIds, db),
+      this.repository.findMessagesByIdsWithAuthor(forwardIds, db)
     ])
 
     const replyById = Object.fromEntries(replyMessages.map((message) => [message.id, message]))
@@ -497,7 +516,7 @@ export class MessagesService extends KnexService {
     if (user?.is_admin) {
       for (const channelId of sourceChannelIds) readableSourceChannelIds.add(channelId)
     } else if (user?.id && sourceChannelIds.length > 0) {
-      const memberships = await this.options.Model('channel_members')
+      const memberships = await db('channel_members')
         .where('user_id', user.id)
         .whereIn('channel_id', sourceChannelIds)
         .select('channel_id')
@@ -580,14 +599,15 @@ export const messages = (app) => {
 
   service.hooks({
     around: {
-      all: [authenticate('jwt')]
+      all: [authenticate('jwt')],
+      create: [messageCreateTransaction]
     },
     before: {
       create: [
         validate(createSchema),
         isChannelMember(),
         async (context) => {
-          const access = await domainService.resolveCreateAccess(context.data?.channel_id)
+          const access = await domainService.resolveCreateAccess(context.data?.channel_id, context.params.transaction.trx)
           if (!access.skipSendPermissionCheck) {
             await checkPermission('send_messages')(context)
           }
@@ -602,7 +622,7 @@ export const messages = (app) => {
           await domainService.resolveReplyAccess({
             channelId: context.data?.channel_id,
             replyToMessageId: context.data?.reply_to_message_id
-          })
+          }, context.params.transaction.trx)
 
           return context
         },
@@ -690,14 +710,11 @@ export const messages = (app) => {
           const fileIds = context.params._fileIds
           if (!fileIds || fileIds.length === 0) return context
 
-          const messageId = context.result.id
-          await db('files')
-            .whereIn('id', fileIds)
-            .where('user_id', context.params.user.id)
-            .whereNull('message_id')
-            .update({ message_id: messageId, updated_at: new Date().toISOString() })
-
-          const files = await db('files').whereIn('id', fileIds).select('*')
+          const files = await domainService.attachFiles({
+            fileIds,
+            userId: context.params.user.id,
+            messageId: context.result.id
+          }, context.params.transaction.trx)
           const storageClient = context.app.get('storageClient')
           const storagePresignClient = context.app.get('storagePresignClient') || storageClient
           if (storagePresignClient) {
@@ -713,18 +730,18 @@ export const messages = (app) => {
           return context
         },
         async (context) => {
-          await upsertMessageSearchDocument(db, context.result.id)
+          const trx = context.params.transaction.trx
+          await upsertMessageSearchDocument(trx, context.result.id)
 
-          const fileIds = context.params._fileIds || []
-          for (const fileId of fileIds) {
-            await upsertFileSearchDocument(db, fileId)
+          for (const file of context.result.files || []) {
+            await upsertFileSearchDocument(trx, file.id)
           }
           return context
         },
         parseMentions,
         createNotifications,
         async (context) => {
-          await db('channel_members')
+          await context.params.transaction.trx('channel_members')
             .where({ channel_id: context.result.channel_id, user_id: context.params.user.id })
             .update({ last_read_at: new Date().toISOString() })
           return context

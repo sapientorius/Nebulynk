@@ -4,7 +4,7 @@ export const parseMentions = async (context) => {
   const { content } = context.result
   if (!content) return context
 
-  const db = context.app.get('postgresqlClient')
+  const db = context.params.transaction?.trx || context.app.get('postgresqlClient')
   const messageId = context.result.id
   const mentions = []
 

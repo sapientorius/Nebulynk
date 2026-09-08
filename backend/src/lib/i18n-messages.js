@@ -45,6 +45,7 @@ export const backendMessages = {
       messages: {
         forward_content_required: 'Weitergeleitete Nachricht ist leer',
         forward_metadata_forbidden: 'Forward-Metadaten sind nur ueber den Forward-Pfad erlaubt',
+        attachments_unavailable: 'Mindestens eine Datei ist nicht verfügbar.',
         invalid_source_link: 'Ungueltiger Nachrichten-Link',
         reply_must_stay_in_channel: 'Antworten muessen im selben Channel bleiben'
       }
@@ -103,6 +104,7 @@ export const backendMessages = {
       messages: {
         forward_content_required: 'Forwarded message is empty',
         forward_metadata_forbidden: 'Forward metadata is only allowed through the forward endpoint',
+        attachments_unavailable: 'One or more attachments are unavailable.',
         invalid_source_link: 'Invalid message link',
         reply_must_stay_in_channel: 'Replies must stay in the same channel'
       }

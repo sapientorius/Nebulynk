@@ -3,12 +3,12 @@ export class MessagesRepository {
     this.db = db
   }
 
-  async findChannelById(channelId) {
-    return this.db('channels').where('id', channelId).first()
+  async findChannelById(channelId, db = this.db) {
+    return db('channels').where('id', channelId).first()
   }
 
-  async findMessageById(messageId) {
-    return this.db('messages').where('id', messageId).first()
+  async findMessageById(messageId, db = this.db) {
+    return db('messages').where('id', messageId).first()
   }
 
   async findMessageByIdWithAuthor(messageId) {
@@ -27,10 +27,10 @@ export class MessagesRepository {
       .first()
   }
 
-  async findMessagesByIdsWithAuthor(messageIds) {
+  async findMessagesByIdsWithAuthor(messageIds, db = this.db) {
     if (!Array.isArray(messageIds) || messageIds.length === 0) return []
 
-    return this.db('messages')
+    return db('messages')
       .leftJoin('users', 'messages.user_id', '=', 'users.id')
       .leftJoin('channels', 'messages.channel_id', '=', 'channels.id')
       .whereIn('messages.id', messageIds)
@@ -59,9 +59,26 @@ export class MessagesRepository {
     await this.db('files').insert(fileData)
   }
 
-  async deleteFilesByIds(fileIds) {
-    if (!Array.isArray(fileIds) || fileIds.length === 0) return
-    await this.db('files').whereIn('id', fileIds).delete()
+  async claimUploads({ fileIds, userId, messageId, updatedAt }, db = this.db) {
+    if (fileIds.length === 0) return []
+    return db('files')
+      .whereIn('id', fileIds)
+      .where('user_id', userId)
+      .whereNull('message_id')
+      .update({ message_id: messageId, updated_at: updatedAt })
+      .returning('*')
+  }
+
+  async deleteUnboundForwardFile(file) {
+    return this.db('files')
+      .where({ id: file.id, user_id: file.user_id, storage_key: file.storage_key, bucket: file.bucket })
+      .whereNull('message_id')
+      .delete()
+      .returning('*')
+  }
+
+  async findFileById(fileId) {
+    return this.db('files').where('id', fileId).first()
   }
 
   async softDeleteMessage(messageId, deletedAtIso) {

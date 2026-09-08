@@ -13,6 +13,8 @@
     "lint:rtk": "rtk node scripts/lint.mjs",
     "test": "node --test test/**/*.test.js",
     "test:rtk": "rtk node --test test/**/*.test.js",
+    "test:integration": "node --test --test-timeout=60000 integration/*.test.js",
+    "test:integration:rtk": "rtk node --test --test-timeout=60000 integration/*.test.js",
     "e2e:reset-db": "node scripts/e2e-reset-db.mjs",
     "e2e:reset-db:rtk": "rtk node scripts/e2e-reset-db.mjs",
     "seed:demo": "node scripts/seed-demo-db.mjs",
@@ -37,6 +39,9 @@
     "migrate:make:rtk": "rtk knex migrate:make",
     "migrate:rollback": "knex migrate:rollback",
     "migrate:rollback:rtk": "rtk knex migrate:rollback"
+  },
+  "devDependencies": {
+    "socket.io-client": "^4.8.3"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.993.0",

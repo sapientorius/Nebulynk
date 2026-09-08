@@ -89,12 +89,12 @@ function createServiceHarness({
     async createFile(fileData) {
       fileRows.push({ ...fileData })
     },
-    async deleteFilesByIds(fileIds) {
-      for (let index = fileRows.length - 1; index >= 0; index -= 1) {
-        if (fileIds.includes(fileRows[index].id)) {
-          fileRows.splice(index, 1)
-        }
-      }
+    async deleteUnboundForwardFile(file) {
+      const index = fileRows.findIndex((row) => row.id === file.id && row.user_id === file.user_id && !row.message_id)
+      return index < 0 ? [] : fileRows.splice(index, 1)
+    },
+    async findFileById(fileId) {
+      return fileRows.find((row) => row.id === fileId)
     }
   }
 

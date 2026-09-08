@@ -19,7 +19,7 @@ async function resolvePermissions(context) {
     return new Set(['*'])
   }
 
-  const db = context.app.get('postgresqlClient')
+  const db = context.params.transaction?.trx || context.app.get('postgresqlClient')
   const permissions = new Set()
 
   // 1. Load platform-level permissions via user_roles

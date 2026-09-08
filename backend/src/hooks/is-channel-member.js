@@ -15,7 +15,7 @@ export const isChannelMember = () => async (context) => {
 
   if (!channelId) return context
 
-  const db = context.app.get('postgresqlClient')
+  const db = context.params.transaction?.trx || context.app.get('postgresqlClient')
   const membership = await db('channel_members')
     .where({ channel_id: channelId, user_id: user.id })
     .first()

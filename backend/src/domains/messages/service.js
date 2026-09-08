@@ -1,4 +1,5 @@
 import { createId } from '@paralleldrive/cuid2'
+import { badRequest } from '../../lib/errors.js'
 import {
   assertChannelIdForFind,
   assertMessageExists,
@@ -20,9 +21,9 @@ export class MessagesDomainService {
     assertChannelIdForFind(query)
   }
 
-  async resolveCreateAccess(channelId) {
+  async resolveCreateAccess(channelId, db) {
     const channel = channelId
-      ? await this.repository.findChannelById(channelId)
+      ? await this.repository.findChannelById(channelId, db)
       : null
 
     assertChannelIsWritable(channel)
@@ -34,12 +35,13 @@ export class MessagesDomainService {
 
   prepareCreateData(rawData) {
     const data = { ...(rawData || {}) }
-    const fileIds = data.file_ids
+    const fileIds = data.file_ids ? [...new Set(data.file_ids)] : []
     delete data.file_ids
 
     return {
       data: {
         ...data,
+        ...(data.content === undefined && fileIds.length > 0 ? { content: '' } : {}),
         id: createId(),
         type: fileIds && fileIds.length > 0 ? 'file' : (data.type || 'text')
       },
@@ -47,10 +49,21 @@ export class MessagesDomainService {
     }
   }
 
-  async resolveReplyAccess({ channelId, replyToMessageId }) {
+  async attachFiles({ fileIds, userId, messageId }, db) {
+    const files = await this.repository.claimUploads({
+      fileIds, userId, messageId, updatedAt: this.now().toISOString()
+    }, db)
+    const byId = new Map(files.map((file) => [file.id, file]))
+    if (byId.size !== fileIds.length || fileIds.some((id) => !byId.has(id))) {
+      throw badRequest('api.messages.attachments_unavailable', {}, 'Mindestens eine Datei ist nicht verfügbar.')
+    }
+    return fileIds.map((id) => byId.get(id))
+  }
+
+  async resolveReplyAccess({ channelId, replyToMessageId }, db) {
     if (!replyToMessageId) return null
 
-    const replyMessage = await this.repository.findMessageById(replyToMessageId)
+    const replyMessage = await this.repository.findMessageById(replyToMessageId, db)
     assertMessageExists(replyMessage)
     assertReplyBelongsToChannel(replyMessage, channelId)
     return replyMessage

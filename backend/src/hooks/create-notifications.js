@@ -24,7 +24,7 @@ function buildNotificationRow({
 }
 
 export async function buildNotificationsToInsert(context) {
-  const db = context.app.get('postgresqlClient')
+  const db = context.params.transaction?.trx || context.app.get('postgresqlClient')
   const message = context.result
   const actor = context.params.user
   const now = new Date().toISOString()
@@ -117,16 +117,19 @@ export const createNotifications = async (context) => {
       return context
     }
 
-    const db = context.app.get('postgresqlClient')
+    const db = context.params.transaction?.trx || context.app.get('postgresqlClient')
     const notificationsToInsert = await buildNotificationsToInsert(context)
     if (notificationsToInsert.length === 0) return context
 
     await db('notifications').insert(notificationsToInsert)
-    logger.info(`Created ${notificationsToInsert.length} notification(s) for message ${context.result.id}`)
-
-    const dispatcher = context.app.get('notificationSideEffectsDispatcher')
-    dispatcher?.enqueue(notificationsToInsert)
+    if (context.params._messageNotifications) {
+      context.params._messageNotifications.push(...notificationsToInsert)
+    } else {
+      const dispatcher = context.app.get('notificationSideEffectsDispatcher')
+      dispatcher?.enqueue(notificationsToInsert)
+    }
   } catch (error) {
+    if (context.params.transaction?.trx) throw error
     logger.error('create-notifications hook failed', { error: error.message, stack: error.stack })
   }
 

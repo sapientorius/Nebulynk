@@ -83,6 +83,15 @@ test('messages policy: mutation access rejects missing messages', async () => {
   )
 })
 
+test('messages behavior: attachment IDs are deduplicated without altering IDs or caller data', () => {
+  const domain = createDomainService()
+  const input = { channel_id: 'channel-1', file_ids: ['file-2', 'file-1', 'file-2', ' file-1'] }
+  const result = domain.prepareCreateData(input)
+  assert.deepEqual(result.fileIds, ['file-2', 'file-1', ' file-1'])
+  assert.deepEqual(input.file_ids, ['file-2', 'file-1', 'file-2', ' file-1'])
+  assert.equal(result.data.content, '')
+})
+
 test('messages behavior: mutation access scopes permission check to message channel', async () => {
   const service = createDomainService()
 

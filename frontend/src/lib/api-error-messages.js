@@ -283,6 +283,7 @@ export const apiErrorMessages = {
         channel_id_required: 'channel_id is required',
         forward_content_required: 'Forwarded message is empty',
         forward_metadata_forbidden: 'Forward metadata is only allowed through the forward endpoint',
+        attachments_unavailable: 'One or more attachments are unavailable.',
         invalid_source_link: 'Invalid message link',
         message_not_found: 'Message not found',
         reply_must_stay_in_channel: 'Replies must stay in the same channel'
@@ -736,6 +737,7 @@ export const apiErrorMessages = {
         channel_id_required: 'channel_id ist erforderlich',
         forward_content_required: 'Weitergeleitete Nachricht ist leer',
         forward_metadata_forbidden: 'Forward-Metadaten sind nur ueber den Forward-Pfad erlaubt',
+        attachments_unavailable: 'Mindestens eine Datei ist nicht verfügbar.',
         invalid_source_link: 'Ungueltiger Nachrichten-Link',
         message_not_found: 'Nachricht nicht gefunden',
         reply_must_stay_in_channel: 'Antworten muessen im selben Channel bleiben'

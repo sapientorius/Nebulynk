@@ -18,6 +18,24 @@ scope, and the permissions granted by the operator. Personal data,
 notifications, files, messages, meetings, and AI artifacts are accessible only
 within their authorized scope.
 
+### Message attachments
+
+Attaching an upload to a new message requires that the upload belongs to the
+sender and is still unassigned. This rule also applies to administrators.
+Forwarding creates new copies owned by the sender after checking source access.
+
+Duplicate attachment IDs are deduplicated. An unavailable attachment rejects
+the entire create request with HTTP 400 and
+`api.messages.attachments_unavailable`; the response does not distinguish
+missing, foreign, or already assigned files. No partial message or attachment
+assignment is retained. Public responses and realtime payloads contain only
+authorized file metadata and omit internal storage coordinates.
+
+Message creation, attachment assignment, search documents, mentions,
+notification records, and the sender's read position commit together. Realtime
+events and notification delivery start only after that commit. Push delivery
+is best effort; it does not provide an exactly-once delivery guarantee.
+
 ### Past meeting content
 
 Public and private channels and group chats store a `meeting_history_access`
