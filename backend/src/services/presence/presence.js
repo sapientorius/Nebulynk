@@ -7,7 +7,7 @@ class PresenceService {
     this.app = app
   }
 
-  async find(params) {
+  async find(_params) {
     return {
       online: getOnlineUserIds()
     }

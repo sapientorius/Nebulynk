@@ -12,8 +12,8 @@
     "e2e:dev:rtk": "rtk vite --host 127.0.0.1 --port 4173 --strictPort",
     "e2e:security:serve": "npm run build && vite preview --host 127.0.0.1 --port 4173 --strictPort",
     "e2e:security:serve:rtk": "rtk npm run build:rtk && rtk vite preview --host 127.0.0.1 --port 4173 --strictPort",
-    "lint": "node scripts/lint.mjs",
-    "lint:rtk": "rtk node scripts/lint.mjs",
+    "lint": "eslint . --max-warnings 0",
+    "lint:rtk": "rtk eslint . --max-warnings 0",
     "test": "vitest run",
     "test:rtk": "rtk vitest run",
     "test:watch": "vitest",
@@ -23,7 +23,9 @@
     "build": "node scripts/prepare-video-assets.mjs && vite build -l error",
     "build:rtk": "rtk node scripts/prepare-video-assets.mjs && rtk vite build -l error",
     "preview": "vite preview",
-    "preview:rtk": "rtk vite preview"
+    "preview:rtk": "rtk vite preview",
+    "test:components": "vitest run --project=components",
+    "test:components:rtk": "rtk vitest run --project=components"
   },
   "dependencies": {
     "@livekit/track-processors": "^0.6.1",
@@ -46,6 +48,8 @@
   "devDependencies": {
     "@playwright/test": "^1.53.1",
     "@vitejs/plugin-vue": "^6.0.4",
+    "@vue/test-utils": "^2.5.0",
+    "jsdom": "^26.1.0",
     "vfonts": "^0.0.3",
     "vite": "^7.3.6",
     "vite-plugin-vue-devtools": "^8.0.6",

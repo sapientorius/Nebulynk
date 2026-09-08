@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-describe('SettingsView theme preference source contract', () => {
+describe('static source contract: SettingsView theme preference source contract', () => {
   it('exposes theme preference in the general settings form', () => {
     const source = readFileSync(resolve('src/views/SettingsView.vue'), 'utf8')
 

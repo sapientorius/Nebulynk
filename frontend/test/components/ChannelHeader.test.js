@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-describe('ChannelHeader call action visibility', () => {
+describe('static source contract: ChannelHeader call action visibility', () => {
   it('keeps the meeting call action available for regular and voice channels but not meeting chat channels', () => {
     const source = readFileSync(resolve('src/components/ChannelHeader.vue'), 'utf8')
 

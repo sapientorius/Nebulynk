@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-describe('MeetingInviteView', () => {
+describe('static source contract: MeetingInviteView', () => {
   it('loads invite metadata and supports guest acceptance into a meeting session', () => {
     const source = readFileSync(resolve('src/views/MeetingInviteView.vue'), 'utf8')
 

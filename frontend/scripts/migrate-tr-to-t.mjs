@@ -168,7 +168,6 @@ function parseCallArgs(source, openParenIndex) {
 
   while (i < source.length) {
     const ch = source[i]
-    const target = mode === 1 ? 'arg1' : 'arg2'
 
     if (quote) {
       if (quote === '`') {
@@ -364,7 +363,6 @@ for (const file of files) {
     const start = Math.min(...trIdxCandidates)
     output += source.slice(cursor, start)
 
-    let callStart = start
     let marker = '$tr('
     if (source.startsWith('this.$tr(', start)) {
       marker = 'this.$tr('
@@ -419,7 +417,6 @@ for (const file of files) {
     cursor = parsed.endIndex
     localChanges += 1
     replacedCalls += 1
-    callStart += 1
   }
 
   if (localChanges > 0) {

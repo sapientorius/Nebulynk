@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-describe('MessageActions', () => {
+describe('static source contract: MessageActions', () => {
   it('renders Mattermost-style quick actions with three recent emoji buttons before picker and primary actions', () => {
     const source = readFileSync(resolve('src/components/MessageActions.vue'), 'utf8')
 

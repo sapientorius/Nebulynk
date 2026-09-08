@@ -91,7 +91,7 @@ export default {
         await this.messageRemindersStore.removeReminder(reminder)
         this.showPopover = false
         window.$message?.success(this.$t('ui.components.reminder_removed'))
-      } catch (error) {
+      } catch {
         const latestReminder = await this.messageRemindersStore.loadForMessage(this.messageId).catch(() => reminder)
         if (latestReminder) {
           window.$message?.error(this.$t('ui.components.reminder_remove_failed'))

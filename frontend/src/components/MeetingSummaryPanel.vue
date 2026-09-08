@@ -308,6 +308,7 @@ import { formatEvidenceLabel, formatTranscriptTimestamp } from '../lib/meeting-a
 
 export default {
   name: 'MeetingSummaryPanel',
+  components: { CopyIcon, DownloadIcon, ShareSocialIcon },
   props: {
     summaryArtifact: {
       type: Object,

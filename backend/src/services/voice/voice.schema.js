@@ -1,4 +1,3 @@
-import { makePatchSchema } from '../../schemas/validators.js'
 
 export const createSchema = {
   type: 'object',

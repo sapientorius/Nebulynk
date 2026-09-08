@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-describe('MessageRow', () => {
+describe('static source contract: MessageRow', () => {
   it('owns one rendered message row with stable timeline test hooks', () => {
     const source = readFileSync(resolve('src/components/MessageRow.vue'), 'utf8')
 

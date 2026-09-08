@@ -6,7 +6,6 @@ import {
   normalizeDesktopPttBindingStatus,
   shouldUseDesktopPttEventBinding
 } from './desktop-ptt-shortcut.js'
-import { desktopWindowState } from './desktop-window-state.js'
 import { isDesktopWorkspaceWindow } from './runtime.js'
 
 // === Constants ===

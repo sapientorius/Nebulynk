@@ -38,8 +38,8 @@
     "benchmark:meeting-history:rtk": "rtk npm run benchmark:meeting-history:rtk --workspace=backend",
     "seed:meeting-history-benchmark": "npm run seed:meeting-history-benchmark --workspace=backend",
     "seed:meeting-history-benchmark:rtk": "rtk npm run seed:meeting-history-benchmark:rtk --workspace=backend",
-    "lint": "npm run lint --workspace=backend && npm run lint --workspace=frontend",
-    "lint:rtk": "rtk npm run lint:rtk --workspace=backend && rtk npm run lint:rtk --workspace=frontend",
+    "lint": "eslint backend frontend scripts eslint.config.mjs --max-warnings 0",
+    "lint:rtk": "rtk eslint backend frontend scripts eslint.config.mjs --max-warnings 0",
     "test:backend": "npm run test --workspace=backend",
     "test:backend:rtk": "rtk npm run test:rtk --workspace=backend",
     "test:backend:integration": "npm run test:integration --workspace=backend",
@@ -95,11 +95,18 @@
     "test:plesk": "node --test scripts/plesk-extension.test.mjs",
     "test:plesk:rtk": "rtk node --test scripts/plesk-extension.test.mjs",
     "test:plesk:garage": "node scripts/run-plesk-garage-integration.mjs",
-    "test:plesk:garage:rtk": "rtk node scripts/run-plesk-garage-integration.mjs"
+    "test:plesk:garage:rtk": "rtk node scripts/run-plesk-garage-integration.mjs",
+    "test:frontend:components": "npm run test:components --workspace=frontend",
+    "test:frontend:components:rtk": "rtk npm run test:components:rtk --workspace=frontend"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.5",
     "ajv": "^8.18.0",
     "ajv-formats": "^3.0.1",
-    "semver": "^7.7.2"
+    "eslint": "^9.39.5",
+    "eslint-plugin-vue": "^10.11.0",
+    "globals": "^16.5.0",
+    "semver": "^7.7.2",
+    "vue-eslint-parser": "^10.4.1"
   }
 }

@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-describe('MeetingView', () => {
+describe('static source contract: MeetingView', () => {
   it('does not render the ended-meeting group chat CTA anymore', () => {
     const source = readFileSync(resolve('src/views/MeetingView.vue'), 'utf8')
 

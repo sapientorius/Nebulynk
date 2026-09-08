@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-describe('MessageList reminder refresh', () => {
+describe('static source contract: MessageList reminder refresh', () => {
   it('loads active reminders when the message list opens and refreshes after the next due reminder', () => {
     const source = readFileSync(resolve('src/components/MessageList.vue'), 'utf8')
 

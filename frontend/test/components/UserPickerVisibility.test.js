@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-describe('workspace user pickers stay member-only', () => {
+describe('static source contract: workspace user pickers stay member-only', () => {
   it('uses the shared directory-only session helpers across picker entry points', () => {
     const newDmSource = readFileSync(resolve('src/components/NewDmModal.vue'), 'utf8')
     const memberListSource = readFileSync(resolve('src/components/MemberList.vue'), 'utf8')

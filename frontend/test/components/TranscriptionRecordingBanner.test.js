@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-describe('TranscriptionRecordingBanner', () => {
+describe('static source contract: TranscriptionRecordingBanner', () => {
   it('owns compact recording status text, info details, and video restore actions with stable test IDs', () => {
     const source = readFileSync(resolve('src/components/TranscriptionRecordingBanner.vue'), 'utf8')
 

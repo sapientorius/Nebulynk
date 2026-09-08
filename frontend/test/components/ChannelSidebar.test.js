@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-describe('ChannelSidebar', () => {
+describe('static source contract: ChannelSidebar', () => {
   it('navigates via router instead of mutating channel state directly on sidebar selection', () => {
     const source = readFileSync(resolve('src/components/ChannelSidebar.vue'), 'utf8')
 

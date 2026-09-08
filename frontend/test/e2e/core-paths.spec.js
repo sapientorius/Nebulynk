@@ -24,6 +24,9 @@ async function login(page, { email, password }) {
   await page.getByTestId('login-submit').click()
   await expect(page).toHaveURL(/\/channels/)
   await expect(page.getByTestId('app-view')).toBeVisible()
+  // The shell mounts before its initial channel selection and replacement route finish.
+  await expect(page).toHaveURL(/\/channels\/[^/?#]+$/)
+  await expect(page.getByTestId('message-input-textarea')).toBeVisible()
 }
 
 async function waitForBootstrapView(page) {
@@ -1878,7 +1881,7 @@ test.describe('P2-02 core e2e paths', () => {
     await textMeetingCard.getByTestId('meeting-card-open').click()
     await expect(page).toHaveURL(new RegExp(`/meetings/${textMeetingId}$`))
     await expect(
-      page.getByTestId('meeting-view').getByRole('button', { name: /Join call|Anruf beitreten/ })
+      page.getByTestId('meeting-view').locator('.meeting-header').getByRole('button', { name: /Join call|Anruf beitreten/ })
     ).toBeVisible()
 
     await page.locator('.channel-sidebar .n-menu').getByText(textChannelName).click()

@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-describe('SettingsView archived channels management', () => {
+describe('static source contract: SettingsView archived channels management', () => {
   it('adds a dedicated security tab with a password change form', () => {
     const source = readFileSync(resolve('src/views/SettingsView.vue'), 'utf8')
 

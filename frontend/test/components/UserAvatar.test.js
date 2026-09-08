@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-describe('UserAvatar source contract', () => {
+describe('static source contract: UserAvatar source contract', () => {
   it('uses theme-aware fallback colors for users without uploaded avatars', () => {
     const source = readFileSync(resolve('src/components/UserAvatar.vue'), 'utf8')
 

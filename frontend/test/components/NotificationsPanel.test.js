@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-describe('NotificationsPanel notification delivery controls', () => {
+describe('static source contract: NotificationsPanel notification delivery controls', () => {
   it('uses the shared notification toggle for browser and desktop runtimes', () => {
     const source = readFileSync(resolve('src/components/NotificationsPanel.vue'), 'utf8')
 

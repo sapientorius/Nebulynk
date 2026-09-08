@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-describe('message markdown integration', () => {
+describe('static source contract: message markdown integration', () => {
   it('wires markdown toolbar actions into MessageInput', () => {
     const source = readFileSync(resolve('src/components/MessageInput.vue'), 'utf8')
 

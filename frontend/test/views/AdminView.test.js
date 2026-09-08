@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-describe('AdminView mobile layout', () => {
+describe('static source contract: AdminView mobile layout', () => {
   it('switches administration navigation to a mobile drawer layout', () => {
     const source = readFileSync(resolve('src/views/AdminView.vue'), 'utf8')
 

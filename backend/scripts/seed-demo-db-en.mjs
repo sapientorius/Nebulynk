@@ -34,7 +34,6 @@ const ADMIN_DB = process.env.POSTGRES_ADMIN_DB || 'postgres'
 const DEFAULT_PASSWORD = 'demo1234'
 const BCRYPT_ROUNDS = 10
 
-const shouldReset = process.argv.includes('--reset')
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -1572,7 +1571,7 @@ async function seedMessageSummaries(db, users, channels) {
 // Notifications
 // ---------------------------------------------------------------------------
 
-async function seedNotifications(db, users, channels, messages) {
+async function seedNotifications(db, users, channels, _messages) {
   const notifs = [
     { userIdx: 0, type: 'mention', actorIdx: 4, msgIdx: 4, channelIdx: 0, snippet: '@Alexandra Schmidt you took the action items, right?', read: false, mins: 155 },
     { userIdx: 0, type: 'mention', actorIdx: 3, msgIdx: 6, channelIdx: 0, snippet: 'FYI: The v2.4 deployment completed successfully...', read: false, mins: 90 },
@@ -1621,7 +1620,7 @@ async function seedNotifications(db, users, channels, messages) {
 // Voice Participants
 // ---------------------------------------------------------------------------
 
-async function seedVoiceParticipants(db, users, channels) {
+async function seedVoiceParticipants(db, users, _channels) {
   // Create a voice channel with is_voice: true
   const voiceChannelId = createId()
   await db('channels').insert({
@@ -1740,7 +1739,7 @@ async function main() {
   await seedPlatformSettings(db)
   const channels = await seedChannels(db, users)
   await seedChannelMembers(db, users, channels)
-  const dmChannels = await seedDms(db, users)
+  await seedDms(db, users)
   await seedNotesChannels(db, users)
   const messages = await seedMessages(db, users, channels)
   await seedReactions(db, messages)

@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-describe('ScreenShareView', () => {
+describe('static source contract: ScreenShareView', () => {
   it('supports both meeting and voice-channel screen share windows', () => {
     const source = readFileSync(resolve('src/views/ScreenShareView.vue'), 'utf8')
     const routerSource = readFileSync(resolve('src/router/index.js'), 'utf8')

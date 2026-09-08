@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-describe('WorkspaceShell search integration', () => {
+describe('static source contract: WorkspaceShell search integration', () => {
   it('mounts the global search dialog and exposes a shared top-bar trigger with keyboard shortcut handling', () => {
     const source = readFileSync(resolve('src/views/WorkspaceShell.vue'), 'utf8')
     const dialogSource = readFileSync(resolve('src/components/GlobalSearchDialog.vue'), 'utf8')

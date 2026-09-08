@@ -52,7 +52,7 @@ function buildForwardSnapshot(sourceMessage) {
   }
 }
 
-function buildForwardContent({ comment, sourceMessage }) {
+function buildForwardContent({ comment }) {
   const trimmedComment = typeof comment === 'string' ? comment.trim() : ''
   if (trimmedComment) return trimmedComment
   return ''

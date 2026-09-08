@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-describe('platform update administration UI', () => {
+describe('static source contract: platform update administration UI', () => {
   it('provides the update timeline, acknowledgement, and owner-only risk dialog', () => {
     const source = readFileSync(resolve('src/components/admin/UpdateCenter.vue'), 'utf8')
 

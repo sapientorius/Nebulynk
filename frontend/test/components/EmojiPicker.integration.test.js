@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-describe('emoji picker integrations', () => {
+describe('static source contract: emoji picker integrations', () => {
   it('keeps the message input wired to the shared emoji picker select flow', () => {
     const source = readFileSync(resolve('src/components/MessageInput.vue'), 'utf8')
 

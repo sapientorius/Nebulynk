@@ -1137,16 +1137,16 @@
 import { defineAsyncComponent } from 'vue'
 import {
   ArrowUndoOutline as BackIcon,
+  LanguageOutline as LanguageIcon,
+  PencilOutline as EditIcon,
+  PeopleOutline as PeopleIcon,
   ChatbubbleEllipsesOutline as ChatIcon,
   CloseOutline,
   DownloadOutline as DownloadIcon,
   DocumentTextOutline as DocumentTextIcon,
   EllipsisHorizontalOutline as MoreIcon,
   HelpCircleOutline as HelpCircleIcon,
-  LanguageOutline as LanguageIcon,
   LockClosedOutline as LockClosedIcon,
-  PencilOutline as EditIcon,
-  PeopleOutline as PeopleIcon,
   SparklesOutline as SparklesIcon,
   VideocamOffOutline as VideocamOffIcon,
   VideocamOutline as VideocamIcon
@@ -1212,6 +1212,10 @@ function observeShortViewport(callback, win = window) {
 export default {
   name: 'MeetingView',
   components: {
+    BackIcon,
+    LanguageIcon,
+    EditIcon,
+    PeopleIcon,
     AskMeetingPanel,
     ChatIcon,
     CloseOutline,

@@ -14,7 +14,7 @@ function usersSeed() {
   ]
 }
 
-function authService(db) {
+function authService(_db) {
   return {
     async verifyAccessToken(token) {
       const userId = { 'admin-token': 'admin-1', 'member-token': 'member-1' }[token]

@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-describe('NebulynkLoader', () => {
+describe('static source contract: NebulynkLoader', () => {
   it('exposes one reusable loader component with pulse and orbit variants', () => {
     const source = readFileSync(resolve('src/components/NebulynkLoader.vue'), 'utf8')
 

@@ -8,6 +8,8 @@ dist-update-feed/
 .env.*
 !.env.production.example
 *.log
+# Local verification runners, negative-control copies and browser evidence.
+/output/
 .DS_Store
 Thumbs.db
 .vscode/

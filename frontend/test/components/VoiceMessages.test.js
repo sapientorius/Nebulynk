@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-describe('Voice messages source contract', () => {
+describe('static source contract: Voice messages source contract', () => {
   it('adds the mic menu and recorder paths to the message composer', () => {
     const source = readFileSync(resolve('src/components/MessageInput.vue'), 'utf8')
 

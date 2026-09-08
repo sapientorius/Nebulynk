@@ -94,7 +94,7 @@ function createDb({ artifactRow = null, messageRow = null } = {}) {
         whereRaw(sql, bindings) {
           return createDeleteBuilder().whereRaw(sql, bindings)
         },
-        insert(payload) {
+        insert(_payload) {
           return {
             onConflict() {
               return {

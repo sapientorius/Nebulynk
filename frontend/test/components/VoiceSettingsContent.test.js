@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-describe('VoiceSettingsContent', () => {
+describe('static source contract: VoiceSettingsContent', () => {
   it('shows opt-in global PTT guidance only for Windows browser helper candidates', () => {
     const source = readFileSync(resolve('src/components/VoiceSettingsContent.vue'), 'utf8')
 

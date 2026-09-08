@@ -74,7 +74,7 @@ function createSocketConnection(token) {
       socket.emit('create', 'authentication', {
         strategy: 'jwt',
         accessToken: token
-      }, (error, result) => {
+      }, (error) => {
         if (error) {
           if (!resolved) {
             resolved = true

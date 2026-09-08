@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-describe('AppView voice screen share integration', () => {
+describe('static source contract: AppView voice screen share integration', () => {
   it('shows voice-channel screen share controls and a shared panel context', () => {
     const source = readFileSync(resolve('src/views/AppView.vue'), 'utf8')
     const controlsSource = readFileSync(resolve('src/components/ScreenShareControls.vue'), 'utf8')

@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-describe('password reset views', () => {
+describe('static source contract: password reset views', () => {
   it('adds a forgot-password link to the login view', () => {
     const source = readFileSync(resolve('src/views/LoginView.vue'), 'utf8')
 

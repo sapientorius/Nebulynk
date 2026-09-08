@@ -9,6 +9,16 @@ export async function createPostgresTestDb({ migrationTarget } = {}) {
   if (!connection) {
     throw new Error('NEBULYNK_TEST_POSTGRES_URL must explicitly identify an isolated PostgreSQL test instance')
   }
+  if (process.env.NEBULYNK_TEST_POSTGRES_ISOLATED !== 'true') {
+    throw new Error('NEBULYNK_TEST_POSTGRES_ISOLATED=true must explicitly confirm an isolated PostgreSQL test instance')
+  }
+  const parsed = new URL(connection)
+  if (!['postgres:', 'postgresql:'].includes(parsed.protocol) || !parsed.hostname) {
+    throw new Error('NEBULYNK_TEST_POSTGRES_URL must be a PostgreSQL URL')
+  }
+  const migrationConfig = { directory: fileURLToPath(new URL('../../migrations/', import.meta.url)) }
+  const names = (await readdir(migrationConfig.directory)).filter((name) => name.endsWith('.js')).sort()
+  if (migrationTarget && !names.includes(migrationTarget)) throw new Error('Unknown test migration target')
   const databaseName = `nebulynk_test_ap01_${createId()}`
   const admin = knex({ client: 'pg', connection, pool: { min: 0, max: 1 } })
   let created = false
@@ -36,10 +46,7 @@ export async function createPostgresTestDb({ migrationTarget } = {}) {
       pool: { min: 0, max: 8 },
       acquireConnectionTimeout: 10000
     })
-    const migrationConfig = { directory: fileURLToPath(new URL('../../migrations/', import.meta.url)) }
     if (migrationTarget) {
-      const names = (await readdir(migrationConfig.directory)).filter((name) => name.endsWith('.js')).sort()
-      if (!names.includes(migrationTarget)) throw new Error('Unknown test migration target')
       await db.migrate.latest({ migrationSource: {
         getMigrations: async () => names.filter((name) => name <= migrationTarget),
         getMigrationName: (name) => name,

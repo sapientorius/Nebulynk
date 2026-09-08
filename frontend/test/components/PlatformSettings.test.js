@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-describe('PlatformSettings source contract', () => {
+describe('static source contract: PlatformSettings source contract', () => {
   it('includes controls for default language, default meeting language, and auto-away timeout', () => {
     const source = readFileSync(resolve('src/components/admin/PlatformSettings.vue'), 'utf8')
 

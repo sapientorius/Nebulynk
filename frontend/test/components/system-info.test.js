@@ -6,7 +6,7 @@ function source(path) {
   return readFileSync(resolve(path), 'utf8')
 }
 
-describe('system information administration UI', () => {
+describe('static source contract: system information administration UI', () => {
   it('shows the four storage cards, localized sizes, and stale-state refresh affordance', () => {
     const component = source('src/components/admin/SystemInfo.vue')
 

@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-describe('ScreenShareControls', () => {
+describe('static source contract: ScreenShareControls', () => {
   it('owns prefixed start, active, and stop controls for screen-share headers', () => {
     const source = readFileSync(resolve('src/components/ScreenShareControls.vue'), 'utf8')
 

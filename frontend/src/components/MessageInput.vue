@@ -19,7 +19,7 @@
     </div>
 
     <div class="pending-files" v-if="pendingFiles.length > 0 || pendingImageUploads.length > 0">
-      <div class="pending-file" v-for="(file, index) in pendingFiles" :key="file.id">
+      <div class="pending-file" v-for="file in pendingFiles" :key="file.id">
         <div class="pending-file-preview" v-if="isImage(file)">
           <img :src="file.url" :alt="file.original_name" class="pending-file-thumb" />
         </div>
@@ -539,6 +539,7 @@ export default {
     async uploadFilesImmediately(files) {
       const fileList = Array.from(files || []).filter(Boolean)
       if (fileList.length === 0) return
+      const channelId = this.activeChannelId
 
       this.fileUploading = true
       try {
@@ -546,7 +547,10 @@ export default {
         for (const file of fileList) {
           try {
             const uploaded = await this.uploadFileWithLimitCheck(file, settings, file.name)
-            if (uploaded) this.onFileUploaded(uploaded)
+            if (uploaded) {
+              this.messagesStore.addDraftFile(channelId, uploaded)
+              this.focusTextarea()
+            }
           } catch {
             window.$message?.error(this.$t('ui.components.upload_failed', { file_name: file.name }))
           }

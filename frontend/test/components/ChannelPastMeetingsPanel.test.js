@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-describe('ChannelPastMeetingsPanel', () => {
+describe('static source contract: ChannelPastMeetingsPanel', () => {
   it('loads past meetings in 4-item windows and reuses the shared meeting summary card', () => {
     const source = readFileSync(resolve('src/components/ChannelPastMeetingsPanel.vue'), 'utf8')
 

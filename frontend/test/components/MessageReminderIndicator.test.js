@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-describe('MessageReminderIndicator', () => {
+describe('static source contract: MessageReminderIndicator', () => {
   it('shows a private, accessible alarm indicator only when a reminder is active', () => {
     const source = readFileSync(resolve('src/components/MessageReminderIndicator.vue'), 'utf8')
 

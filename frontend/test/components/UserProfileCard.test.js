@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-describe('UserProfileCard avatar flow source contract', () => {
+describe('static source contract: UserProfileCard avatar flow source contract', () => {
   it('replaces manual avatar urls with upload, crop, and remove controls', () => {
     const source = readFileSync(resolve('src/components/UserProfileCard.vue'), 'utf8')
 

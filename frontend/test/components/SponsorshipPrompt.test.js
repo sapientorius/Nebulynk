@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-describe('SponsorshipPrompt', () => {
+describe('static source contract: SponsorshipPrompt', () => {
   it('uses a dismissible modal with a safe external sponsorship link', () => {
     const source = readFileSync(resolve('src/components/SponsorshipPrompt.vue'), 'utf8')
 

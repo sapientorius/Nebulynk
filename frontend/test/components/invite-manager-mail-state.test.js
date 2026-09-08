@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-describe('InviteManager mail delivery messaging', () => {
+describe('static source contract: InviteManager mail delivery messaging', () => {
   it('distinguishes sent, failed, and not-configured invite email states', () => {
     const source = readFileSync(resolve('src/components/admin/InviteManager.vue'), 'utf8')
 

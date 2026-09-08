@@ -6,7 +6,7 @@ function source(path) {
   return readFileSync(resolve(path), 'utf8')
 }
 
-describe('self-registration views', () => {
+describe('static source contract: self-registration views', () => {
   it('shares the animated auth card between login and registration routes', () => {
     const auth = source('src/views/AuthView.vue')
     const login = source('src/views/LoginView.vue')

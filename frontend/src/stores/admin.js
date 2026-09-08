@@ -507,6 +507,8 @@ export const useAdminStore = defineStore('admin', () => {
 
   return {
     users,
+    beginPrimaryAdminTransferPasskeyOptions,
+    transferPrimaryAdmin,
     roles,
     permissions,
     rolePermissions,

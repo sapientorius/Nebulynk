@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-describe('MemberList direct-chat removal guard', () => {
+describe('static source contract: MemberList direct-chat removal guard', () => {
   it('only shows remove controls for managed membership channels', () => {
     const source = readFileSync(resolve('src/components/MemberList.vue'), 'utf8')
 

@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-describe('SMTP admin settings sources', () => {
+describe('static source contract: SMTP admin settings sources', () => {
   it('adds a dedicated SMTP settings panel with save and test actions', () => {
     const source = readFileSync(resolve('src/components/admin/SmtpSettings.vue'), 'utf8')
 

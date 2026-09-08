@@ -4,7 +4,6 @@ import { validate } from '../../schemas/validators.js'
 import {
   DEFAULT_SMTP_SETTINGS_ID,
   buildSmtpSettingsResponse,
-  getEmailDeliveryStatus,
   invalidateSmtpTransporter,
   normalizeStoredSmtpPatch,
   sendTestEmail,

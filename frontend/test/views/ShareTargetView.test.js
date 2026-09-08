@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-describe('Android PWA share target integration', () => {
+describe('static source contract: Android PWA share target integration', () => {
   it('registers text, link, and arbitrary file sharing in the web manifest', () => {
     const manifest = JSON.parse(readFileSync(resolve('public/manifest.webmanifest'), 'utf8'))
 

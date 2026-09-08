@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-describe('MessageInput autofocus regression', () => {
+describe('static source contract: MessageInput autofocus regression', () => {
   it('focuses the textarea on mount, chat switches, and reply intent through one guarded helper', () => {
     const source = readFileSync(resolve('src/components/MessageInput.vue'), 'utf8')
 

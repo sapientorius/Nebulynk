@@ -220,8 +220,8 @@ function decodeBase64UrlJson(segment) {
       return JSON.parse(text)
     }
 
-    if (typeof Buffer !== 'undefined') {
-      const text = Buffer.from(normalized, 'base64').toString('utf8')
+    if (typeof globalThis.Buffer !== 'undefined') {
+      const text = globalThis.Buffer.from(normalized, 'base64').toString('utf8')
       return JSON.parse(text)
     }
   } catch {

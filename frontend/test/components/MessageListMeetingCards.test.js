@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-describe('MessageList meeting card hydration', () => {
+describe('static source contract: MessageList meeting card hydration', () => {
   it('reloads ended referenced meetings with full detail so inline mini summaries appear on first render', () => {
     const source = readFileSync(resolve('src/components/MessageList.vue'), 'utf8')
 

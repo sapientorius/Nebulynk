@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-describe('WorkspaceShell', () => {
+describe('static source contract: WorkspaceShell', () => {
   it('keeps channels and meetings under one authenticated parent shell', () => {
     const shellSource = readFileSync(resolve('src/views/WorkspaceShell.vue'), 'utf8')
     const routerSource = readFileSync(resolve('src/router/index.js'), 'utf8')

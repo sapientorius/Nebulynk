@@ -2,7 +2,6 @@ import { authenticate } from '@feathersjs/authentication'
 import { checkPermission } from '../../hooks/check-permission.js'
 import { validate } from '../../schemas/validators.js'
 import {
-  AI_FUNCTION_KEYS,
   getCapabilityForFunctionKey,
   isValidFunctionKey,
   providerSupportsCapability

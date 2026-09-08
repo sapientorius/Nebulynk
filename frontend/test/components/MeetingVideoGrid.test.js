@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-describe('MeetingVideoGrid source contract', () => {
+describe('static source contract: MeetingVideoGrid source contract', () => {
   it('attaches participant camera tracks and keeps the camera toggle in the voice store', () => {
     const source = readFileSync(resolve('src/components/MeetingVideoGrid.vue'), 'utf8')
 

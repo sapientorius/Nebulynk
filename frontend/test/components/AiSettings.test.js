@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-describe('AiSettings source contract', () => {
+describe('static source contract: AiSettings source contract', () => {
   it('includes provider management and function assignment controls', () => {
     const source = readFileSync(resolve('src/components/admin/AiSettings.vue'), 'utf8')
 

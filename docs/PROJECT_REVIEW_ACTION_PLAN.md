@@ -3,7 +3,7 @@
 Stand: 7. September 2026  
 Bewertete Anwendungsversion: `0.5.1`  
 Bewerteter Commit: `baa254c` (`feat: implement default channel membership management and migration`)  
-Status: AP-01 wurde am 7. September 2026 umgesetzt und verifiziert; siehe [Übergabe AP-01](AP_01_HANDOFF.md). AP-02 wurde am 8. September 2026 umgesetzt und verifiziert; siehe [Übergabe AP-02](AP_02_HANDOFF.md). AP-03 bis AP-06 sind weiterhin offen. Die ursprüngliche Bewertung selbst enthielt noch keine Implementierung der Korrekturen.
+Status: AP-01 wurde am 7. September 2026 umgesetzt und verifiziert; siehe [Übergabe AP-01](AP_01_HANDOFF.md). AP-02 wurde am 8. September 2026 umgesetzt und verifiziert; siehe [Übergabe AP-02](AP_02_HANDOFF.md). AP-03 wurde am 8. September 2026 im vereinbarten Umfang umgesetzt und lokal verifiziert; siehe [Übergabe AP-03](AP_03_HANDOFF.md). AP-04 bis AP-06 sind weiterhin offen. Die ursprüngliche Bewertung selbst enthielt noch keine Implementierung der Korrekturen.
 
 ## Zweck und Verwendung
 
@@ -111,7 +111,7 @@ Nicht ausgeführt wurden Browser-E2E, allgemeine Lasttests und die vollständige
 | --- | --- | --- | --- | --- |
 | AP-01 | Sehr hoch | Autorisierte, atomare Dateizuordnung bei Nachrichten | Sofort; unabhängig von großen Refactorings | Abgeschlossen, siehe [Übergabe](AP_01_HANDOFF.md) |
 | AP-02 | Hoch | Wiederaufnehmbare, konsistente Erinnerungsverarbeitung | Parallel zu AP-01 bei getrennter Dateizuständigkeit möglich | Abgeschlossen, siehe [Übergabe](AP_02_HANDOFF.md) |
-| AP-03 | Hoch | Statische Analyse, echte Komponententests, PostgreSQL-Integrationstests | Infrastruktur früh; mit AP-01/AP-02 abstimmen | Offen |
+| AP-03 | Hoch | Statische Analyse, echte Komponententests, PostgreSQL-Integrationstests | Infrastruktur früh; mit AP-01/AP-02 abstimmen | Abgeschlossen, siehe [Übergabe](AP_03_HANDOFF.md) |
 | AP-04 | Mittel bis hoch | Klar abgegrenzte Meeting-, UI- und API-Module | Nach relevanter Verhaltensabsicherung aus AP-03 | Offen |
 | AP-05 | Mittel | Kontrollierter Server-Lebenszyklus und überprüfbare Betriebsannahmen | Mit AP-02 und Backend-Teil von AP-04 abstimmen | Offen |
 | AP-06 | Mittel | Einheitlicher verbindlicher Prüfumfang lokal und in GitHub Actions | Vorhandene Lücken sofort; abschließende Integration nach AP-03 | Offen |
@@ -324,11 +324,11 @@ Vorgehen:
 
 Abnahmekriterien AP-03A:
 
-- [ ] Statische Analyse läuft für Backend und Frontend über einen dokumentierten verbindlichen Umfang.
-- [ ] Temporäre, nicht eingecheckte Kontrollbeispiele mit undefinierter Variable und ungültigem Vue-Template werden tatsächlich abgelehnt.
-- [ ] Jede Ausnahme besitzt eine nachvollziehbare Begründung; neu hinzugefügter Code wird nicht pauschal ausgespart.
-- [ ] Normale npm-Befehle funktionieren ohne RTK; CI verwendet denselben Regelumfang.
-- [ ] Vorhandene Tests und Frontend-Build bleiben erfolgreich.
+- [x] Statische Analyse läuft für Backend und Frontend über einen dokumentierten verbindlichen Umfang.
+- [x] Temporäre, nicht eingecheckte Kontrollbeispiele mit undefinierter Variable und ungültigem Vue-Template werden tatsächlich abgelehnt.
+- [x] Jede Ausnahme besitzt eine nachvollziehbare Begründung; neu hinzugefügter Code wird nicht pauschal ausgespart.
+- [x] Normale npm-Befehle funktionieren ohne RTK; CI verwendet denselben Regelumfang.
+- [x] Vorhandene Tests und Frontend-Build bleiben erfolgreich.
 
 ### Teilpaket AP-03B: Ausgeführte Komponenten- und Interaktionstests
 
@@ -363,11 +363,11 @@ Browser-E2E bleiben für echte Navigation, Session/Cookies, Medienbrowser-APIs u
 
 Abnahmekriterien AP-03B:
 
-- [ ] Vue-SFCs werden in einer geeigneten Umgebung tatsächlich gerendert und über Interaktionen geprüft.
-- [ ] Die genannten kritischen Vertikalen haben aussagekräftige Erfolgs- und Fehlerfalltests.
-- [ ] Für alle bisherigen Komponenten-/View-Quelltexttests ist die weitere Behandlung nachvollziehbar dokumentiert.
-- [ ] Entfernte Assertions haben eine fachliche Ersatzprüfung oder eine begründete Einstufung als redundant.
-- [ ] Node-Tests, neue Komponententests, relevante Browser-E2E und Build sind erfolgreich.
+- [x] Vue-SFCs werden in einer geeigneten Umgebung tatsächlich gerendert und über Interaktionen geprüft.
+- [x] Die genannten kritischen Vertikalen haben aussagekräftige Erfolgs- und Fehlerfalltests.
+- [x] Für alle bisherigen Komponenten-/View-Quelltexttests ist die weitere Behandlung nachvollziehbar dokumentiert.
+- [x] Entfernte Assertions haben eine fachliche Ersatzprüfung oder eine begründete Einstufung als redundant.
+- [x] Node-Tests, neue Komponententests, relevante Browser-E2E und Build sind erfolgreich.
 
 ### Teilpaket AP-03C: PostgreSQL-Integrationstests
 
@@ -386,19 +386,21 @@ Vorgehen:
 
 Abnahmekriterien AP-03C:
 
-- [ ] Ausdrücklich isolierter, dokumentierter Testaufbau mit echten Migrationen existiert.
-- [ ] Rollback und Konkurrenz aus AP-01/AP-02 sind gegen PostgreSQL geprüft.
-- [ ] Mindestens ein relevanter Membership-/Meeting-Historienfall prüft tatsächlich ausgeführtes SQL.
-- [ ] Testdaten-Cleanup kann die normale Entwicklungsdatenbank nicht versehentlich als Standardziel verwenden.
-- [ ] Lokaler Aufruf und CI-Job verwenden denselben Testumfang und melden fehlende Voraussetzungen klar.
+- [x] Ausdrücklich isolierter, dokumentierter Testaufbau mit echten Migrationen existiert.
+- [x] Rollback und Konkurrenz aus AP-01/AP-02 sind gegen PostgreSQL geprüft.
+- [x] Mindestens ein relevanter Membership-/Meeting-Historienfall prüft tatsächlich ausgeführtes SQL.
+- [x] Testdaten-Cleanup kann die normale Entwicklungsdatenbank nicht versehentlich als Standardziel verwenden.
+- [x] Lokaler Aufruf und CI-Job verwenden denselben Testumfang und melden fehlende Voraussetzungen klar.
 
 ### Gesamtübergabe AP-03
 
 AP-03A, AP-03B und AP-03C können separat bearbeitet werden. Änderungen an Manifesten, Lockfile und gemeinsamen Setup-Dateien müssen koordiniert werden. Für AP-04 zuerst die ausgewählten Meeting-/Composer-Verhaltenstests bereitstellen. Für AP-06 die fertigen Scriptnamen und Infrastrukturvoraussetzungen übergeben.
 
-- [ ] Alle drei Teilpakete sind abgeschlossen oder ihr noch offener Umfang ist ausdrücklich ausgewiesen.
-- [ ] Die Dokumentation beschreibt, was Unit-, Komponenten-, Integrations- und E2E-Tests jeweils garantieren.
-- [ ] Kein Testerfolg wird aus einer reinen Quelltextprüfung als ausgeführtes Nutzerverhalten abgeleitet.
+- [x] Alle drei Teilpakete sind abgeschlossen oder ihr noch offener Umfang ist ausdrücklich ausgewiesen.
+- [x] Die Dokumentation beschreibt, was Unit-, Komponenten-, Integrations- und E2E-Tests jeweils garantieren.
+- [x] Kein Testerfolg wird aus einer reinen Quelltextprüfung als ausgeführtes Nutzerverhalten abgeleitet.
+
+Umgesetzt und lokal verifiziert am 8. September 2026. Die [Übergabe AP-03](AP_03_HANDOFF.md) dokumentiert 28 ausgeführte Komponentenfälle, 699 Frontend-Tests, 617 Backend-Tests, 78 PostgreSQL-Integrationstests, elf erfolgreiche ausgewählte Browserfälle und den erfolgreichen lokalen CI-/Build-Lauf. Die [Vertragsmatrix](AP_03_TEST_CONTRACTS.md) benennt zurückgestellte UI-Umstellungen einzeln. Ein außerhalb dieses Umfangs gefundener Foreground-Benachrichtigungsfehler bleibt offen; der vollständige Browserbestand und ein GitHub-Lauf werden nicht als erfolgreich ausgewiesen.
 
 ## AP-04: Große Module nach Verantwortlichkeiten aufteilen
 

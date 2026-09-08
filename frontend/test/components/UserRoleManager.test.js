@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-describe('UserRoleManager source contract', () => {
+describe('static source contract: UserRoleManager source contract', () => {
   it('groups administrative controls in a responsive actions dropdown', () => {
     const source = readFileSync(resolve('src/components/admin/UserRoleManager.vue'), 'utf8')
 

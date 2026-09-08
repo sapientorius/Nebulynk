@@ -1067,8 +1067,6 @@ describe('auth api helpers', () => {
       disableTwoFactor,
       disableUser,
       enableUser,
-      getPasskeys,
-      getTwoFactorStatus,
       regenerateTwoFactorRecoveryCodes,
       resetUserPasskeys,
       transferPrimaryAdmin,

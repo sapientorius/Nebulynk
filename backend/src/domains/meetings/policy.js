@@ -3,7 +3,7 @@ import { badRequest, forbidden, notFound } from '../../lib/errors.js'
 export async function assertCanAccessMeeting({
   meetingId,
   user,
-  preloadedMeeting = null,
+  preloadedMeeting: _preloadedMeeting = null,
   findMeetingParticipant,
   loadMeetingById
 }) {

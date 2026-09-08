@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-describe('MeetingSettings source contract', () => {
+describe('static source contract: MeetingSettings source contract', () => {
   it('contains all meeting-related platform settings and saves them together', () => {
     const source = readFileSync(resolve('src/components/admin/MeetingSettings.vue'), 'utf8')
 

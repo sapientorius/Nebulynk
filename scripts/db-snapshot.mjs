@@ -107,7 +107,7 @@ function runDockerStream(args, { outputPath, inputPath }) {
       if (outputPath) {
         try {
           await fsp.rm(outputPath, { force: true })
-        } catch {}
+        } catch { /* Preserve the original command error if partial-output cleanup fails. */ }
       }
 
       rejectPromise(error)

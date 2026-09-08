@@ -34,10 +34,6 @@ function parseDurationToken(token) {
   return Number.isFinite(amount) && unitMs ? amount * unitMs : null
 }
 
-function toIsoTimestamp(value) {
-  return new Date(value).toISOString()
-}
-
 function hashToken(token) {
   return createHash(HASH_ALGORITHM)
     .update(String(token || ''))
@@ -313,7 +309,7 @@ function ensureSessionUsable(session) {
 
 export async function refreshSession(app, {
   refreshToken,
-  transport = 'body',
+  transport: _transport = 'body',
   lastUsedIp = null,
   userAgent = null
 }) {

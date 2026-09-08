@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-describe('DesignSettings source contract', () => {
+describe('static source contract: DesignSettings source contract', () => {
   it('exposes dedicated per-theme design controls and local reset actions', () => {
     const source = readFileSync(resolve('src/components/admin/DesignSettings.vue'), 'utf8')
 

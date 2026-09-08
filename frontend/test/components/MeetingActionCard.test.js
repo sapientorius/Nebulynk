@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-describe('MeetingActionCard', () => {
+describe('static source contract: MeetingActionCard', () => {
   it('clamps the mini summary to two lines and exposes the full text on hover or click', () => {
     const source = readFileSync(resolve('src/components/MeetingActionCard.vue'), 'utf8')
 

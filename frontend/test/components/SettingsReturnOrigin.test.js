@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-describe('settings return origin source contract', () => {
+describe('static source contract: settings return origin source contract', () => {
   it('opens settings with a safe returnTo query from the current route', () => {
     const source = readFileSync(resolve('src/components/UserAccountMenu.vue'), 'utf8')
 

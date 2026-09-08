@@ -33,7 +33,7 @@ export function isAnyDesktopRuntime(targetWindow = typeof window !== 'undefined'
 
 export function getDesktopRuntimeKind(targetWindow = typeof window !== 'undefined' ? window : null) {
   if (!canUseWindow(targetWindow)) return null
-  if (!!targetWindow.__TAURI_INTERNALS__) return 'tauri'
+  if (targetWindow.__TAURI_INTERNALS__) return 'tauri'
   if (hasElectronDesktopApi(targetWindow)) return 'electron'
   return null
 }

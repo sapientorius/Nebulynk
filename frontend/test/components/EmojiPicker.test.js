@@ -3,7 +3,7 @@ import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { loadRecentEmojis, saveRecentEmoji } from '../../src/lib/recent-emojis.js'
 
-describe('EmojiPicker recent emoji behavior', () => {
+describe('static source contract: EmojiPicker recent emoji behavior', () => {
   it('does not autofocus its search input in the mobile layout', () => {
     const source = readFileSync(resolve('src/components/EmojiPicker.vue'), 'utf8')
     const mountedHook = source.slice(

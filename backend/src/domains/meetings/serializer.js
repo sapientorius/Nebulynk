@@ -314,7 +314,7 @@ export async function enrichMeetingsWithDetails({
   db,
   app,
   rows,
-  viewerUserId = null,
+  viewerUserId: _viewerUserId = null,
   viewerUser = null,
   sourceChannelDisplayNameByChannelId = {},
   messageAuthorIdsByChannelId = {},

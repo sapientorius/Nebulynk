@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-describe('AskMeetingPanel', () => {
+describe('static source contract: AskMeetingPanel', () => {
   it('owns Ask the Meeting history, citation links, and stable submit control', () => {
     const source = readFileSync(resolve('src/components/AskMeetingPanel.vue'), 'utf8')
 

@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-describe('ScreenShareChatOverlay', () => {
+describe('static source contract: ScreenShareChatOverlay', () => {
   it('owns the reusable maximized screen-share chat shell with prefixed test IDs', () => {
     const source = readFileSync(resolve('src/components/ScreenShareChatOverlay.vue'), 'utf8')
 

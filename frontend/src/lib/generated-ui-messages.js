@@ -168,8 +168,6 @@ export const generatedUiMessages = {
           meeting_summary: 'Meeting-Zusammenfassungen',
           chat_summary: 'Chat-Zusammenfassungen',
           image_generation: 'Bildgenerierung',
-          image_generation: 'Bildgenerierung',
-          image_generation: 'Bildgenerierung',
           api_key_placeholder: 'sk-...',
           welcome_message: 'Willkommensnachricht...'
         },
@@ -921,8 +919,6 @@ export const generatedUiMessages = {
           users_roles: 'Users & Roles',
           meeting_summary: 'Meeting summaries',
           chat_summary: 'Chat summaries',
-          image_generation: 'Image generation',
-          image_generation: 'Image generation',
           image_generation: 'Image generation',
           api_key_placeholder: 'sk-...',
           welcome_message: 'Welcome message...'
