@@ -272,8 +272,18 @@ export function hasVisibleChannelSession(userId, channelId) {
   return false
 }
 
-export function setupPresence(app) {
-  app.on('login', async (authResult, { connection }) => {
+export function setupPresence(app, { setTimer = setTimeout, clearTimer = clearTimeout, removeParticipant = removeVoiceParticipant } = {}) {
+  let stopped = false
+  const pending = new Set()
+  function run(work) {
+    if (stopped) return Promise.resolve()
+    const promise = Promise.resolve().then(work)
+    pending.add(promise)
+    promise.then(() => pending.delete(promise), () => pending.delete(promise))
+    return promise
+  }
+  const onLogin = (authResult, params) => run(() => login(authResult, params))
+  async function login(authResult, { connection }) {
     if (!connection) return
 
     const user = authResult.user
@@ -319,9 +329,10 @@ export function setupPresence(app) {
 
       logger.info(`${user.display_name} ist jetzt online`)
     }
-  })
+  }
 
-  app.on('disconnect', (connection) => {
+  const onDisconnect = (connection) => {
+    if (stopped) return
     if (!connection) return
 
     const userId = connectionToUser.get(connection)
@@ -339,41 +350,60 @@ export function setupPresence(app) {
       if (connections.size === 0) {
         onlineUsers.delete(userId)
 
-        const timer = setTimeout(async () => {
-          disconnectTimers.delete(userId)
+        const timer = setTimer(() => {
+          void run(async () => {
+            disconnectTimers.delete(userId)
 
-          // Double-check they haven't reconnected
-          if (!onlineUsers.has(userId)) {
-            clearAutoAwayState(userId)
+            // Double-check they haven't reconnected
+            if (!onlineUsers.has(userId)) {
+              clearAutoAwayState(userId)
 
-            try {
-              // Use service.patch (triggers 'users patched' event -> allUsers sync)
-              await app.service('users').patch(userId, { status: 'offline' })
-            } catch (error) {
-              logger.error('Fehler beim Status-Update auf offline:', { error: error.message })
+              try {
+                // Use service.patch (triggers 'users patched' event -> allUsers sync)
+                await app.service('users').patch(userId, { status: 'offline' })
+              } catch (error) {
+                logger.error('Fehler beim Status-Update auf offline:', { error: error.message })
+              }
+
+              // Remove from voice channel if connected
+              try {
+                await removeParticipant(app, userId)
+              } catch (error) {
+                logger.error('Fehler beim Voice-Cleanup:', { error: error.message })
+              }
+
+              app.channel('authenticated').send({
+                type: 'presence',
+                userId,
+                status: 'offline'
+              })
+
+              logger.info(`User ${userId} ist jetzt offline`)
             }
-
-            // Remove from voice channel if connected
-            try {
-              await removeVoiceParticipant(app, userId)
-            } catch (error) {
-              logger.error('Fehler beim Voice-Cleanup:', { error: error.message })
-            }
-
-            app.channel('authenticated').send({
-              type: 'presence',
-              userId,
-              status: 'offline'
-            })
-
-            logger.info(`User ${userId} ist jetzt offline`)
-          }
+          }).catch((error) => logger.error('Presence disconnect failed', { error: error.message }))
         }, DISCONNECT_GRACE_MS)
 
         disconnectTimers.set(userId, timer)
       }
     }
-  })
+  }
+  app.on('login', onLogin)
+  app.on('disconnect', onDisconnect)
+  function quiesce() {
+    stopped = true
+    app.removeListener('login', onLogin)
+    app.removeListener('disconnect', onDisconnect)
+    for (const timer of disconnectTimers.values()) clearTimer(timer)
+    disconnectTimers.clear()
+  }
+  return {
+    quiesce,
+    async stop() {
+      quiesce()
+      while (pending.size) await Promise.allSettled([...pending])
+      resetPresenceStateForTests()
+    }
+  }
 }
 
 // Clean up stale online status after server restart

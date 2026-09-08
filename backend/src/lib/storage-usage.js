@@ -118,6 +118,12 @@ export class StorageUsageManager {
     this.recordingStorageClients = new Map()
   }
 
+  async stop() {
+    await this.scanPromise
+    for (const client of new Set(this.recordingStorageClients.values())) client.destroy?.()
+    this.recordingStorageClients.clear()
+  }
+
   async getUsage() {
     if (this.snapshot) return this._buildResponse(this.snapshot)
     return this._scan()

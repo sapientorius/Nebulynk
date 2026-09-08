@@ -101,3 +101,19 @@ Pre-transaction authorization/metadata reads remain outside the transaction, and
 post-commit external failures have no compensating transaction. These are
 preserved boundaries, not new delivery guarantees. Service lifecycle work stays
 with AP-05.
+
+## Backend lifecycle and instance count
+
+Run exactly one backend instance per shared application state. Stop the previous
+backend completely before starting its replacement; overlapping/rolling backend
+deployments are unsupported even with a desired replica count of one. Configure
+the orchestrator accordingly and allow a maintenance window.
+
+The backend handles SIGTERM/SIGINT with a 60-second shutdown budget; container
+stop grace is 75 seconds. Wait for `GET /health/ready` to return HTTP 200 before
+routing traffic. Startup clears shared voice participants and stale presence;
+existing LiveKit media does not imply seamless API-session recovery.
+
+See [runtime operations and isolated capacity verification](runtime-operations.md)
+for lifecycle ownership, recovery limits, exact rollout steps and reproducible
+local Docker tests. Redis rate limiting does not enable multiple API instances.

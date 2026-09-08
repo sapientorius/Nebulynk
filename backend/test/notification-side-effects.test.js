@@ -1,6 +1,33 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { setTimeout as delay } from 'node:timers/promises'
 import { createNotificationSideEffectsDispatcher } from '../src/lib/notification-side-effects.js'
+
+test('flush and stop wait for an already active push batch and all queued batches', async () => {
+  const gate = Promise.withResolvers()
+  const entered = Promise.withResolvers()
+  const pushed = []
+  const dispatcher = createNotificationSideEffectsDispatcher({
+    get: () => createUsersDb([{ id: 'u', status: 'online' }]),
+    service: () => ({ emit() {} })
+  }, {
+    hasVisibleSession: () => false,
+    async sendPush() { entered.resolve(); await gate.promise; pushed.push('push') }
+  })
+  dispatcher.enqueue([{ id: 'one', user_id: 'u' }])
+  await entered.promise
+  dispatcher.enqueue([{ id: 'two', user_id: 'u' }])
+  let flushed = false
+  const flush = dispatcher.flush().then(() => { flushed = true })
+  const stop = dispatcher.stop()
+  await delay(0)
+  assert.equal(flushed, false)
+  assert.throws(() => dispatcher.enqueue([{ id: 'late' }]), /stopped/)
+  gate.resolve()
+  await Promise.all([flush, stop])
+  assert.equal(pushed.length, 2)
+  await dispatcher.stop()
+})
 
 function createUsersDb(users = []) {
   return (table) => {

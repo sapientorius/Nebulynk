@@ -3,7 +3,7 @@
 Stand: 7. September 2026  
 Bewertete Anwendungsversion: `0.5.1`  
 Bewerteter Commit: `baa254c` (`feat: implement default channel membership management and migration`)  
-Status: AP-01 wurde am 7. September 2026 umgesetzt und verifiziert; siehe [Übergabe AP-01](AP_01_HANDOFF.md). AP-02 wurde am 8. September 2026 umgesetzt und verifiziert; siehe [Übergabe AP-02](AP_02_HANDOFF.md). AP-03 wurde am 8. September 2026 im vereinbarten Umfang umgesetzt und lokal verifiziert; siehe [Übergabe AP-03](AP_03_HANDOFF.md). AP-04 wurde am 8. September 2026 einschließlich AP-04A/B/C umgesetzt und lokal technisch abgenommen; siehe [Übergabe AP-04](AP_04_HANDOFF.md). AP-05 und AP-06 sind weiterhin offen. Die ursprüngliche Bewertung selbst enthielt noch keine Implementierung der Korrekturen.
+Status: AP-01 wurde am 7. September 2026 umgesetzt und verifiziert; siehe [Übergabe AP-01](AP_01_HANDOFF.md). AP-02 wurde am 8. September 2026 umgesetzt und verifiziert; siehe [Übergabe AP-02](AP_02_HANDOFF.md). AP-03 wurde am 8. September 2026 im vereinbarten Umfang umgesetzt und lokal verifiziert; siehe [Übergabe AP-03](AP_03_HANDOFF.md). AP-04 wurde am 8. September 2026 einschließlich AP-04A/B/C umgesetzt und lokal technisch abgenommen; siehe [Übergabe AP-04](AP_04_HANDOFF.md). AP-05 wurde am 8. September 2026 umgesetzt, hinsichtlich Lifecycle abgenommen und mit dokumentierter lokaler Lastgrenze gemessen; siehe [Übergabe AP-05](AP_05_HANDOFF.md) und [Basisbericht](AP_05_BASELINE.md). AP-06 bleibt offen. Die ursprüngliche Bewertung selbst enthielt noch keine Implementierung der Korrekturen.
 
 ## Zweck und Verwendung
 
@@ -113,7 +113,7 @@ Nicht ausgeführt wurden Browser-E2E, allgemeine Lasttests und die vollständige
 | AP-02 | Hoch | Wiederaufnehmbare, konsistente Erinnerungsverarbeitung | Parallel zu AP-01 bei getrennter Dateizuständigkeit möglich | Abgeschlossen, siehe [Übergabe](AP_02_HANDOFF.md) |
 | AP-03 | Hoch | Statische Analyse, echte Komponententests, PostgreSQL-Integrationstests | Infrastruktur früh; mit AP-01/AP-02 abstimmen | Abgeschlossen, siehe [Übergabe](AP_03_HANDOFF.md) |
 | AP-04 | Mittel bis hoch | Klar abgegrenzte Meeting-, UI- und API-Module | Nach relevanter Verhaltensabsicherung aus AP-03 | Abgeschlossen: AP-04A/B/C lokal technisch abgenommen ([Übergabe](AP_04_HANDOFF.md)) |
-| AP-05 | Mittel | Kontrollierter Server-Lebenszyklus und überprüfbare Betriebsannahmen | Mit AP-02 und Backend-Teil von AP-04 abstimmen | Offen |
+| AP-05 | Mittel | Kontrollierter Server-Lebenszyklus und überprüfbare Betriebsannahmen | Mit AP-02 und Backend-Teil von AP-04 abstimmen | Abgeschlossen; lokale Lastgrenze dokumentiert, siehe [AP-05](AP_05_HANDOFF.md) |
 | AP-06 | Mittel | Einheitlicher verbindlicher Prüfumfang lokal und in GitHub Actions | Vorhandene Lücken sofort; abschließende Integration nach AP-03 | Offen |
 
 AP-01 und AP-02 dürfen nicht auf einen vollständigen Umbau der Testlandschaft warten. Sie müssen die nötigen gezielten Regressionstests selbst mitbringen. AP-03 kann deren Infrastruktur anschließend vereinheitlichen.
@@ -621,12 +621,12 @@ Erforderliche Tests:
 
 ### Abnahme und Übergabe
 
-- [ ] Alle relevanten Hintergrundaufgaben besitzen einen verwalteten Start-/Stop-Lebenszyklus.
-- [ ] Signalverarbeitung, laufende Requests/Jobs, Socket-Abbau und Ressourcenschließung sind konsistent getestet.
-- [ ] Dispatcher- und Presence-Cleanup sind berücksichtigt; keine ausstehenden Timer schreiben nach Pool-Schließung.
-- [ ] Unterstützte Eininstanz-Topologie und Auswirkungen überlappender Deployments sind dokumentiert.
-- [ ] Reproduzierbarer Lasttest-Aufruf und ein Basisbericht mit tatsächlich gemessenen Ergebnissen liegen vor.
-- [ ] Nicht erreichte Laststufen oder nicht verfügbare Medieninfrastruktur werden als offene Verifikation ausgewiesen.
+- [x] Alle relevanten Hintergrundaufgaben besitzen einen verwalteten Start-/Stop-Lebenszyklus.
+- [x] Signalverarbeitung, laufende Requests/Jobs, Socket-Abbau und Ressourcenschließung sind konsistent getestet.
+- [x] Dispatcher- und Presence-Cleanup sind berücksichtigt; keine ausstehenden Timer schreiben nach Pool-Schließung.
+- [x] Unterstützte Eininstanz-Topologie und Auswirkungen überlappender Deployments sind dokumentiert.
+- [x] Reproduzierbarer Lasttest-Aufruf und ein Basisbericht mit tatsächlich gemessenen Ergebnissen liegen vor.
+- [x] Nicht erreichte Laststufen oder nicht verfügbare Medieninfrastruktur werden als offene Verifikation ausgewiesen.
 
 AP-05 muss die in AP-02 gewählte Reminder-Verarbeitung einbinden, ohne deren Fachlogik erneut zu ändern. Mit AP-04B ist die Zuständigkeit für Meeting-Jobs und externe Seiteneffekte abzustimmen. Teilaufgabe C kann getrennt bearbeitet werden; ein fertiger Shutdown allein schließt die Kapazitätsprüfung nicht ab.
 

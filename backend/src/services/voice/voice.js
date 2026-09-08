@@ -184,35 +184,37 @@ export class VoiceService {
   }
 
   _scheduleMeetingRecordingStart(channel, user) {
-    Promise.resolve()
-      .then(async () => {
-        const meeting = await this._findMeetingByChatChannelId(channel.id)
-        if (!meeting) return
-        if (!this._shouldStartMeetingRecording(meeting)) {
-          logger.info('Skipping meeting recording start because transcription recording is paused', {
-            meetingId: meeting.id,
-            channelId: channel.id,
-            userId: user.id
-          })
-          return
-        }
-
-        logger.info('Scheduling meeting recording start after voice join', {
+    const run = async () => {
+      const meeting = await this._findMeetingByChatChannelId(channel.id)
+      if (!meeting) return
+      if (!this._shouldStartMeetingRecording(meeting)) {
+        logger.info('Skipping meeting recording start because transcription recording is paused', {
           meetingId: meeting.id,
           channelId: channel.id,
-          userId: user.id,
-          participantIdentity: user.id,
-          meetingStartedAt: meeting.started_at || null
+          userId: user.id
         })
+        return
+      }
 
-        await startMeetingParticipantRecording(this.app, {
-          meetingId: meeting.id,
-          roomName: channel.id,
-          userId: user.id,
-          participantIdentity: user.id,
-          participantDisplayName: user.display_name
-        })
+      logger.info('Scheduling meeting recording start after voice join', {
+        meetingId: meeting.id,
+        channelId: channel.id,
+        userId: user.id,
+        participantIdentity: user.id,
+        meetingStartedAt: meeting.started_at || null
       })
+
+      await startMeetingParticipantRecording(this.app, {
+        meetingId: meeting.id,
+        roomName: channel.id,
+        userId: user.id,
+        participantIdentity: user.id,
+        participantDisplayName: user.display_name
+      })
+    }
+    const runtime = this.app.get('runtime')
+    const promise = runtime ? runtime.track('meeting-recording-start', run) : Promise.resolve().then(run)
+    promise
       .catch((error) => {
         logger.warn('Meeting recording start failed in background', {
           channelId: channel?.id || null,

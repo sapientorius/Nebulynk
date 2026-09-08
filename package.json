@@ -97,7 +97,11 @@
     "test:plesk:garage": "node scripts/run-plesk-garage-integration.mjs",
     "test:plesk:garage:rtk": "rtk node scripts/run-plesk-garage-integration.mjs",
     "test:frontend:components": "npm run test:components --workspace=frontend",
-    "test:frontend:components:rtk": "rtk npm run test:components:rtk --workspace=frontend"
+    "test:frontend:components:rtk": "rtk npm run test:components:rtk --workspace=frontend",
+    "benchmark:runtime": "node scripts/run-runtime-verification.mjs benchmark",
+    "benchmark:runtime:rtk": "rtk node scripts/run-runtime-verification.mjs benchmark",
+    "test:backend:lifecycle": "node scripts/run-runtime-verification.mjs lifecycle",
+    "test:backend:lifecycle:rtk": "rtk node scripts/run-runtime-verification.mjs lifecycle"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",

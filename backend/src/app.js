@@ -10,6 +10,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 dotenv.config({ path: resolve(__dirname, '../../.env') })
 
 import { logger } from './logger.js'
+import { createRuntime } from './lib/runtime.js'
+import { teardownRuntime } from './lib/runtime-teardown.js'
 import { authentication } from './authentication.js'
 import { services } from './services/index.js'
 import { channels } from './channels.js'
@@ -57,6 +59,10 @@ import {
 } from './lib/security-config.js'
 
 const app = koa(feathers())
+const runtime = createRuntime({ log: logger })
+app.set('runtime', runtime)
+const storageClients = new Set()
+app.set('ownedStorageClients', storageClients)
 app.proxy = shouldTrustProxy(process.env)
 
 // Load configuration
@@ -113,6 +119,7 @@ app.use(async (ctx, next) => {
   }
 })
 app.use(errorHandler())
+app.use(runtime.middleware)
 
 // Mount upload route before REST (needs raw Koa access for multipart)
 configureUploadRoute(app)
@@ -176,12 +183,12 @@ app.set('notificationSideEffectsDispatcher', createNotificationSideEffectsDispat
 app.configure(channels)
 
 // Set up presence tracking (Socket.IO connect/disconnect)
-setupPresence(app)
+app.set('presenceController', setupPresence(app))
 
 // Global hooks
 app.hooks({
   around: {
-    all: [logErrorHook]
+    all: [runtime.hook, logErrorHook]
   },
   before: {
     all: [
@@ -234,10 +241,12 @@ app.hooks({
       // Initialize S3-compatible object storage clients
       try {
         const storageClient = createStorageClient()
+        storageClients.add(storageClient)
         const publicEndpoint = resolveStorageS3PublicEndpoint(process.env)
         const storagePresignClient = publicEndpoint
           ? createStorageClient({ endpoint: publicEndpoint })
           : storageClient
+        storageClients.add(storagePresignClient)
         const bucket = resolveStorageBucket(process.env)
         await initBucket(storageClient, bucket)
         app.set('storageClient', storageClient)
@@ -262,7 +271,7 @@ app.hooks({
       }
 
       // Periodic cleanup: expire custom statuses every 60 seconds
-      setInterval(async () => {
+      runtime.register({ name: 'status-expiration', run: async () => {
         try {
           const now = new Date().toISOString()
           const expired = await db('users')
@@ -292,9 +301,9 @@ app.hooks({
         } catch (error) {
           logger.error('Status-Expiration-Cleanup fehlgeschlagen:', { error: error.message })
         }
-      }, 60_000)
+      }, intervalMs: 60_000 })
 
-      setInterval(async () => {
+      runtime.register({ name: 'guest-expiration', run: async () => {
         try {
           const nowIso = new Date().toISOString()
           await db('users')
@@ -310,64 +319,49 @@ app.hooks({
         } catch (error) {
           logger.error('Guest account expiration sweep failed:', { error: error.message })
         }
-      }, 300_000)
+      }, intervalMs: 300_000 })
 
-      setInterval(async () => {
+      runtime.register({ name: 'auto-away', run: async () => {
         try {
           await runAutoAwaySweep(app)
         } catch (error) {
           logger.error('Presence auto-away sweep failed:', { error: error.message })
         }
-      }, 60_000)
+      }, intervalMs: 60_000 })
 
       // Periodic cleanup: end active meetings after 10 minutes without participants.
-      setInterval(async () => {
+      runtime.register({ name: 'meeting-idle', run: async () => {
         try {
           await endExpiredIdleMeetings(app)
         } catch (error) {
           logger.error('Meeting idle-timeout cleanup failed:', { error: error.message })
         }
-      }, 60_000)
+      }, intervalMs: 60_000 })
 
-      setInterval(async () => {
+      runtime.register({ name: 'scheduled-meetings', run: async () => {
         try {
           await endOverdueScheduledMeetings(app)
         } catch (error) {
           logger.error('Scheduled meeting expiry cleanup failed:', { error: error.message })
         }
-      }, 60_000)
+      }, intervalMs: 60_000 })
 
-      setInterval(async () => {
+      runtime.register({ name: 'meeting-intelligence', run: async () => {
         try {
           await processPendingMeetingTranscripts(app)
           await processPendingMeetingSummaries(app)
         } catch (error) {
           logger.error('Meeting intelligence processing failed:', { error: error.message })
         }
-      }, 15_000)
+      }, intervalMs: 15_000, immediate: true })
 
-      let messageReminderProcessing = false
-      setInterval(async () => {
-        if (messageReminderProcessing) return
-        messageReminderProcessing = true
+      runtime.register({ name: 'message-reminders', run: async () => {
         try {
           await processDueMessageReminders(app)
         } catch (error) {
           logger.error('Message reminder processing failed:', { error: error.message })
-        } finally {
-          messageReminderProcessing = false
         }
-      }, 30_000)
-
-      try {
-        await processPendingMeetingTranscripts(app)
-        await processPendingMeetingSummaries(app)
-        await processDueMessageReminders(app)
-      } catch (error) {
-        logger.error('Initial background processing failed:', { error: error.message })
-      }
-
-      app.get('platformUpdateManager')?.start()
+      }, intervalMs: 30_000, immediate: true })
 
       // Continue the setup chain (Socket.IO init, service setup, etc.)
       await next()
@@ -375,20 +369,7 @@ app.hooks({
   ],
   teardown: [
     async (context, next) => {
-      // Continue teardown chain first (services, etc.)
-      await next()
-
-      const db = app.get('postgresqlClient')
-      const rateLimiter = app.get('rateLimiter')
-      app.get('platformUpdateManager')?.stop()
-      if (rateLimiter?.close) {
-        await rateLimiter.close()
-        logger.info('Rate limiter closed')
-      }
-      if (db) {
-        await db.destroy()
-        logger.info('Database connection closed')
-      }
+      await teardownRuntime(app, next)
     }
   ]
 })

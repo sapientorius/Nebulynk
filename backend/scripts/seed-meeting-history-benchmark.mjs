@@ -175,6 +175,7 @@ try {
     meetings.push({
       id: meetingId,
       title: `Benchmark meeting ${index}`,
+      language: 'en',
       status: 'ended',
       source_channel_id: source.id,
       chat_channel_id: chatId,

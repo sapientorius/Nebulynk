@@ -106,7 +106,7 @@ async function runStage({ baseUrl, concurrency, durationSeconds, scenarios, toke
       const requestIndex = nextRequest
       nextRequest += 1
       const scenario = scenarios[requestIndex % scenarios.length]
-      const token = tokens[requestIndex % tokens.length]
+      const token = tokens[scenario.tokenIndex ?? (requestIndex % tokens.length)]
       const startedAt = performance.now()
       try {
         const response = await fetch(`${baseUrl}${scenario.path}`, {
@@ -174,6 +174,25 @@ if (resolvedTokens.length === 0) {
 }
 
 const scenarios = buildScenarios({ sourceChannelIds, chatChannelIds })
+// Measure authorized accesses. Cycling unrelated personas through a protected
+// historical chat produced expected 403s that were incorrectly counted as load failures.
+if (tokens.length === 0 && manifest?.personas) {
+  const roles = { all: 'late_member', start: 'start_member', active: 'active_participant' }
+  for (const [key, role] of Object.entries(roles)) {
+    const tokenIndex = manifest.personas.findIndex((persona) => persona.role === role)
+    if (tokenIndex < 0) continue
+    const ids = [manifest.sourceChannelIds?.[key], manifest.chatChannelIds?.[key]].filter(Boolean)
+    for (const scenario of scenarios) {
+      if (ids.some((id) => scenario.path.includes(id))) {
+        // Source-scoped search requires source membership. The active participant
+        // fixture intentionally is not a source member, though it can read its meeting chat.
+        const adminIndex = manifest.personas.findIndex((persona) => persona.role === 'platform_admin')
+        scenario.tokenIndex = key === 'active' && scenario.path.startsWith('/search?') && adminIndex >= 0
+          ? adminIndex : tokenIndex
+      }
+    }
+  }
+}
 console.log(JSON.stringify({
   phase: 'warmup',
   expectedFixture: { historicalMeetings: 1000, channelMembers: 1000, personas: 4 },

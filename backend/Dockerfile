@@ -24,4 +24,4 @@ WORKDIR /app/backend
 EXPOSE 3030
 
 # Start
-CMD ["npm", "run", "start"]
+CMD ["node", "src/index.js"]

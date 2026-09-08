@@ -135,6 +135,7 @@ function createHarness({
 
   const app = {
     get(key) {
+      if (key === 'runtime') return undefined
       if (key === 'postgresqlClient') {
         return db
       }

@@ -36,7 +36,8 @@ export function createNotificationSideEffectsDispatcher(app, {
   schedule = (task) => queueMicrotask(task)
 } = {}) {
   const queue = []
-  let draining = false
+  let draining = null
+  let stopped = false
   let scheduled = false
 
   async function processBatch(notifications = []) {
@@ -94,28 +95,29 @@ export function createNotificationSideEffectsDispatcher(app, {
     }
   }
 
-  async function drain() {
-    if (draining) return
-    draining = true
-
-    try {
-      while (queue.length > 0) {
-        const nextBatch = queue.shift()
-        try {
-          await processBatch(nextBatch)
-        } catch (error) {
-          log.error('Notification side-effect batch failed', {
-            error: error.message,
-            stack: error.stack
-          })
+  function drain() {
+    if (draining) return draining
+    draining = Promise.resolve().then(async () => {
+      try {
+        while (queue.length > 0) {
+          const nextBatch = queue.shift()
+          try {
+            await processBatch(nextBatch)
+          } catch (error) {
+            log.error('Notification side-effect batch failed', {
+              error: error.message,
+              stack: error.stack
+            })
+          }
+        }
+      } finally {
+        draining = null
+        if (queue.length > 0) {
+          scheduleDrain()
         }
       }
-    } finally {
-      draining = false
-      if (queue.length > 0) {
-        scheduleDrain()
-      }
-    }
+    })
+    return draining
   }
 
   function scheduleDrain() {
@@ -129,11 +131,16 @@ export function createNotificationSideEffectsDispatcher(app, {
 
   return {
     enqueue(notifications = []) {
+      if (stopped) throw new Error('Notification dispatcher is stopped')
       if (!Array.isArray(notifications) || notifications.length === 0) return
       queue.push(notifications.map((notification) => ({ ...notification })))
       scheduleDrain()
     },
     async flush() {
+      await drain()
+    },
+    async stop() {
+      stopped = true
       await drain()
     },
     getPendingCount() {

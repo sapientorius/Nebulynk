@@ -9,7 +9,7 @@ export const channels = (app) => {
     app.channel('anonymous').join(connection)
   })
 
-  app.on('login', async (authResult, { connection }) => {
+  const joinChannels = async (authResult, { connection }) => {
     if (!connection) return
 
     const user = authResult.user
@@ -35,6 +35,12 @@ export const channels = (app) => {
     }
 
     logger.info(`User ${user.display_name} connected`, { userId: user.id })
+  }
+  app.on('login', (authResult, params) => {
+    const runtime = app.get('runtime')
+    const work = () => joinChannels(authResult, params)
+    const promise = runtime ? runtime.track('channel-login', work) : work()
+    return promise.catch((error) => logger.error('Channel login failed', { error: error.message }))
   })
 
   // Messages -> publish to the specific channel room

@@ -108,6 +108,13 @@ services:
     restart: unless-stopped
 
   backend:
+    stop_grace_period: 75s
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:'+(process.env.BACKEND_PORT||3030)+'/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 60s
     build:
       context: .
       dockerfile: backend/Dockerfile

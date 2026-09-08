@@ -168,6 +168,9 @@ export class PlatformUpdateManager {
     this.sendSecurityEmail = sendSecurityEmail
     this.log = log
     this.timer = null
+    this.stopped = false
+    this.schedulerStopped = false
+    this.pendingChecks = new Set()
   }
 
   async getState() {
@@ -431,7 +434,15 @@ export class PlatformUpdateManager {
     }
   }
 
-  async check({ force = false, throwIfDisabled = false } = {}) {
+  check(options = {}) {
+    if (this.stopped) return Promise.reject(new Error('Platform update manager is stopped'))
+    const promise = this._check(options)
+    this.pendingChecks.add(promise)
+    promise.then(() => this.pendingChecks.delete(promise), () => this.pendingChecks.delete(promise))
+    return promise
+  }
+
+  async _check({ force = false, throwIfDisabled = false } = {}) {
     const initialState = await this.getState()
     if (initialState?.checks_enabled === false) {
       if (throwIfDisabled) throw Object.assign(new Error('platform_update_checks_disabled'), { code: 'platform_update_checks_disabled' })
@@ -521,17 +532,29 @@ export class PlatformUpdateManager {
   }
 
   start() {
-    if (this.timer || process.env.NODE_ENV === 'test') return
-    const run = () => void this.check().catch((error) => {
-      this.log.error('Platform update scheduler failed', { error: error.message })
-    })
-    this.timer = setInterval(run, PLATFORM_UPDATE_SCHEDULER_TICK_MS)
-    this.timer.unref?.()
-    run()
+    if (this.timer || this.schedulerStopped || this.stopped || process.env.NODE_ENV === 'test') return
+    const run = async () => {
+      try { await this.check() } catch (error) {
+        this.log.error('Platform update scheduler failed', { error: error.message })
+      } finally {
+        if (!this.schedulerStopped) {
+          this.timer = setTimeout(run, PLATFORM_UPDATE_SCHEDULER_TICK_MS)
+          this.timer.unref?.()
+        }
+      }
+    }
+    this.timer = setTimeout(run, 0)
   }
 
-  stop() {
-    if (this.timer) clearInterval(this.timer)
+  quiesce() {
+    this.schedulerStopped = true
+    if (this.timer) clearTimeout(this.timer)
     this.timer = null
+  }
+
+  async stop() {
+    this.quiesce()
+    this.stopped = true
+    await Promise.allSettled([...this.pendingChecks])
   }
 }
