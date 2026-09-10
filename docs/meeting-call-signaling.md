@@ -32,6 +32,21 @@ Clients fetch its ID to reconcile authoritative state. `find` recovers ringing
 attempts and calls associated with active meetings. Expired notifications open
 the source chat; they never initiate a fresh call.
 
+Incoming call notifications also fetch the attempt as a recovery path when its
+signaling event was missed. Opening a chat refreshes pending calls. The global
+overlay and a banner above the source chat messages share acceptance, decline
+and cancellation actions, including their pending state. The existing incoming
+ringtone plays immediately and every four seconds until the invitation ends.
+Clicking a call notification opens the source chat for explicit acceptance;
+it never joins a meeting automatically.
+
+Call-linked chat messages also reconcile the attempt. While an attempt is still
+ringing locally, clients fetch its status every two seconds, with at most one
+recovery request per attempt in flight. This continues past the local countdown
+until the server confirms its outcome, so a missed acceptance event cannot strand
+the caller. Only the browser that started the attempt automatically joins the
+active meeting; recovered attempts on other tabs or devices still require entry.
+
 ## Transactions and history
 
 All attempt mutations lock the source channel before locking the attempt. A

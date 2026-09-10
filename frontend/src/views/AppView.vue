@@ -60,6 +60,7 @@
           <div class="drop-overlay" v-if="dragging">
             <div class="drop-overlay-text">{{ $t('app.dropFileHint') }}</div>
           </div>
+          <MeetingCallOverlay :channel-id="activeChannelId" />
           <MessageList />
           <MessageInput ref="messageInput" />
         </div>
@@ -82,6 +83,7 @@
         test-id-prefix="voice"
         @toggle-chat="toggleShareChat"
       >
+        <MeetingCallOverlay :channel-id="activeChannelId" />
         <MessageList />
         <MessageInput />
       </ScreenShareChatOverlay>
@@ -91,6 +93,7 @@
 
 <script>
 import { defineAsyncComponent } from 'vue'
+import MeetingCallOverlay from '../components/MeetingCallOverlay.vue'
 import { openDetachedScreenShareWindow } from '../lib/screen-share.js'
 import {
   useChannelsStore,
@@ -113,6 +116,7 @@ const ScreenShareControls = defineAsyncComponent(() => import('../components/Scr
 export default {
   name: 'AppView',
   components: {
+    MeetingCallOverlay,
     ChannelPastMeetingsPanel,
     ChannelHeader,
     MeetingScreenSharePanel,

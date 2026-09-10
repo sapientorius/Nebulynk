@@ -11,13 +11,16 @@ import { getApiErrorMessage } from '../lib/api-error.js'
 export const useMeetingCallsStore = defineStore('meeting-calls', () => {
   const calls = ref([])
   const now = ref(Date.now())
+  const busy = ref({})
   const owned = new Set()
   const entering = new Map()
   const entered = new Set()
   const requests = new Map()
+  const reconciling = new Map()
   let generation = 0
   let timer = null
-  let lastRing = 0
+  let lastRing = null
+  let lastReconcile = Date.now()
   const selfId = () => useSessionStore().user?.id
   const incoming = computed(() => calls.value.filter(call => call.caller_id !== selfId()
     && call.recipient_status === 'invited'
@@ -29,15 +32,39 @@ export const useMeetingCallsStore = defineStore('meeting-calls', () => {
     && call.meeting_status === 'active' && (call.caller_id === selfId() || call.recipient_status === 'accepted')
     && useMeetingsStore().activeMeetingId !== call.meeting_id))
 
+  function syncRing() {
+    if (!incoming.value.length) { lastRing = null; return }
+    if (lastRing === null || now.value - lastRing >= 4000) {
+      lastRing = now.value
+      playSfx(SFX_EVENTS.CALL_INCOMING)
+    }
+  }
+
   function ensureTimer() {
     if (timer) return
     timer = setInterval(() => {
       now.value = Date.now()
-      if (incoming.value.length && now.value - lastRing >= 4000) {
-        lastRing = now.value
-        playSfx(SFX_EVENTS.CALL_INCOMING)
+      syncRing()
+      if (now.value - lastReconcile >= 2000) {
+        lastReconcile = now.value
+        reconcilePendingCalls()
       }
     }, 500)
+  }
+
+  function reconcilePendingCalls() {
+    // A missed socket event must not leave the caller ringing after acceptance.
+    // Keep checking ringing records beyond the local deadline: acceptance may
+    // have committed just before it, and only the server knows the outcome.
+    for (const call of calls.value) {
+      if (call.status !== 'ringing' && !incoming.value.some(entry => entry.id === call.id)) continue
+      if (reconciling.has(call.id)) continue
+      const currentGeneration = generation
+      reconciling.set(call.id, currentGeneration)
+      load(call.id).catch(() => {}).finally(() => {
+        if (reconciling.get(call.id) === currentGeneration) reconciling.delete(call.id)
+      })
+    }
   }
 
   async function enter(call, { automatic = false } = {}) {
@@ -59,10 +86,13 @@ export const useMeetingCallsStore = defineStore('meeting-calls', () => {
     if (!call?.id) return
     now.value = Date.now()
     calls.value = [...calls.value.filter(entry => entry.id !== call.id), call]
+    syncRing()
     ensureTimer()
     if (call.status === 'accepted' && owned.has(call.id)) {
       owned.delete(call.id)
-      enter(call, { automatic: true }).catch(error => window.$message?.error(getApiErrorMessage(error) || t('calls.unavailable')))
+      if (call.meeting_status === 'active') {
+        enter(call, { automatic: true }).catch(error => window.$message?.error(getApiErrorMessage(error) || t('calls.unavailable')))
+      }
     }
     if (!['ringing', 'accepted'].includes(call.status)) owned.delete(call.id)
   }
@@ -112,7 +142,9 @@ export const useMeetingCallsStore = defineStore('meeting-calls', () => {
   }
 
   async function act(id, action) {
+    if (busy.value[id]) return
     const currentGeneration = generation
+    busy.value = { ...busy.value, [id]: action }
     try {
       const { data } = await api.patch(`/meeting-calls/${id}`, { action })
       if (currentGeneration !== generation) return
@@ -123,20 +155,25 @@ export const useMeetingCallsStore = defineStore('meeting-calls', () => {
     } catch (error) {
       if (currentGeneration === generation) await load(id).catch(() => {})
       throw error
+    } finally {
+      if (currentGeneration === generation) delete busy.value[id]
     }
   }
 
   function reset() {
     generation++
     calls.value = []
+    busy.value = {}
     owned.clear()
     entered.clear()
     entering.clear()
     requests.clear()
+    reconciling.clear()
     clearInterval(timer)
     timer = null
-    lastRing = 0
+    lastRing = null
+    lastReconcile = Date.now()
   }
   onScopeDispose(reset)
-  return { calls, incoming, outgoing, available, now, start, act, load, refresh, enter, reset }
+  return { calls, incoming, outgoing, available, now, busy, start, act, load, refresh, enter, reset }
 })

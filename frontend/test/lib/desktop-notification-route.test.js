@@ -5,6 +5,12 @@ import {
 } from '../../src/lib/desktop-notification-route.js'
 
 describe('desktop notification routing', () => {
+  it.each([null, 'history-1'])('opens call notifications in their source chat (message=%s)', messageId => {
+    expect(buildDesktopNotificationRoute({
+      notification: { type: 'meeting_call', channel_id: 'source', call_id: 'call', message_id: messageId },
+      meetingByChatChannelId: { source: 'meeting' }
+    })).toBe(`/channels/source${messageId ? '?message=history-1' : ''}`)
+  })
   it('opens meeting invites directly on the meeting route', () => {
     expect(buildDesktopNotificationRoute({
       notification: {

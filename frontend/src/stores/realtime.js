@@ -1,4 +1,5 @@
 import { playSfx, SFX_EVENTS } from '../lib/sfx.js'
+import { useMeetingCallsStore } from './meeting-calls.js'
 import { showDesktopNotification } from '../lib/desktop-bridge.js'
 import { buildDesktopNotificationRoute } from '../lib/desktop-notification-route.js'
 import { isAppForegroundVisible } from '../lib/desktop-window-state.js'
@@ -102,6 +103,9 @@ export function setupRealtimeListeners(socket, {
     }
 
     notificationsStore.ingestIncomingNotification(notification)
+    if (notification.type === 'meeting_call' && notification.call_id) {
+      useMeetingCallsStore().load(notification.call_id).catch(() => {})
+    }
     maybeDispatchDesktopNotification(notification).catch((error) => {
       logDesktopNotificationDiagnostic('[desktop-notify:skip]', {
         id: notification.id,
@@ -109,7 +113,7 @@ export function setupRealtimeListeners(socket, {
         message: error?.message || String(error)
       })
     })
-    if (notification.actor_id !== sessionStore.user?.id && sessionStore.user?.status !== 'dnd') {
+    if (notification.type !== 'meeting_call' && notification.actor_id !== sessionStore.user?.id && sessionStore.user?.status !== 'dnd') {
       playSfx(SFX_EVENTS.NOTIFICATION)
     }
   }
@@ -204,6 +208,7 @@ export function setupRealtimeListeners(socket, {
   }
 
   socket.on('messages created', (message) => {
+    if (message.call_id) useMeetingCallsStore().load(message.call_id).catch(() => {})
     const isOwnMessage = message.user_id === sessionStore.user?.id
     if (message.channel_id === channelsStore.activeChannelId) {
       messagesStore.addMessageIfMissing(message)
@@ -410,7 +415,7 @@ export function setupRealtimeListeners(socket, {
   })
 
   socket.on('meeting-calls changed', ({ id }) => {
-    import('./meeting-calls.js').then(({ useMeetingCallsStore }) => useMeetingCallsStore().load(id)).catch(() => {})
+    if (id) useMeetingCallsStore().load(id).catch(() => {})
   })
 
   socket.on('meetings created', (meeting) => {
@@ -427,7 +432,7 @@ export function setupRealtimeListeners(socket, {
 
   socket.on('meetings ended', (payload) => {
     meetingsStore?.handleMeetingEnded(payload)
-    import('./meeting-calls.js').then(({ useMeetingCallsStore }) => useMeetingCallsStore().refresh()).catch(() => {})
+    useMeetingCallsStore().refresh().catch(() => {})
   })
 
   socket.on('meetings artifacts-queued', (payload) => {

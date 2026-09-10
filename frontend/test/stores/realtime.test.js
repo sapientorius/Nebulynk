@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { setupRealtimeListeners } from '../../src/stores/realtime.js'
 
+const callsMock = vi.hoisted(() => ({ load: vi.fn(async () => ({})), refresh: vi.fn(async () => {}) }))
+vi.mock('../../src/stores/meeting-calls.js', () => ({ useMeetingCallsStore: () => callsMock }))
+
 const sfxMock = vi.hoisted(() => ({
   playSfx: vi.fn(),
   SFX_EVENTS: {
@@ -159,6 +162,27 @@ async function flushAsyncWork() {
 }
 
 describe('realtime socket contract', () => {
+  it('reconciles the caller when a call-linked source message arrives', async () => {
+    const { socket, emit } = createSocketHarness()
+    setupRealtimeListeners(socket, createStoreMocks())
+    emit('messages created', { id: 'meeting-message', user_id: 'user-self', channel_id: 'channel-active', call_id: 'accepted-call', call_outcome: 'accepted' })
+    await flushAsyncWork()
+    expect(callsMock.load).toHaveBeenCalledExactlyOnceWith('accepted-call')
+  })
+  it('hydrates call events and notification fallback without a second notification sound', async () => {
+    const { socket, emit } = createSocketHarness()
+    const stores = createStoreMocks()
+    setupRealtimeListeners(socket, stores)
+    emit('meeting-calls changed', { id: 'call-1' })
+    const notification = { id: 'notif-call', type: 'meeting_call', call_id: 'call-1', actor_id: 'user-other' }
+    emit('notifications created', notification)
+    emit('notifications created', notification)
+    await flushAsyncWork()
+    expect(callsMock.load).toHaveBeenCalledTimes(2)
+    expect(callsMock.load).toHaveBeenCalledWith('call-1')
+    expect(stores.notificationsStore.ingestIncomingNotification).toHaveBeenCalledOnce()
+    expect(sfxMock.playSfx).not.toHaveBeenCalled()
+  })
   beforeEach(() => {
     sfxMock.playSfx.mockReset()
     showDesktopNotificationMock.mockReset()

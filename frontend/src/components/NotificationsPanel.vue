@@ -29,6 +29,7 @@
             'notif-item-clickable': !hasMeetingInviteCard(notif)
           }"
           :data-testid="hasMeetingInviteCard(notif) ? 'notification-meeting-item' : 'notification-item'"
+          :data-call-id="notif.call_id || undefined"
           @click="handleNotificationClick(notif)"
         >
           <div class="notif-header">
@@ -94,6 +95,7 @@ import { getCurrentLocale } from '../lib/i18n.js'
 import { buildMeetingCardState, countMeetingConnectedParticipants } from '../lib/meeting-card.js'
 import { toPlainMessageSnippet } from '../lib/message-markdown.js'
 import { resolveNotificationMeetingId } from '../lib/notification-meeting.js'
+import { useMeetingCallsStore } from '../stores/meeting-calls.js'
 import { isAnyDesktopRuntime } from '../lib/runtime.js'
 import MeetingActionCard from './MeetingActionCard.vue'
 import UserAvatar from './UserAvatar.vue'
@@ -307,6 +309,15 @@ export default {
     async openNotification(notif) {
       await this.markNotificationRead(notif)
       this.notificationsStore.showPanel = false
+
+      if (notif?.type === 'meeting_call' && notif.channel_id) {
+        if (notif.call_id) await useMeetingCallsStore().load(notif.call_id).catch(() => {})
+        await this.$router.push({
+          path: `/channels/${notif.channel_id}`,
+          query: notif.message_id ? { message: notif.message_id } : {}
+        }).catch(() => {})
+        return
+      }
 
       if (notif?.type === 'registration_pending') {
         try {
