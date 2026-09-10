@@ -52,7 +52,7 @@ export default {
     remainingSeconds() {
       if (!this.currentCall) return 0
       const elapsed = this.tickingNow - this.currentCall.received_at
-      const remainingMs = Math.max(0, 30_000 - elapsed)
+      const remainingMs = Math.max(0, 60_000 - elapsed)
       return Math.ceil(remainingMs / 1000)
     }
   },

@@ -20,7 +20,7 @@ beforeEach(async () => {
   store = useMeetingCallsStore()
   wrappers = []
   current = { id: 'call', caller_id: 'bob', caller_name: 'Bob', source_name: 'Bob', source_channel_id: 'source',
-    status: 'ringing', recipient_status: 'invited', expires_at: new Date(Date.now() + 30000).toISOString() }
+    status: 'ringing', recipient_status: 'invited', expires_at: new Date(Date.now() + 60000).toISOString() }
   mocks.api.get.mockImplementation(async path => ({ data: path === '/meeting-calls' ? [current] : current }))
   mocks.join.mockResolvedValue({})
   mocks.push.mockResolvedValue(undefined)

@@ -1,6 +1,6 @@
 # Calling before a meeting starts
 
-Spontaneous calls in direct and group chats ring for 30 seconds before a meeting
+Spontaneous calls in direct and group chats ring for 60 seconds before a meeting
 exists. The first recipient to accept creates the normal meeting, including its
 chat, access snapshot and source-chat card. Recording and AI processing continue
 to follow the existing meeting settings after participants join. An audio

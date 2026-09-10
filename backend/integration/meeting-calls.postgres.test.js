@@ -56,7 +56,7 @@ test('ringing creates only a shared attempt and scoped invitations', async () =>
   const call = await start()
   assert.equal(call.created_new, true)
   assert.equal(call.status, 'ringing')
-  assert.equal(new Date(call.expires_at).getTime(), clock + 30_000)
+  assert.equal(new Date(call.expires_at).getTime(), clock + 60_000)
   await assertNoMeeting()
   assert.equal(await count('messages'), 0)
   assert.equal(await count('notifications'), 2)
@@ -71,7 +71,7 @@ test('ringing creates only a shared attempt and scoped invitations', async () =>
 
 test('first acceptance starts exactly one meeting at acceptance time; remaining users keep their deadline', async () => {
   const call = await start()
-  clock += 7000
+  clock += 45_000
   const accepted = await calls.patch(call.id, { action: 'accept' }, params('alice'))
   assert.equal(accepted.accepted_now, true)
   assert.equal(accepted.status, 'accepted')
@@ -119,7 +119,7 @@ test('all declines create one history entry and no meeting', async () => {
 
 test('timeout is enforced on accept without waiting for the sweep and survives restart', async () => {
   const call = await start()
-  clock += 30_000
+  clock += 60_000
   await assert.rejects(calls.patch(call.id, { action: 'accept' }, params('alice')), { code: 400 })
   const restarted = new MeetingCallsService(app, { now: () => new Date(clock) })
   await restarted.expire()
@@ -132,7 +132,7 @@ test('timeout is enforced on accept without waiting for the sweep and survives r
 test('expiry preserves a started meeting and closes outstanding group invitations', async () => {
   const call = await start()
   await calls.patch(call.id, { action: 'accept' }, params('alice'))
-  clock += 30_001
+  clock += 60_001
   await calls.expire()
   assert.equal((await db('meetings').first()).status, 'active')
   assert.equal((await calls.get(call.id, params('bob'))).recipient_status, 'expired')

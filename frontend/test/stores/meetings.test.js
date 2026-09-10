@@ -1259,7 +1259,10 @@ describe('meetings store', () => {
     expect(store.incomingCalls).toHaveLength(1)
     expect(sfxMock.playSfx).toHaveBeenCalledWith(sfxMock.SFX_EVENTS.CALL_INCOMING)
 
-    vi.advanceTimersByTime(30_000)
+    vi.advanceTimersByTime(59_999)
+    expect(store.incomingCalls).toHaveLength(1)
+    expect(apiMock.patch).not.toHaveBeenCalled()
+    vi.advanceTimersByTime(1)
     await Promise.resolve()
     await Promise.resolve()
 

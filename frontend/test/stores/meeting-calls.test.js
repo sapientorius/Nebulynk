@@ -16,7 +16,7 @@ vi.mock('../../src/lib/sfx.js', () => ({ playSfx: mocks.sound, SFX_EVENTS: { CAL
 
 let store
 const call = (overrides = {}) => ({ id: 'call', caller_id: 'caller', source_channel_id: 'source',
-  status: 'ringing', recipient_status: 'invited', expires_at: new Date(Date.now() + 30_000).toISOString(), ...overrides })
+  status: 'ringing', recipient_status: 'invited', expires_at: new Date(Date.now() + 60_000).toISOString(), ...overrides })
 
 describe('meeting call signaling', () => {
   it('rings immediately and every four seconds, without restarting on duplicate loads', async () => {
@@ -124,7 +124,7 @@ describe('meeting call signaling', () => {
     await store.start('source')
     let resolve
     mocks.api.get.mockReturnValueOnce(new Promise(done => { resolve = done }))
-    await vi.advanceTimersByTimeAsync(32000)
+    await vi.advanceTimersByTimeAsync(62000)
     expect(mocks.api.get).toHaveBeenCalledTimes(2)
     resolve({ data: call() })
     await vi.advanceTimersByTimeAsync(0)
@@ -189,7 +189,9 @@ describe('meeting call signaling', () => {
     mocks.api.get.mockResolvedValue({ data: { ...initial, status: 'accepted', meeting_id: 'meeting', meeting_status: 'active' } })
     await store.load('call')
     expect(store.incoming).toHaveLength(1)
-    await vi.advanceTimersByTimeAsync(20_000)
+    await vi.advanceTimersByTimeAsync(49_999)
+    expect(store.incoming).toHaveLength(1)
+    await vi.advanceTimersByTimeAsync(1)
     expect(store.incoming).toHaveLength(0)
     expect(mocks.api.patch).not.toHaveBeenCalled()
   })

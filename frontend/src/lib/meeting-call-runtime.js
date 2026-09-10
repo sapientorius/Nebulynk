@@ -28,7 +28,7 @@ export function createMeetingCallRuntime({ hasCalls, playRing, onTimeout }) {
     callTimeouts.set(meetingId, setTimeout(() => {
       callTimeouts.delete(meetingId)
       Promise.resolve(onTimeout(meetingId)).catch(() => {})
-    }, 30000))
+    }, 60000))
   }
 
   function stop() {

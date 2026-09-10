@@ -7,7 +7,7 @@ import { logger } from '../../logger.js'
 import { upsertMessageSearchDocument } from '../../lib/search-index.js'
 import { MeetingsService } from '../meetings/meetings.js'
 
-export const CALL_TIMEOUT_MS = 30_000
+export const CALL_TIMEOUT_MS = 60_000
 const unavailable = () => badRequest('api.meetings.call_unavailable', {}, 'Anruf nicht mehr verfügbar')
 
 async function afterCommitSafely(work) {

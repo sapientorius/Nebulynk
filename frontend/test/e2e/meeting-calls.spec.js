@@ -54,7 +54,7 @@ test('direct calls ring before meeting creation, preserve unsuccessful history a
     // Reload recovers signaling from the server without creating a meeting or resetting the deadline.
     await other.reload()
     await expect(other.getByTestId('incoming-meeting-call')).toBeVisible()
-    await expect(page.getByTestId('outgoing-call')).toHaveCount(0, { timeout: 35_000 })
+    await expect(page.getByTestId('outgoing-call')).toHaveCount(0, { timeout: 65_000 })
     await expect(page.getByTestId('call-history-entry')).toHaveCount(3)
 
     await start()
