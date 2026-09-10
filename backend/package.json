@@ -62,7 +62,7 @@
     "formidable": "^3.5.4",
     "knex": "^3.1.0",
     "livekit-server-sdk": "^2.15.0",
-    "nodemailer": "^9.0.3",
+    "nodemailer": "^9.1.1",
     "pg": "^8.18.0",
     "qrcode": "^1.5.4",
     "redis": "^5.12.1",
