@@ -16,14 +16,11 @@ export const useMeetingCallsStore = defineStore('meeting-calls', () => {
   const entering = new Map()
   const entered = new Set()
   const requests = new Map()
-  const reconciling = new Map()
   let generation = 0
   let timer = null
   let lastRing = null
-  let lastReconcile = Date.now()
-  let recoveryTimer = null
-  let recoveryDocument = null
   let refreshRequest = null
+  let recoveryRequest = null
   let pendingRing = null
   const selfId = () => useSessionStore().user?.id
   const meetingEnded = call => call.meeting_id && useMeetingsStore().isMeetingEnded(call.meeting_id)
@@ -34,10 +31,14 @@ export const useMeetingCallsStore = defineStore('meeting-calls', () => {
     && new Date(call.expires_at).getTime() > now.value))
   const outgoing = computed(() => calls.value.filter(call => call.caller_id === selfId()
     && call.status === 'ringing' && new Date(call.expires_at).getTime() > now.value))
-  const available = computed(() => calls.value.filter(call => call.status === 'accepted'
-    && !meetingEnded(call)
-    && call.meeting_status === 'active' && (call.caller_id === selfId() || call.recipient_status === 'accepted')
-    && useMeetingsStore().activeMeetingId !== call.meeting_id))
+  const available = computed(() => {
+    const meetingsStore = useMeetingsStore()
+    return calls.value.filter(call => call.status === 'accepted'
+      && !meetingEnded(call)
+      && call.meeting_status === 'active' && (call.caller_id === selfId() || call.recipient_status === 'accepted')
+      && meetingsStore.activeMeetingId !== call.meeting_id
+      && !meetingsStore.isVoiceConnectedToMeeting(call.meeting_id))
+  })
 
   function syncRing() {
     if (!incoming.value.length) { lastRing = null; return }
@@ -58,31 +59,32 @@ export const useMeetingCallsStore = defineStore('meeting-calls', () => {
     }
   }
 
-  function ensureTimer() {
+  function hasOpenCountdown() {
+    const currentTime = Date.now()
+    return calls.value.some(call => (
+      (call.status === 'ringing' || (call.status === 'accepted' && call.recipient_status === 'invited'))
+      && new Date(call.expires_at).getTime() > currentTime
+    ))
+  }
+
+  function stopTimer() {
+    if (!timer) return
+    clearInterval(timer)
+    timer = null
+  }
+
+  function syncTimer() {
+    if (!hasOpenCountdown()) {
+      stopTimer()
+      return
+    }
+
     if (timer) return
     timer = setInterval(() => {
       now.value = Date.now()
       syncRing()
-      if (now.value - lastReconcile >= 2000) {
-        lastReconcile = now.value
-        reconcilePendingCalls()
-      }
-    }, 500)
-  }
-
-  function reconcilePendingCalls() {
-    // A missed socket event must not leave the caller ringing after acceptance.
-    // Keep checking ringing records beyond the local deadline: acceptance may
-    // have committed just before it, and only the server knows the outcome.
-    for (const call of calls.value) {
-      if (call.status !== 'ringing' && !incoming.value.some(entry => entry.id === call.id)) continue
-      if (reconciling.has(call.id)) continue
-      const currentGeneration = generation
-      reconciling.set(call.id, currentGeneration)
-      load(call.id).catch(() => {}).finally(() => {
-        if (reconciling.get(call.id) === currentGeneration) reconciling.delete(call.id)
-      })
-    }
+      if (!hasOpenCountdown()) stopTimer()
+    }, 1000)
   }
 
   async function enter(call, { automatic = false } = {}) {
@@ -109,7 +111,7 @@ export const useMeetingCallsStore = defineStore('meeting-calls', () => {
     now.value = Date.now()
     calls.value = [...calls.value.filter(entry => entry.id !== call.id), call]
     syncRing()
-    ensureTimer()
+    syncTimer()
     if (call.status === 'accepted' && owned.has(call.id)) {
       owned.delete(call.id)
       if (call.meeting_status === 'active') {
@@ -131,6 +133,7 @@ export const useMeetingCallsStore = defineStore('meeting-calls', () => {
       if (currentGeneration === generation && requests.get(id) === sequence && [403, 404].includes(error.response?.status)) {
         calls.value = calls.value.filter(call => call.id !== id)
         owned.delete(id)
+        syncTimer()
       }
       throw error
     }
@@ -149,6 +152,7 @@ export const useMeetingCallsStore = defineStore('meeting-calls', () => {
     await Promise.all([...disappearedMeetings].map(id => useMeetingsStore().ensureMeetingLoaded(id, { force: true }).catch(() => { unresolvedMeetings.add(id) })))
     if (generation !== currentGeneration) return
     calls.value = calls.value.filter(call => ids.has(call.id) || beforeRefresh.get(call.id) !== call || unresolvedMeetings.has(call.meeting_id))
+    syncTimer()
     await Promise.all([...ids].map(id => load(id).catch(() => {})))
   }
 
@@ -161,18 +165,19 @@ export const useMeetingCallsStore = defineStore('meeting-calls', () => {
     return task
   }
 
-  function recoverCalls() {
-    if (!selfId()) return
-    refresh().catch(() => {})
-    useMeetingsStore().reconcileConnectedMeeting().catch(() => {})
-  }
+  function recover() {
+    if (!selfId()) return Promise.resolve()
+    if (recoveryRequest) return recoveryRequest
 
-  function startRecovery() {
-    if (recoveryTimer || !selfId()) return
-    recoveryDocument = typeof document === 'undefined' ? null : document
-    recoveryDocument?.addEventListener('visibilitychange', recoverCalls)
-    recoveryTimer = setInterval(recoverCalls, 5000)
-    recoverCalls()
+    const taskGeneration = generation
+    const task = Promise.all([
+      refresh().catch(() => {}),
+      useMeetingsStore().reconcileConnectedMeeting().catch(() => {})
+    ]).finally(() => {
+      if (generation === taskGeneration && recoveryRequest === task) recoveryRequest = null
+    })
+    recoveryRequest = task
+    return task
   }
 
   async function start(sourceChannelId, title = '') {
@@ -212,11 +217,8 @@ export const useMeetingCallsStore = defineStore('meeting-calls', () => {
 
   function reset() {
     generation++
-    clearInterval(recoveryTimer)
-    recoveryTimer = null
-    recoveryDocument?.removeEventListener('visibilitychange', recoverCalls)
-    recoveryDocument = null
     refreshRequest = null
+    recoveryRequest = null
     pendingRing = null
     calls.value = []
     busy.value = {}
@@ -224,12 +226,9 @@ export const useMeetingCallsStore = defineStore('meeting-calls', () => {
     entered.clear()
     entering.clear()
     requests.clear()
-    reconciling.clear()
-    clearInterval(timer)
-    timer = null
+    stopTimer()
     lastRing = null
-    lastReconcile = Date.now()
   }
   onScopeDispose(reset)
-  return { calls, incoming, outgoing, available, now, busy, start, act, load, refresh, startRecovery, enter, reset }
+  return { calls, incoming, outgoing, available, now, busy, start, act, load, refresh, recover, enter, reset }
 })

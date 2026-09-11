@@ -5,7 +5,7 @@ import { useMeetingCallsStore } from '../../src/stores/meeting-calls.js'
 const mocks = vi.hoisted(() => ({
   api: { get: vi.fn(), post: vi.fn(), patch: vi.fn() },
   session: { user: { id: 'caller' } },
-  meetings: { join: vi.fn(), activeMeetingId: null, reconcileConnectedMeeting: vi.fn(), ensureMeetingLoaded: vi.fn(), isMeetingEnded: vi.fn(() => false) },
+  meetings: { join: vi.fn(), activeMeetingId: null, reconcileConnectedMeeting: vi.fn(), ensureMeetingLoaded: vi.fn(), isMeetingEnded: vi.fn(() => false), isVoiceConnectedToMeeting: vi.fn(() => false) },
   push: vi.fn(), sound: vi.fn(), prepareSound: vi.fn()
 }))
 vi.mock('../../src/lib/api.js', () => ({ default: mocks.api }))
@@ -59,6 +59,7 @@ describe('meeting call signaling', () => {
     release(true)
     await vi.advanceTimersByTimeAsync(0)
     expect(mocks.sound).not.toHaveBeenCalled()
+    expect(vi.getTimerCount()).toBe(0)
   })
 
   it('hydrates the meeting before discarding an accepted call missing from discovery, and retries failures', async () => {
@@ -99,6 +100,7 @@ describe('meeting call signaling', () => {
     await vi.advanceTimersByTimeAsync(8000)
     expect(mocks.sound).toHaveBeenCalledExactlyOnceWith('incoming')
     expect(store.incoming).toHaveLength(0)
+    expect(vi.getTimerCount()).toBe(0)
   })
 
   it('shares one pending action across surfaces and releases it after failure', async () => {
@@ -121,6 +123,7 @@ describe('meeting call signaling', () => {
     mocks.meetings.reconcileConnectedMeeting.mockResolvedValue(undefined)
     mocks.meetings.ensureMeetingLoaded.mockResolvedValue(undefined)
     mocks.meetings.isMeetingEnded.mockReturnValue(false)
+    mocks.meetings.isVoiceConnectedToMeeting.mockReturnValue(false)
     setActivePinia(createPinia())
     mocks.session.user.id = 'caller'
     mocks.meetings.activeMeetingId = null
@@ -130,45 +133,32 @@ describe('meeting call signaling', () => {
   })
   afterEach(() => { store.$dispose(); vi.useRealTimers(); vi.unstubAllGlobals() })
 
-  it('discovers an unknown incoming call without navigation and coalesces list requests', async () => {
+  it('recovers an unknown incoming call without navigation and coalesces recovery work', async () => {
     mocks.session.user.id = 'alice'
-    mocks.api.get.mockResolvedValue({ data: [] })
-    store.startRecovery()
-    store.startRecovery()
-    await store.refresh()
-    expect(mocks.api.get).toHaveBeenCalledExactlyOnceWith('/meeting-calls')
     const incoming = call()
     mocks.api.get.mockImplementation(async path => ({ data: path === '/meeting-calls' ? [incoming] : incoming }))
-    await vi.advanceTimersByTimeAsync(5000)
+    await Promise.all([store.recover(), store.recover()])
+    expect(mocks.api.get.mock.calls.filter(([path]) => path === '/meeting-calls')).toHaveLength(1)
+    expect(mocks.meetings.reconcileConnectedMeeting).toHaveBeenCalledExactlyOnceWith()
     expect(store.incoming).toHaveLength(1)
     expect(mocks.sound).toHaveBeenCalledExactlyOnceWith('incoming')
     expect(mocks.meetings.join).not.toHaveBeenCalled()
   })
 
-  it('discovers while hidden and refreshes immediately on tab return', async () => {
-    const doc = new EventTarget()
-    doc.visibilityState = 'hidden'
-    vi.stubGlobal('document', doc)
+  it('does not issue call requests while time advances without a recovery trigger', async () => {
     mocks.api.get.mockResolvedValue({ data: [] })
-    store.startRecovery()
-    await vi.advanceTimersByTimeAsync(15000)
-    expect(mocks.api.get).toHaveBeenCalledTimes(4)
-    doc.visibilityState = 'visible'
-    doc.dispatchEvent(new Event('visibilitychange'))
-    await store.refresh()
-    expect(mocks.api.get).toHaveBeenCalledTimes(5)
-    store.reset()
-    doc.dispatchEvent(new Event('visibilitychange'))
-    await vi.advanceTimersByTimeAsync(10000)
-    expect(mocks.api.get).toHaveBeenCalledTimes(5)
+    await store.recover()
+    expect(mocks.api.get).toHaveBeenCalledExactlyOnceWith('/meeting-calls')
+    mocks.api.get.mockClear()
+    await vi.advanceTimersByTimeAsync(30_000)
+    expect(mocks.api.get).not.toHaveBeenCalled()
     expect(vi.getTimerCount()).toBe(0)
   })
 
-  it('does not start discovery without an authenticated user', async () => {
+  it('does not recover without an authenticated user', async () => {
     const id = mocks.session.user.id
     delete mocks.session.user.id
-    store.startRecovery()
-    await vi.advanceTimersByTimeAsync(10000)
+    await store.recover()
     expect(mocks.api.get).not.toHaveBeenCalled()
     expect(vi.getTimerCount()).toBe(0)
     mocks.session.user.id = id
@@ -191,17 +181,17 @@ describe('meeting call signaling', () => {
     expect(mocks.api.get).toHaveBeenCalledTimes(2)
   })
 
-  it('retries discovery after a failed request without overlapping slow requests', async () => {
+  it('allows an explicit retry after a failed recovery without overlapping slow requests', async () => {
     mocks.api.get.mockRejectedValueOnce(new Error('offline'))
-    store.startRecovery()
-    await vi.advanceTimersByTimeAsync(0)
+    await store.recover()
     let resolve
     mocks.api.get.mockReturnValueOnce(new Promise(done => { resolve = done }))
-    await vi.advanceTimersByTimeAsync(15000)
+    const first = store.recover()
+    const second = store.recover()
     expect(mocks.api.get).toHaveBeenCalledTimes(2)
     store.reset()
     resolve({ data: [call()] })
-    await vi.advanceTimersByTimeAsync(5000)
+    await Promise.all([first, second])
     expect(store.calls).toEqual([])
     expect(mocks.sound).not.toHaveBeenCalled()
     expect(vi.getTimerCount()).toBe(0)
@@ -241,46 +231,43 @@ describe('meeting call signaling', () => {
     expect(mocks.push).toHaveBeenCalledExactlyOnceWith('/meetings/meeting')
   })
 
-  it('recovers a missed acceptance event and stops polling after joining the caller once', async () => {
+  it('recovers a missed acceptance during an explicit recovery and does not poll afterwards', async () => {
     mocks.api.post.mockResolvedValue({ data: call({ created_new: true }) })
     mocks.api.get.mockResolvedValue({ data: call() })
     await store.start('source')
-    mocks.api.get.mockResolvedValue({ data: call({ status: 'accepted', meeting_id: 'meeting', meeting_status: 'active' }) })
-    await vi.advanceTimersByTimeAsync(2000)
+    const accepted = call({ status: 'accepted', meeting_id: 'meeting', meeting_status: 'active' })
+    mocks.api.get.mockImplementation(async path => ({ data: path === '/meeting-calls' ? [accepted] : accepted }))
+    await store.recover()
     expect(store.outgoing).toHaveLength(0)
     expect(mocks.meetings.join).toHaveBeenCalledExactlyOnceWith('meeting')
     expect(mocks.push).toHaveBeenCalledExactlyOnceWith('/meetings/meeting')
-    const reads = mocks.api.get.mock.calls.length
-    await vi.advanceTimersByTimeAsync(6000)
-    expect(mocks.api.get).toHaveBeenCalledTimes(reads)
+    mocks.api.get.mockClear()
+    await vi.advanceTimersByTimeAsync(6_000)
+    expect(mocks.api.get).not.toHaveBeenCalled()
     expect(mocks.meetings.join).toHaveBeenCalledTimes(1)
   })
 
   it('does not automatically join a recovered ringing attempt on another device', async () => {
     mocks.api.get.mockResolvedValue({ data: call() })
     await store.load('call')
-    mocks.api.get.mockResolvedValue({ data: call({ status: 'accepted', meeting_id: 'meeting', meeting_status: 'active' }) })
-    await vi.advanceTimersByTimeAsync(2000)
+    const accepted = call({ status: 'accepted', meeting_id: 'meeting', meeting_status: 'active' })
+    mocks.api.get.mockImplementation(async path => ({ data: path === '/meeting-calls' ? [accepted] : accepted }))
+    await store.recover()
     expect(store.outgoing).toHaveLength(0)
     expect(store.available).toHaveLength(1)
     expect(mocks.meetings.join).not.toHaveBeenCalled()
   })
 
-  it('retries transient failures past the countdown without overlapping recovery requests', async () => {
+  it('stops the countdown timer after the ringing invitation expires', async () => {
     mocks.api.post.mockResolvedValue({ data: call({ created_new: true }) })
     mocks.api.get.mockResolvedValue({ data: call() })
     await store.start('source')
-    let resolve
-    mocks.api.get.mockReturnValueOnce(new Promise(done => { resolve = done }))
-    await vi.advanceTimersByTimeAsync(62000)
-    expect(mocks.api.get).toHaveBeenCalledTimes(2)
-    resolve({ data: call() })
-    await vi.advanceTimersByTimeAsync(0)
-    mocks.api.get.mockRejectedValueOnce(new Error('offline'))
-    await vi.advanceTimersByTimeAsync(2000)
-    mocks.api.get.mockResolvedValue({ data: call({ status: 'accepted', meeting_id: 'meeting', meeting_status: 'active' }) })
-    await vi.advanceTimersByTimeAsync(2000)
-    expect(mocks.meetings.join).toHaveBeenCalledExactlyOnceWith('meeting')
+    expect(vi.getTimerCount()).toBe(1)
+    mocks.api.get.mockClear()
+    await vi.advanceTimersByTimeAsync(61_000)
+    expect(store.outgoing).toHaveLength(0)
+    expect(vi.getTimerCount()).toBe(0)
+    expect(mocks.api.get).not.toHaveBeenCalled()
   })
 
   it('ignores an in-flight recovery after logout', async () => {
@@ -289,10 +276,10 @@ describe('meeting call signaling', () => {
     await store.start('source')
     let resolve
     mocks.api.get.mockReturnValueOnce(new Promise(done => { resolve = done }))
-    await vi.advanceTimersByTimeAsync(2000)
+    const recovery = store.recover()
     store.reset()
-    resolve({ data: call({ status: 'accepted', meeting_id: 'meeting', meeting_status: 'active' }) })
-    await vi.advanceTimersByTimeAsync(6000)
+    resolve({ data: [call({ status: 'accepted', meeting_id: 'meeting', meeting_status: 'active' })] })
+    await recovery
     expect(mocks.meetings.join).not.toHaveBeenCalled()
     expect(store.calls).toEqual([])
     expect(vi.getTimerCount()).toBe(0)
@@ -302,8 +289,9 @@ describe('meeting call signaling', () => {
     mocks.api.post.mockResolvedValue({ data: call({ created_new: true }) })
     mocks.api.get.mockResolvedValue({ data: call() })
     await store.start('source')
-    mocks.api.get.mockResolvedValue({ data: call({ status: 'accepted', meeting_id: 'meeting', meeting_status: 'ended' }) })
-    await vi.advanceTimersByTimeAsync(2000)
+    const ended = call({ status: 'accepted', meeting_id: 'meeting', meeting_status: 'ended' })
+    mocks.api.get.mockImplementation(async path => ({ data: path === '/meeting-calls' ? [ended] : ended }))
+    await store.recover()
     expect(store.outgoing).toHaveLength(0)
     expect(mocks.meetings.join).not.toHaveBeenCalled()
   })
@@ -316,6 +304,17 @@ describe('meeting call signaling', () => {
     expect(mocks.meetings.join).not.toHaveBeenCalled()
     await store.enter(data)
     expect(mocks.meetings.join).toHaveBeenCalledOnce()
+  })
+
+  it('does not expose an accepted call while its meeting voice session is connected', async () => {
+    const data = call({ status: 'accepted', meeting_id: 'meeting', meeting_status: 'active' })
+    mocks.meetings.isVoiceConnectedToMeeting.mockImplementation(id => id === 'meeting')
+    mocks.api.get.mockResolvedValue({ data })
+
+    await store.load('call')
+
+    expect(store.available).toEqual([])
+    expect(mocks.meetings.isVoiceConnectedToMeeting).toHaveBeenCalledWith('meeting')
   })
 
   it('only the winning recipient device automatically joins', async () => {

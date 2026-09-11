@@ -93,6 +93,53 @@ test('direct calls ring before meeting creation, preserve unsuccessful history a
   }
 })
 
+test('a connected participant hides the ready-call overlay outside the meeting and reopens it without rejoining', async ({ page, browser }) => {
+  test.setTimeout(120_000)
+  const credentials = await readSharedState()
+  await login(page, credentials.adminEmail, credentials.adminPassword)
+  const context = await browser.newContext({ baseURL: new URL(page.url()).origin })
+  try {
+    const recipient = await context.newPage()
+    await login(recipient, credentials.inviteEmail, credentials.invitePassword)
+    const admin = await loginViaApi(page.request, { email: credentials.adminEmail, password: credentials.adminPassword })
+    const member = await loginViaApi(recipient.request, { email: credentials.inviteEmail, password: credentials.invitePassword })
+    const response = await page.request.post(resolveBackendUrl('/dms'), {
+      headers: { Authorization: `Bearer ${admin.accessToken}` }, data: { user_ids: [member.user.id] }
+    })
+    expect(response.ok()).toBe(true)
+    const dm = await response.json()
+    await page.goto(`/channels/${dm.id}`)
+    await recipient.goto(`/channels/${dm.id}`)
+    await page.getByRole('button', { name: /^Call$|^Anrufen$/ }).click()
+    await recipient.getByTestId('incoming-meeting-call').getByRole('button', { name: /Accept|Annehmen/ }).click()
+    await expect(page.getByTestId('meeting-view')).toBeVisible()
+    await expect(recipient.getByTestId('meeting-view')).toBeVisible()
+
+    let repeatedJoinRequests = 0
+    page.on('request', request => {
+      if (request.method() === 'PATCH'
+        && /\/meetings\/[^/?]+$/.test(request.url())
+        && request.postData()?.includes('"action":"join"')) {
+        repeatedJoinRequests++
+      }
+    })
+
+    await page.locator('.dm-item').filter({ has: page.getByText(member.user.display_name, { exact: true }) }).last().click()
+    await expect(page).toHaveURL(new RegExp(`/channels/${dm.id}$`))
+    await expect(page.getByTestId('voice-status-connected')).toBeVisible()
+    await expect(page.getByTestId('outgoing-call')).toHaveCount(0)
+
+    await page.locator('.voice-channel-link').click()
+    await expect(page.getByTestId('meeting-view')).toBeVisible()
+    await expect(page.getByTestId('voice-status-connected')).toBeVisible()
+    expect(repeatedJoinRequests).toBe(0)
+
+    await page.getByRole('button', { name: /^End meeting$|^Meeting beenden$/ }).click()
+  } finally {
+    await context.close()
+  }
+})
+
 test('group recipients share one meeting and retain one invitation after the first acceptance', async ({ page, browser }) => {
   test.setTimeout(120_000)
   const credentials = await readSharedState()
@@ -149,7 +196,7 @@ test('group recipients share one meeting and retain one invitation after the fir
   }
 })
 
-test('caller recovers acceptance when realtime call and chat events are lost', async ({ page, browser }) => {
+test('caller recovers a lost acceptance on foreground return', async ({ page, browser }) => {
   const credentials = await readSharedState()
   let droppedEvents = 0
   await page.routeWebSocket(/socket\.io\//, socket => {
@@ -182,6 +229,9 @@ test('caller recovers acceptance when realtime call and chat events are lost', a
     await expect(recipient.getByTestId('incoming-meeting-call')).toBeVisible()
     await recipient.getByTestId('incoming-meeting-call').getByRole('button', { name: /Accept|Annehmen/ }).click()
     await expect(recipient.getByTestId('meeting-view')).toBeVisible()
+    // The caller deliberately missed the realtime events. Foreground resume is
+    // the explicit recovery trigger that reloads the current call once.
+    await page.evaluate(() => window.dispatchEvent(new Event('focus')))
     await expect(page.getByTestId('meeting-view')).toBeVisible()
     await expect(page.getByTestId('outgoing-call')).toHaveCount(0)
     expect(new URL(page.url()).pathname).toBe(new URL(recipient.url()).pathname)
@@ -208,7 +258,7 @@ test('the personal notes channel still starts immediately', async ({ page }) => 
 })
 
 for (const loseEndEvent of [false, true]) {
-  test(`ending a meeting clears the other participant connection and source card${loseEndEvent ? ' after lost end events' : ' immediately'}`, async ({ page, browser }) => {
+  test(`ending a meeting clears the other participant connection and source card${loseEndEvent ? ' on foreground return after lost end events' : ' immediately'}`, async ({ page, browser }) => {
     const credentials = await readSharedState()
     await login(page, credentials.adminEmail, credentials.adminPassword)
     const context = await browser.newContext({ baseURL: new URL(page.url()).origin })
@@ -245,15 +295,17 @@ for (const loseEndEvent of [false, true]) {
       await expect(recipient.getByTestId('meeting-view')).toBeVisible()
       const meetingId = new URL(page.url()).pathname.split('/').pop()
       meetingToEnd = meetingId
-      // Navigate through the sidebar, keeping the recipient's media session alive.
-      await recipient.locator('.dm-item').filter({ has: recipient.getByText(admin.user.display_name, { exact: true }) }).click()
+      // The newest matching DM is the one just created for this scenario.
+      // Selecting it through the sidebar keeps the recipient's media session alive.
+      await recipient.locator('.dm-item').filter({ has: recipient.getByText(admin.user.display_name, { exact: true }) }).last().click()
       await expect(recipient).toHaveURL(new RegExp(`/channels/${dm.id}$`))
       await expect(recipient.getByTestId('voice-status-connected')).toBeVisible()
       const card = recipient.locator(`[data-testid="meeting-card"][data-meeting-id="${meetingId}"]`)
       await expect(card.getByTestId('meeting-card-join')).toBeVisible()
-      // No recipient interaction from here: the event or global reconciliation must clean up.
+      // Lost terminal events are reconciled once when the app returns to the foreground.
       await page.getByRole('button', { name: /^End meeting$|^Meeting beenden$/ }).click()
-      await expect(recipient.getByTestId('voice-controls')).toHaveCount(0, { timeout: loseEndEvent ? 7000 : 2000 })
+      if (loseEndEvent) await recipient.evaluate(() => window.dispatchEvent(new Event('focus')))
+      await expect(recipient.getByTestId('voice-controls')).toHaveCount(0, { timeout: 2000 })
       await expect(card.getByTestId('meeting-card-status')).toHaveText(/Ended|Beendet/)
       await expect(card.getByTestId('meeting-card-join')).toHaveCount(0)
       if (loseEndEvent) expect(dropped).toBeGreaterThan(0)
@@ -267,8 +319,8 @@ for (const loseEndEvent of [false, true]) {
 }
 
 
-for (const { loseEvents, settings } of [{ loseEvents: false }, { loseEvents: true }, { loseEvents: false, settings: true }]) {
-  test(`incoming calls reach an idle recipient in ${settings ? 'settings' : 'another channel'}${loseEvents ? ' after lost events' : ' immediately'}`, async ({ page, browser }) => {
+for (const settings of [false, true]) {
+  test(`incoming calls reach an idle recipient in ${settings ? 'settings' : 'another channel'} immediately`, async ({ page, browser }) => {
     const credentials = await readSharedState()
     await login(page, credentials.adminEmail, credentials.adminPassword)
     const context = await browser.newContext({ baseURL: new URL(page.url()).origin })
@@ -289,7 +341,6 @@ for (const { loseEvents, settings } of [{ loseEvents: false }, { loseEvents: tru
         server.onMessage(message => {
           const payload = message.toString()
           if (payload.includes('meeting-calls changed')) callEvents++
-          if (loseEvents && (payload.includes('meeting-calls changed') || payload.includes('meeting_call'))) return
           socket.send(message)
         })
       })
@@ -314,7 +365,7 @@ for (const { loseEvents, settings } of [{ loseEvents: false }, { loseEvents: tru
       const soundCount = await recipient.evaluate(() => window.__callSoundContexts.length)
       // No recipient clicks, navigation or reload from here until the overlay appears.
       await page.getByRole('button', { name: /^Call$|^Anrufen$/ }).click()
-      await expect(recipient.getByTestId('incoming-meeting-call')).toBeVisible({ timeout: loseEvents ? 7000 : 2000 })
+      await expect(recipient.getByTestId('incoming-meeting-call')).toBeVisible({ timeout: 2000 })
       expect(recipient.url()).toBe(idleUrl)
       expect(callEvents).toBeGreaterThan(0)
       expect(callReads).toBeGreaterThan(0)

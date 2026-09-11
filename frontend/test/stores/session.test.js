@@ -189,7 +189,7 @@ vi.mock('../../src/stores/ui.js', () => ({
 vi.mock('../../src/stores/meetings.js', () => ({
   useMeetingsStore: () => meetingsStoreMock
 }))
-const meetingCallsStoreMock = vi.hoisted(() => ({ refresh: vi.fn().mockResolvedValue(undefined), startRecovery: vi.fn(), reset: vi.fn() }))
+const meetingCallsStoreMock = vi.hoisted(() => ({ recover: vi.fn().mockResolvedValue(undefined), reset: vi.fn() }))
 vi.mock('../../src/stores/meeting-calls.js', () => ({ useMeetingCallsStore: () => meetingCallsStoreMock }))
 
 function resetMocks() {
@@ -270,6 +270,9 @@ function resetMocks() {
   uiStoreMock.reset.mockReset()
   meetingsStoreMock.refresh.mockReset()
   meetingsStoreMock.reset.mockReset()
+  meetingCallsStoreMock.recover.mockReset()
+  meetingCallsStoreMock.recover.mockResolvedValue(undefined)
+  meetingCallsStoreMock.reset.mockReset()
   voiceStoreMock.channelId = null
 }
 
@@ -1171,14 +1174,14 @@ describe('session store api actions', () => {
     await store.destroy()
     await store.init()
     voiceStoreMock.reconnectIfNeeded.mockClear()
-    expect(meetingCallsStoreMock.startRecovery).toHaveBeenCalled()
-    meetingCallsStoreMock.refresh.mockClear()
+    expect(meetingCallsStoreMock.recover).toHaveBeenCalledOnce()
+    meetingCallsStoreMock.recover.mockClear()
 
     expect(store.presenceSyncPending).toBe(true)
     expect(store.onlineUserIds).toEqual([])
 
     await authenticatedHandler(socket)
-    expect(meetingCallsStoreMock.refresh).toHaveBeenCalledOnce()
+    expect(meetingCallsStoreMock.recover).toHaveBeenCalledOnce()
 
     expect(store.presenceSyncPending).toBe(false)
     expect(store.onlineUserIds).toEqual(['user-self', 'user-2'])
@@ -1210,6 +1213,7 @@ describe('session store api actions', () => {
     expect(channelsStoreMock.refreshChannel).toHaveBeenCalledWith('channel-1')
     expect(dmsStoreMock.refreshChannel).not.toHaveBeenCalled()
     expect(messagesStoreMock.syncActiveTimelineFromLatest).toHaveBeenCalledTimes(1)
+    expect(meetingCallsStoreMock.recover).toHaveBeenCalledOnce()
   })
 
   it('syncForegroundResumeState skips metadata refresh for archived meeting history', async () => {
@@ -1249,6 +1253,7 @@ describe('session store api actions', () => {
 
     expect(dmsStoreMock.refresh).toHaveBeenCalledWith({ force: true })
     expect(notificationsStoreMock.refreshUnreadCounts).toHaveBeenCalledWith({ force: true })
+    expect(meetingCallsStoreMock.recover).not.toHaveBeenCalled()
   })
 
   it('init forces unread-count refresh during bootstrap reconciliation', async () => {

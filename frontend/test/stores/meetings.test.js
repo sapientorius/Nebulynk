@@ -27,7 +27,8 @@ const voiceStoreMock = vi.hoisted(() => ({
   connectWithPayload: vi.fn().mockResolvedValue(undefined),
   leave: vi.fn().mockResolvedValue(undefined),
   clearChannelState: vi.fn(),
-  channelId: null
+  channelId: null,
+  connected: false
 }))
 
 const dmsStoreMock = vi.hoisted(() => ({
@@ -250,6 +251,7 @@ describe('meetings store', () => {
     voiceStoreMock.leave.mockReset()
     voiceStoreMock.clearChannelState.mockReset()
     voiceStoreMock.channelId = null
+    voiceStoreMock.connected = false
     dmsStoreMock.createGroup.mockReset()
     dmsStoreMock.createGroup.mockResolvedValue({ id: 'group-1' })
     notificationsStoreMock.markMeetingInviteRead.mockReset()
@@ -379,6 +381,26 @@ describe('meetings store', () => {
       requestMicrophonePermission: true,
       isCurrent: expect.any(Function)
     })
+  })
+
+  it('reuses an existing voice connection for the same meeting without issuing another join', async () => {
+    const store = useMeetingsStore()
+    const meeting = {
+      id: 'meeting-connected',
+      status: 'active',
+      chat_channel_id: 'meeting-channel-connected'
+    }
+    store.upsertMeeting(meeting)
+    voiceStoreMock.channelId = 'meeting-channel-connected'
+    voiceStoreMock.connected = true
+
+    const result = await store.join('meeting-connected')
+
+    expect(result).toEqual({ meeting })
+    expect(apiMock.patch).not.toHaveBeenCalled()
+    expect(voiceStoreMock.connectWithPayload).not.toHaveBeenCalled()
+    expect(channelsStoreMock.select).toHaveBeenCalledExactlyOnceWith('meeting-channel-connected')
+    expect(store.activeMeetingId).toBe('meeting-connected')
   })
 
   it('setActive marks matching meeting invite notifications read when opening a meeting', async () => {

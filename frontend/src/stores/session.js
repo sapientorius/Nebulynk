@@ -324,6 +324,7 @@ export const useSessionStore = defineStore('session', () => {
     const dmsStore = useDmsStore()
     const messagesStore = useMessagesStore()
     const notificationsStore = useNotificationsStore()
+    const meetingCallsStore = useMeetingCallsStore()
 
     const activeChannelId = channelsStore.activeChannelId
     const activeChannel = channelsStore.channels?.find?.((channel) => channel.id === activeChannelId) || null
@@ -343,6 +344,9 @@ export const useSessionStore = defineStore('session', () => {
         ? safeTask(() => notificationsStore.refreshUnreadCounts({ force: true }))
         : safeTask(() => notificationsStore.refreshUnreadCounts()),
       safeTask(() => notificationsStore.refreshNotifications()),
+      reason === 'socket-authenticated'
+        ? Promise.resolve()
+        : safeTask(() => meetingCallsStore.recover()),
       activeChannelId
         ? dmsStore.hasDmChannel?.(activeChannelId)
           ? safeTask(() => dmsStore.refreshChannel(activeChannelId))
@@ -486,7 +490,6 @@ export const useSessionStore = defineStore('session', () => {
     const voiceStore = useVoiceStore()
     const meetingsStore = useMeetingsStore()
     const meetingCallsStore = useMeetingCallsStore()
-    meetingCallsStore.startRecovery()
     const voiceMessageArtifactsStore = useVoiceMessageArtifactsStore()
     const messageSummariesStore = useMessageSummariesStore()
 
@@ -523,7 +526,7 @@ export const useSessionStore = defineStore('session', () => {
         presenceSyncPending.value = true
         await Promise.all([
           refreshPresence().catch(() => {}),
-          meetingCallsStore.refresh().catch(() => {})
+          meetingCallsStore.recover().catch(() => {})
         ])
         await Promise.resolve(voiceStore.reconnectIfNeeded()).catch(() => {})
         foregroundResumeSync.requestSync('socket-authenticated', {
@@ -554,7 +557,7 @@ export const useSessionStore = defineStore('session', () => {
 
     // Keep meeting channels/topic metadata in store after channel refreshes.
     await meetingsStore.refresh(true)
-    await useMeetingCallsStore().refresh().catch(() => {})
+    await meetingCallsStore.recover().catch(() => {})
 
     await voiceStore.reconnectIfNeeded()
   }

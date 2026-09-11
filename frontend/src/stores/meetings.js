@@ -218,6 +218,15 @@ export const useMeetingsStore = defineStore('meetings', () => {
     return meetings.value.some((meeting) => meeting.chat_channel_id === channelId)
   }
 
+  function isVoiceConnectedToMeeting(meetingId) {
+    const meeting = getMeetingById(meetingId)
+    const voiceStore = useVoiceStore()
+    return !!meeting
+      && !isTerminal(meeting)
+      && voiceStore.connected === true
+      && voiceStore.channelId === meeting.chat_channel_id
+  }
+
   function clearActive() {
     activationGeneration++
     activeMeetingId.value = null
@@ -745,6 +754,15 @@ export const useMeetingsStore = defineStore('meetings', () => {
 
   async function join(meetingId, options = {}) {
     const requestGeneration = runtimeGeneration
+    const connectedMeeting = getMeetingById(meetingId)
+    if (isVoiceConnectedToMeeting(meetingId)) {
+      activeMeetingId.value = connectedMeeting.id
+      activeMeeting.value = connectedMeeting
+      clearIncomingCall(connectedMeeting.id)
+      await useChannelsStore().select(connectedMeeting.chat_channel_id)
+      return { meeting: connectedMeeting }
+    }
+
     const { data } = await api.patch(`/meetings/${meetingId}`, {
       action: 'join',
       ...options
@@ -1097,6 +1115,7 @@ export const useMeetingsStore = defineStore('meetings', () => {
     reset,
     clearActive,
     hasMeetingChatChannel,
+    isVoiceConnectedToMeeting,
     hasActiveMeetingForSourceChannel,
     findMeetingByChatChannelId,
     upsertMeeting,

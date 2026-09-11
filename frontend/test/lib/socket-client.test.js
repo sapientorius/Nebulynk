@@ -8,11 +8,25 @@ vi.mock('socket.io-client', () => ({
 
 function createSocketHarness() {
   const handlers = new Map()
+  const managerHandlers = new Map()
+  const engineHandlers = new Map()
   const authAttempts = []
+  const engine = {
+    on: vi.fn((eventName, handler) => {
+      engineHandlers.set(eventName, handler)
+    })
+  }
+  const manager = {
+    engine,
+    on: vi.fn((eventName, handler) => {
+      managerHandlers.set(eventName, handler)
+    })
+  }
 
   const socket = {
     connected: false,
     auth: {},
+    io: manager,
     on: vi.fn((eventName, handler) => {
       handlers.set(eventName, handler)
     }),
@@ -39,6 +53,15 @@ function createSocketHarness() {
     triggerDisconnect(reason) {
       socket.connected = false
       handlers.get('disconnect')?.(reason)
+    },
+    triggerConnectError(error = new Error('connection refused')) {
+      handlers.get('connect_error')?.(error)
+    },
+    triggerReconnectError(error = new Error('reconnect failed')) {
+      managerHandlers.get('reconnect_error')?.(error)
+    },
+    triggerUpgradeError(error = new Error('websocket upgrade failed')) {
+      engineHandlers.get('upgradeError')?.(error)
     },
     getAuthAttempt(index = authAttempts.length - 1) {
       return authAttempts[index]
@@ -184,5 +207,33 @@ describe('createSocketClient', () => {
     await Promise.resolve()
 
     client.destroy()
+  })
+
+  it('logs clear development diagnostics for connection, reconnect, and transport upgrade failures', async () => {
+    const harness = createSocketHarness()
+    socketIoMock.mockReturnValue(harness.socket)
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const apiClient = {
+      getStoredAccessToken: vi.fn(() => 'token-1'),
+      getBaseUrl: vi.fn(() => 'https://chat.example.com/api')
+    }
+
+    const { createSocketClient } = await import('../../src/lib/socket-client.js')
+    const client = createSocketClient({ apiClient })
+    client.connectSocket()
+
+    const connectionError = new Error('connection refused')
+    const reconnectError = new Error('reconnect failed')
+    const upgradeError = new Error('websocket upgrade failed')
+    harness.triggerConnectError(connectionError)
+    harness.triggerReconnectError(reconnectError)
+    harness.triggerUpgradeError(upgradeError)
+
+    expect(warning).toHaveBeenNthCalledWith(1, '[Socket] connection failed:', connectionError)
+    expect(warning).toHaveBeenNthCalledWith(2, '[Socket] reconnect failed:', reconnectError)
+    expect(warning).toHaveBeenNthCalledWith(3, '[Socket] transport upgrade failed:', upgradeError)
+
+    client.destroy()
+    warning.mockRestore()
   })
 })

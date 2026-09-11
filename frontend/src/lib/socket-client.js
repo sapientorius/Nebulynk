@@ -9,8 +9,21 @@ function readViteEnv(key) {
 export function createSocketClient(options = {}) {
   let socket = null
   const authenticatedListeners = new Set()
+  const diagnosedEngines = new WeakSet()
   let stopAuthSubscription = null
   let authRecoveryRequest = null
+
+  function logDiagnostic(event, error) {
+    if (import.meta.env?.DEV !== true) return
+    console.warn(`[Socket] ${event}:`, error)
+  }
+
+  function attachTransportDiagnostics(candidateSocket) {
+    const engine = candidateSocket.io?.engine
+    if (!engine || typeof engine !== 'object' || diagnosedEngines.has(engine)) return
+    diagnosedEngines.add(engine)
+    engine.on?.('upgradeError', (error) => logDiagnostic('transport upgrade failed', error))
+  }
 
   function getToken() {
     return options.apiClient?.getStoredAccessToken?.() || null
@@ -86,9 +99,19 @@ export function createSocketClient(options = {}) {
     connectedSocket.__nebulynkAccessToken = token
     connectedSocket.__nebulynkAuthReady = false
     connectedSocket.__nebulynkIntentionalDisconnect = false
+    attachTransportDiagnostics(connectedSocket)
+
+    connectedSocket.on('connect_error', (error) => {
+      logDiagnostic('connection failed', error)
+    })
+    connectedSocket.io?.on?.('reconnect_error', (error) => {
+      logDiagnostic('reconnect failed', error)
+    })
 
     connectedSocket.on('connect', () => {
       if (socket !== connectedSocket) return
+
+      attachTransportDiagnostics(connectedSocket)
 
       const currentToken = getToken()
       if (!currentToken) return

@@ -6,11 +6,16 @@ import MeetingCallOverlay from '../../src/components/MeetingCallOverlay.vue'
 import { useMeetingCallsStore } from '../../src/stores/meeting-calls.js'
 
 const mocks = vi.hoisted(() => ({
-  api: { get: vi.fn(), patch: vi.fn() }, join: vi.fn(), push: vi.fn(), sound: vi.fn()
+  api: { get: vi.fn(), patch: vi.fn() }, join: vi.fn(), push: vi.fn(), sound: vi.fn(), isVoiceConnectedToMeeting: vi.fn(() => false)
 }))
 vi.mock('../../src/lib/api.js', () => ({ default: mocks.api }))
 vi.mock('../../src/stores/session.js', () => ({ useSessionStore: () => ({ user: { id: 'alice' } }) }))
-vi.mock('../../src/stores/meetings.js', () => ({ useMeetingsStore: () => ({ join: mocks.join, activeMeetingId: null, isMeetingEnded: () => false }) }))
+vi.mock('../../src/stores/meetings.js', () => ({ useMeetingsStore: () => ({
+  join: mocks.join,
+  activeMeetingId: null,
+  isMeetingEnded: () => false,
+  isVoiceConnectedToMeeting: mocks.isVoiceConnectedToMeeting
+}) }))
 vi.mock('../../src/router/index.js', () => ({ default: { push: mocks.push } }))
 vi.mock('../../src/lib/sfx.js', () => ({ playSfx: mocks.sound, prepareSfxAudio: async () => true, SFX_EVENTS: { CALL_INCOMING: 'incoming' } }))
 
@@ -24,6 +29,8 @@ beforeEach(async () => {
   mocks.api.get.mockImplementation(async path => ({ data: path === '/meeting-calls' ? [current] : current }))
   mocks.join.mockResolvedValue({})
   mocks.push.mockResolvedValue(undefined)
+  mocks.isVoiceConnectedToMeeting.mockReset()
+  mocks.isVoiceConnectedToMeeting.mockReturnValue(false)
 })
 afterEach(() => {
   wrappers.forEach(wrapper => wrapper.unmount())
@@ -98,4 +105,22 @@ it('shows the caller and group context separately, and gives outgoing calls a ca
   expect(overlay.get('[data-testid=outgoing-call] .call-name').text()).toBe('Design team')
   expect(button(overlay, 'Cancel')).toBeTruthy()
   expect(button(overlay, 'Accept')).toBeUndefined()
+})
+
+it('hides an accepted call when the user is already connected to its meeting voice channel', async () => {
+  current = {
+    ...current,
+    status: 'accepted',
+    recipient_status: 'accepted',
+    meeting_id: 'meeting',
+    meeting_status: 'active'
+  }
+  mocks.isVoiceConnectedToMeeting.mockReturnValue(true)
+  const overlay = await render()
+
+  await store.load('call')
+  await flushPromises()
+
+  expect(overlay.find('[data-testid=incoming-meeting-call]').exists()).toBe(false)
+  expect(mocks.isVoiceConnectedToMeeting).toHaveBeenCalledWith('meeting')
 })
