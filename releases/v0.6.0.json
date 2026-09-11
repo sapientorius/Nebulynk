@@ -1,0 +1,138 @@
+{
+  "schema_version": 1,
+  "version": "0.6.0",
+  "revision": 1,
+  "channel": "stable",
+  "published_at": "2026-09-11T23:27:50.533Z",
+  "title": {
+    "en": "Nebulynk 0.6.0"
+  },
+  "summary": {
+    "en": "Adds spontaneous calls in direct and group chats that become meetings only when someone accepts, alongside administrator storage visibility, reliable reminder recovery, automatic General membership, and a readiness-aware deployment lifecycle."
+  },
+  "changes": [
+    {
+      "category": "feature",
+      "title": {
+        "en": "Calls become meetings only on acceptance"
+      },
+      "description": {
+        "en": "Start a call from a direct or group chat and ring the other current members for up to 60 seconds. No meeting is created while the call is ringing: the first participant to accept creates the regular meeting and its chat context. Notes still opens immediately and active meetings are reused."
+      }
+    },
+    {
+      "category": "feature",
+      "title": {
+        "en": "Call overlays, history, and recovery"
+      },
+      "description": {
+        "en": "Incoming and outgoing call overlays show the deadline and available actions, realtime updates keep multiple devices in sync, and unsuccessful attempts leave searchable chat history with a retry action."
+      }
+    },
+    {
+      "category": "feature",
+      "title": {
+        "en": "Administrator storage usage overview"
+      },
+      "description": {
+        "en": "Platform administrators can inspect logical database, file, meeting-recording, object-count, and total storage usage in Admin > System Info, refresh snapshots, and see stale or partial results."
+      }
+    },
+    {
+      "category": "improvement",
+      "title": {
+        "en": "Atomic message and attachment handling"
+      },
+      "description": {
+        "en": "Message creation keeps attachments, related records, and authorized file output consistent in one transaction, while forwarding cleanup protects copies that are already bound."
+      }
+    },
+    {
+      "category": "improvement",
+      "title": {
+        "en": "Reliable message reminders"
+      },
+      "description": {
+        "en": "Reminder processing now uses PostgreSQL transactions and row locks, rechecks access at delivery time, keeps technical failures retryable, and repairs legacy processing rows during migration."
+      }
+    },
+    {
+      "category": "improvement",
+      "title": {
+        "en": "Automatic General membership"
+      },
+      "description": {
+        "en": "Eligible active members now join the default General channel automatically when they activate an account, and migration 070 backfills missing memberships for existing eligible users."
+      }
+    },
+    {
+      "category": "improvement",
+      "title": {
+        "en": "More resilient sessions and message visibility"
+      },
+      "description": {
+        "en": "The browser client centralizes authentication transport, token refresh, and platform caching, while message auto-read is limited to content visible when the app is in the foreground."
+      }
+    },
+    {
+      "category": "improvement",
+      "title": {
+        "en": "Readiness-aware backend lifecycle"
+      },
+      "description": {
+        "en": "The backend exposes GET /health/ready, coordinates background work and presence cleanup, and performs orderly shutdown within a 60-second budget for stop-before-start deployments."
+      }
+    },
+    {
+      "category": "improvement",
+      "title": {
+        "en": "Clearer meeting summaries"
+      },
+      "description": {
+        "en": "Meeting topic titles and their supporting summary text now use a clearer stacked layout for easier scanning."
+      }
+    },
+    {
+      "category": "improvement",
+      "title": {
+        "en": "Broader release verification"
+      },
+      "description": {
+        "en": "Shared linting, PostgreSQL integration, Chromium end-to-end, Docker runtime, Gitleaks, and Trivy checks provide stronger release evidence and diagnostics."
+      }
+    },
+    {
+      "category": "security",
+      "title": {
+        "en": "Audit-fixed image processing dependency"
+      },
+      "description": {
+        "en": "The bundled sharp image-processing dependency is updated to 0.35.4, removing the HIGH libheif vulnerability reported for earlier releases."
+      }
+    }
+  ],
+  "security": [
+    {
+      "severity": "high",
+      "affected_versions": "<0.35.4",
+      "summary": {
+        "en": "Versions before sharp 0.35.4 include vulnerable libheif dependencies; Nebulynk 0.6.0 updates the image-processing stack."
+      },
+      "advisory_url": "https://github.com/advisories/GHSA-rgj7-g3m4-5g8c"
+    }
+  ],
+  "upgrade": {
+    "backup_required": true,
+    "downtime_expected": true,
+    "breaking": false,
+    "manual_steps": {
+      "en": [
+        "Before updating, create and verify an external backup of PostgreSQL and both Garage data directories or volumes. Do not remove persistent volumes.",
+        "Deploy the v0.6.0 backend and frontend together from the reviewed release tag. Stop the previous backend completely before starting the new one; migrations 070_default_general_channel_memberships, 071_message_reminder_recovery, and 072_meeting_calls run during startup.",
+        "Allow the backend container at least 75 seconds for shutdown, wait for GET /health/ready to return HTTP 200, and only then route traffic to the replacement instance.",
+        "After deployment, verify login, messaging, reminders, an incoming or outgoing call, and file access. System Info reports logical database and object-storage totals, not physical host disk usage."
+      ]
+    },
+    "docs_url": "https://github.com/sapientorius/Nebulynk/blob/v0.6.0/docs/SELF_HOSTING.md"
+  }
+}

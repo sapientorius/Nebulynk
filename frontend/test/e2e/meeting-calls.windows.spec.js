@@ -53,7 +53,6 @@ test.describe('background ringing with normal browser policies', () => {
   test.skip(process.platform === 'linux' && !process.env.DISPLAY, 'Window-focus tests require a desktop or xvfb-run on Linux.')
   for (const mode of ['unfocused', 'minimized', 'hidden-tab']) {
     test(`rings with ${mode} without recipient interaction`, async ({ page, browser }, testInfo) => {
-      const loseEvents = mode !== 'unfocused'
       const credentials = await readSharedState()
       await login(page, credentials.adminEmail, credentials.adminPassword)
       const recipientBrowser = mode === 'hidden-tab'
@@ -70,14 +69,16 @@ test.describe('background ringing with normal browser policies', () => {
             return start.apply(this, args)
           }
         })
-        let events = 0
+        let callDiscoveryEvents = 0
         await recipient.routeWebSocket(/socket\.io\//, socket => {
           const server = socket.connectToServer()
           server.onMessage(message => {
             const payload = message.toString()
-            if (payload.includes('meeting-calls changed')) events++
-            // Also exercise background polling when both discovery hints are lost.
-            if (loseEvents && (payload.includes('meeting-calls changed') || payload.includes('meeting_call'))) return
+            if (payload.includes('meeting-calls changed')
+              || payload.includes('meeting_call')
+              || (payload.includes('messages created') && payload.includes('"call_id"'))) {
+              callDiscoveryEvents++
+            }
             socket.send(message)
           })
         })
@@ -109,8 +110,8 @@ test.describe('background ringing with normal browser policies', () => {
         if (mode !== 'hidden-tab') await expect.poll(() => recipient.evaluate(() => document.hasFocus())).toBe(false)
         const soundCount = await recipient.evaluate(() => window.__ringStarts.length)
         await page.getByRole('button', { name: /^Call$|^Anrufen$/ }).click()
-        await expect(recipient.getByTestId('incoming-meeting-call')).toBeVisible({ timeout: loseEvents ? 7000 : 2000 })
-        expect(events).toBeGreaterThan(0)
+        await expect(recipient.getByTestId('incoming-meeting-call')).toBeVisible({ timeout: 7000 })
+        expect(callDiscoveryEvents).toBeGreaterThan(0)
         await expect.poll(() => recipient.evaluate(({ count, hidden }) => window.__ringStarts.slice(count)
           .some(sound => sound.state === 'running' && (hidden ? sound.visibility === 'hidden' : !sound.focused)),
         { count: soundCount, hidden: mode === 'hidden-tab' })).toBe(true)
@@ -121,4 +122,56 @@ test.describe('background ringing with normal browser policies', () => {
       }
     })
   }
+
+  test('recovers a missed incoming call after returning from a hidden tab', async ({ page }, testInfo) => {
+    const credentials = await readSharedState()
+    await login(page, credentials.adminEmail, credentials.adminPassword)
+    const recipientBrowser = await openNativeRecipient(testInfo)
+    const context = recipientBrowser.context
+    try {
+      const recipient = context.pages()[0] || await context.newPage()
+      let droppedDiscoveryEvents = 0
+      await recipient.routeWebSocket(/socket\.io\//, socket => {
+        const server = socket.connectToServer()
+        server.onMessage(message => {
+          const payload = message.toString()
+          const isCallDiscoveryEvent = payload.includes('meeting-calls changed')
+            || payload.includes('meeting_call')
+            || (payload.includes('messages created') && payload.includes('"call_id"'))
+          if (isCallDiscoveryEvent) {
+            droppedDiscoveryEvents++
+            return
+          }
+          socket.send(message)
+        })
+      })
+      await recipient.bringToFront()
+      await login(recipient, credentials.inviteEmail, credentials.invitePassword)
+      const admin = await loginViaApi(page.request, { email: credentials.adminEmail, password: credentials.adminPassword })
+      const member = await loginViaApi(recipient.request, { email: credentials.inviteEmail, password: credentials.invitePassword })
+      const response = await page.request.post(resolveBackendUrl('/dms'), {
+        headers: { Authorization: `Bearer ${admin.accessToken}` }, data: { user_ids: [member.user.id] }
+      })
+      expect(response.ok()).toBe(true)
+      const dm = await response.json()
+      await page.goto(`/channels/${dm.id}`)
+      await page.bringToFront()
+
+      const foregroundTab = await context.newPage()
+      await foregroundTab.goto('about:blank')
+      await foregroundTab.bringToFront()
+      await expect.poll(() => recipient.evaluate(() => document.visibilityState)).toBe('hidden')
+
+      await page.getByRole('button', { name: /^Call$|^Anrufen$/ }).click()
+      await expect.poll(() => droppedDiscoveryEvents).toBeGreaterThan(0)
+      await expect(recipient.getByTestId('incoming-meeting-call')).toHaveCount(0)
+
+      await recipient.bringToFront()
+      await expect.poll(() => recipient.evaluate(() => document.visibilityState)).toBe('visible')
+      await expect(recipient.getByTestId('incoming-meeting-call')).toBeVisible({ timeout: 3000 })
+      await page.getByTestId('outgoing-call').getByRole('button', { name: /^Cancel$|^Abbrechen$/ }).click()
+    } finally {
+      await recipientBrowser.close()
+    }
+  })
 })
