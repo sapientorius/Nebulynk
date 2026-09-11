@@ -68,7 +68,7 @@ async function createHarness() {
   app.set('postgresqlClient', db)
   app.set('platformUpdateManager', manager)
   app.set('rateLimiter', createRateLimiter(new MemoryRateLimitStore()))
-  app.set('frontendOrigins', ['http://127.0.0.1:5173'])
+  app.set('frontendOrigins', ['http://127.0.0.1:5179'])
   app.set('passkeyRpId', '127.0.0.1')
   app.set('passkeyHelpers', {
     async generateAuthenticationOptions() {

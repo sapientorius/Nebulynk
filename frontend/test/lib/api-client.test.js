@@ -80,7 +80,7 @@ describe('resolveSocketBaseUrl', () => {
     expect(resolveSocketBaseUrl('/api', {
       targetWindow: {
         location: {
-          origin: 'http://localhost:5173'
+          origin: 'http://localhost:5179'
         }
       }
     })).toBe('http://localhost:3030')
@@ -103,7 +103,7 @@ describe('resolveSocketBaseUrl', () => {
       backendBaseUrl: 'https://backend.example.com/api',
       targetWindow: {
         location: {
-          origin: 'http://localhost:5173'
+          origin: 'http://localhost:5179'
         }
       }
     })).toBe('https://backend.example.com')

@@ -1,5 +1,5 @@
 const LOCAL_DEV_HOSTS = new Set(['localhost', '127.0.0.1'])
-const LOCAL_FRONTEND_DEV_PORTS = new Set(['5173', '1420'])
+const LOCAL_FRONTEND_DEV_PORTS = new Set(['5179', '1420'])
 const LOCAL_BACKEND_DEV_PORTS = new Set(['3030'])
 
 function normalizeUrlInput(value) {

@@ -3,7 +3,7 @@ import { resolveDesktopApiBaseUrl, resolveDesktopAppUrl } from '../../src/lib/de
 
 describe('resolveDesktopApiBaseUrl', () => {
   it('maps a local frontend dev origin to the backend dev origin', () => {
-    expect(resolveDesktopApiBaseUrl('http://localhost:5173')).toBe('http://localhost:3030')
+    expect(resolveDesktopApiBaseUrl('http://localhost:5179')).toBe('http://localhost:3030')
     expect(resolveDesktopApiBaseUrl('http://127.0.0.1:1420')).toBe('http://127.0.0.1:3030')
   })
 

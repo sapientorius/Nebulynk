@@ -39,6 +39,11 @@ test('resolveFrontendOrigins supports comma-separated origin lists', () => {
   assert.equal(resolveFrontendUrl({ FRONTEND_URL: 'https://chat.example.com,https://admin.example.com' }), 'https://chat.example.com')
 })
 
+test('local web development defaults use port 5179', () => {
+  assert.deepEqual(resolveFrontendOrigins({}), ['http://localhost:5179'])
+  assert.ok(resolveClientOrigins({}).includes('http://127.0.0.1:5179'))
+})
+
 test('resolveDesktopFrontendOrigins includes desktop dev and Tauri production origins', () => {
   const origins = resolveDesktopFrontendOrigins({
     NODE_ENV: 'development'

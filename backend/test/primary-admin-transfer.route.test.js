@@ -166,7 +166,7 @@ async function createRouteHarness(seed = {}) {
   })
 
   app.set('postgresqlClient', db)
-  app.set('frontendOrigins', ['http://127.0.0.1:5173'])
+  app.set('frontendOrigins', ['http://127.0.0.1:5179'])
   app.set('passkeyRpId', '127.0.0.1')
   app.set('passkeyHelpers', createPasskeyHelpers())
   app.set('rateLimiter', createRateLimiter(new MemoryRateLimitStore()))

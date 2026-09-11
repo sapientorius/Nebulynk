@@ -11,7 +11,7 @@ const DEFAULT_API_BASE_URL = configuredApiUrl
 
 const LOCAL_DEV_SOCKET_HOSTS = new Set(['localhost', '127.0.0.1'])
 
-const LOCAL_DEV_FRONTEND_PORTS = new Set(['5173', '4173', '1420'])
+const LOCAL_DEV_FRONTEND_PORTS = new Set(['5179', '4173', '1420'])
 
 function normalizeApiBaseUrl(baseUrl) {
   if (typeof baseUrl !== 'string') return DEFAULT_API_BASE_URL

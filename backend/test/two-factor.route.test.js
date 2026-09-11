@@ -155,7 +155,7 @@ function createPasskeyHelpers() {
           userVerified: true,
           credentialDeviceType: 'multiDevice',
           credentialBackedUp: true,
-          origin: 'http://127.0.0.1:5173',
+          origin: 'http://127.0.0.1:5179',
           rpID: '127.0.0.1'
         }
       }
@@ -197,7 +197,7 @@ async function createRouteHarness(seed = {}) {
   app.set('authentication', {
     browserJwtOptions: { expiresIn: '15m' }
   })
-  app.set('frontendOrigins', ['http://127.0.0.1:5173'])
+  app.set('frontendOrigins', ['http://127.0.0.1:5179'])
   app.set('passkeyRpId', '127.0.0.1')
   app.set('passkeyHelpers', createPasskeyHelpers())
   app.set('rateLimiter', createRateLimiter(new MemoryRateLimitStore()))

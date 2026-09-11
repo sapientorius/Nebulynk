@@ -1,9 +1,9 @@
 export const DEFAULT_AUTHENTICATION_SECRET = 'change-me-in-production'
-const DEFAULT_FRONTEND_URL = 'http://localhost:5173'
+const DEFAULT_FRONTEND_URL = 'http://localhost:5179'
 const DEFAULT_DESKTOP_FRONTEND_ORIGINS = [
   'http://127.0.0.1:1420',
   'http://localhost:1420',
-  'http://127.0.0.1:5173',
+  'http://127.0.0.1:5179',
   'https://tauri.localhost',
   'http://tauri.localhost',
   'tauri://localhost'
