@@ -12,6 +12,27 @@ vi.mock('zzfx', () => ({
 }))
 
 describe('notification sfx background gating', () => {
+  it('resumes audio on normal gestures and removes its activation listeners', async () => {
+    const { initializeSfxAudio, prepareSfxAudio } = await import('../../src/lib/sfx.js')
+    const target = new EventTarget()
+    const context = { state: 'suspended', resume: vi.fn(async () => { context.state = 'running' }) }
+    zzfxState.audioContext = context
+    const stop = initializeSfxAudio(target)
+    target.dispatchEvent(new Event('pointerdown'))
+    await Promise.resolve()
+    expect(context.state).toBe('running')
+    context.state = 'suspended'
+    target.dispatchEvent(new Event('keydown'))
+    await Promise.resolve()
+    expect(context.resume).toHaveBeenCalledTimes(2)
+    stop()
+    context.state = 'suspended'
+    target.dispatchEvent(new Event('pointerdown'))
+    expect(context.resume).toHaveBeenCalledTimes(2)
+    context.resume.mockRejectedValueOnce(new Error('autoplay blocked'))
+    expect(await prepareSfxAudio()).toBe(false)
+    delete zzfxState.audioContext
+  })
   beforeEach(() => {
     zzfxMock.mockReset()
     resetDesktopWindowState()

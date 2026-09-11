@@ -51,6 +51,7 @@ const baseMessages = {
     calls: {
       notification: 'Call',
       ringing: 'Calling …', ready: 'Meeting started', open: 'Open meeting',
+      timeRemaining: 'Time remaining', seconds: '{count}s',
       expired: 'Call not answered', declined: 'Call declined', cancelled: 'Call cancelled',
       retry: 'Call again', unavailable: 'Call is no longer available'
     },
@@ -938,6 +939,7 @@ const baseMessages = {
     calls: {
       notification: 'Anruf',
       ringing: 'Ruft an …', ready: 'Meeting gestartet', open: 'Meeting öffnen',
+      timeRemaining: 'Verbleibende Zeit', seconds: '{count} s',
       expired: 'Anruf nicht angenommen', declined: 'Anruf abgelehnt', cancelled: 'Anruf abgebrochen',
       retry: 'Erneut anrufen', unavailable: 'Anruf nicht mehr verfügbar'
     },

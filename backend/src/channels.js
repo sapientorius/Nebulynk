@@ -1,5 +1,14 @@
 import { logger } from './logger.js'
 
+export async function publishMeetingEnd(app, data) {
+  const db = app.get('postgresqlClient')
+  const meeting = await db('meetings').where('id', data.meetingId).first('chat_channel_id', 'source_channel_id')
+  if (!meeting) return null
+  const channelIds = [meeting.chat_channel_id, meeting.source_channel_id].filter(Boolean)
+  const members = await db('channel_members').whereIn('channel_id', channelIds).distinct('user_id')
+  return members.map(({ user_id }) => app.channel(`user/${user_id}`))
+}
+
 export const channels = (app) => {
   if (typeof app.channel !== 'function') {
     return
@@ -96,7 +105,7 @@ export const channels = (app) => {
     return targetChannels
   })
   app.service('meetings').publish('joined', (data) => app.channel(`channel/${data.chatChannelId}`))
-  app.service('meetings').publish('ended', (data) => app.channel(`channel/${data.chatChannelId}`))
+  app.service('meetings').publish('ended', (data) => publishMeetingEnd(app, data))
   app.service('meetings').publish('artifacts-queued', (data) => app.channel(`channel/${data.chatChannelId}`))
   app.service('meetings').publish('artifacts-updated', (data) => app.channel(`channel/${data.chatChannelId}`))
   app.service('meetings').publish('recording-state-updated', (data) => app.channel(`channel/${data.chatChannelId}`))

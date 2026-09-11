@@ -19,6 +19,25 @@ ZZFX.volume = 0.35
 
 const lastPlayedAt = new Map()
 
+export async function prepareSfxAudio() {
+  const context = ZZFX.audioContext
+  if (!context || context.state === 'closed') return false
+  try {
+    if (context.state !== 'running') await context.resume()
+    return context.state === 'running'
+  } catch { return false }
+}
+
+export function initializeSfxAudio(target = globalThis.document) {
+  const activate = () => { prepareSfxAudio().catch(() => {}) }
+  target?.addEventListener('pointerdown', activate, { capture: true, passive: true })
+  target?.addEventListener('keydown', activate, { capture: true, passive: true })
+  return () => {
+    target?.removeEventListener('pointerdown', activate, { capture: true })
+    target?.removeEventListener('keydown', activate, { capture: true })
+  }
+}
+
 const EVENT_RULES = Object.freeze({
   [SFX_EVENTS.NOTIFICATION]: {
     onlyWhenHidden: true,

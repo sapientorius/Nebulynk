@@ -189,9 +189,8 @@ vi.mock('../../src/stores/ui.js', () => ({
 vi.mock('../../src/stores/meetings.js', () => ({
   useMeetingsStore: () => meetingsStoreMock
 }))
-vi.mock('../../src/stores/meeting-calls.js', () => ({
-  useMeetingCallsStore: () => ({ refresh: vi.fn().mockResolvedValue(undefined), reset: vi.fn() })
-}))
+const meetingCallsStoreMock = vi.hoisted(() => ({ refresh: vi.fn().mockResolvedValue(undefined), startRecovery: vi.fn(), reset: vi.fn() }))
+vi.mock('../../src/stores/meeting-calls.js', () => ({ useMeetingCallsStore: () => meetingCallsStoreMock }))
 
 function resetMocks() {
   apiMock.get.mockReset()
@@ -1172,11 +1171,14 @@ describe('session store api actions', () => {
     await store.destroy()
     await store.init()
     voiceStoreMock.reconnectIfNeeded.mockClear()
+    expect(meetingCallsStoreMock.startRecovery).toHaveBeenCalled()
+    meetingCallsStoreMock.refresh.mockClear()
 
     expect(store.presenceSyncPending).toBe(true)
     expect(store.onlineUserIds).toEqual([])
 
     await authenticatedHandler(socket)
+    expect(meetingCallsStoreMock.refresh).toHaveBeenCalledOnce()
 
     expect(store.presenceSyncPending).toBe(false)
     expect(store.onlineUserIds).toEqual(['user-self', 'user-2'])

@@ -176,6 +176,7 @@ export default {
       autoReadForegroundRecheckFrame: null,
       meetingCardByMessageId: {},
       loadingMeetingById: {},
+      checkedMeetingById: {},
       joiningMeetingById: {},
       collapsibleMessageIds: {},
       expandedMessageIds: {},
@@ -319,6 +320,7 @@ export default {
       this.autoReadPendingMessageIds = {}
       this.meetingCardByMessageId = {}
       this.loadingMeetingById = {}
+      this.checkedMeetingById = {}
       this.joiningMeetingById = {}
       this.messageSummariesStore.cancelSelection()
       this.messageSummariesStore.clearChannel(this.activeChannelId)
@@ -858,17 +860,19 @@ export default {
       if (!meetingId) return
       const meeting = this.meetingsStore.getMeetingById(meetingId)
       const requiresFullDetail = Boolean(meeting && meeting.status === 'ended' && meeting.detail_level !== 'full')
-      if (meeting && !requiresFullDetail) return
+      const requiresStatus = meeting?.status === 'active' && !this.checkedMeetingById?.[meetingId]
+      if (meeting && !requiresFullDetail && !requiresStatus) return
       if (this.loadingMeetingById[meetingId]) return
 
       this.loadingMeetingById = {
         ...this.loadingMeetingById,
         [meetingId]: true
       }
+      this.checkedMeetingById = { ...this.checkedMeetingById, [meetingId]: true }
 
       this.meetingsStore.ensureMeetingLoaded(
         meetingId,
-        requiresFullDetail ? { detail: 'full' } : {}
+        requiresFullDetail ? { detail: 'full' } : requiresStatus ? { force: true } : {}
       )
         .catch(() => {})
         .finally(() => {
@@ -887,7 +891,7 @@ export default {
       if (!meetingId) return
       if (this.joiningMeetingById[meetingId]) return
 
-      const meeting = await this.meetingsStore.ensureMeetingLoaded(meetingId).catch(() => null)
+      const meeting = await this.meetingsStore.ensureMeetingLoaded(meetingId, { force: true }).catch(() => null)
       if (!meeting || meeting.status !== 'active') return
       if (this.voiceStore.channelId === meeting.chat_channel_id) return
 

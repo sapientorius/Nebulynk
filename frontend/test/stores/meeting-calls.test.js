@@ -5,20 +5,74 @@ import { useMeetingCallsStore } from '../../src/stores/meeting-calls.js'
 const mocks = vi.hoisted(() => ({
   api: { get: vi.fn(), post: vi.fn(), patch: vi.fn() },
   session: { user: { id: 'caller' } },
-  meetings: { join: vi.fn(), activeMeetingId: null },
-  push: vi.fn(), sound: vi.fn()
+  meetings: { join: vi.fn(), activeMeetingId: null, reconcileConnectedMeeting: vi.fn(), ensureMeetingLoaded: vi.fn(), isMeetingEnded: vi.fn(() => false) },
+  push: vi.fn(), sound: vi.fn(), prepareSound: vi.fn()
 }))
 vi.mock('../../src/lib/api.js', () => ({ default: mocks.api }))
 vi.mock('../../src/router/index.js', () => ({ default: { push: mocks.push } }))
 vi.mock('../../src/stores/session.js', () => ({ useSessionStore: () => mocks.session }))
 vi.mock('../../src/stores/meetings.js', () => ({ useMeetingsStore: () => mocks.meetings }))
-vi.mock('../../src/lib/sfx.js', () => ({ playSfx: mocks.sound, SFX_EVENTS: { CALL_INCOMING: 'incoming', CALL_OUTGOING: 'outgoing' } }))
+vi.mock('../../src/lib/sfx.js', () => ({ playSfx: mocks.sound, prepareSfxAudio: mocks.prepareSound, SFX_EVENTS: { CALL_INCOMING: 'incoming', CALL_OUTGOING: 'outgoing' } }))
 
 let store
 const call = (overrides = {}) => ({ id: 'call', caller_id: 'caller', source_channel_id: 'source',
   status: 'ringing', recipient_status: 'invited', expires_at: new Date(Date.now() + 60_000).toISOString(), ...overrides })
 
 describe('meeting call signaling', () => {
+  it.each(['navigation', 'end'])('does not reopen a meeting when a delayed join finishes after %s', async reason => {
+    let release
+    mocks.meetings.activeMeetingId = 'meeting'
+    mocks.meetings.join.mockReturnValue(new Promise(resolve => { release = resolve }))
+    const entering = store.enter(call({ meeting_id: 'meeting' }))
+    if (reason === 'navigation') mocks.meetings.activeMeetingId = null
+    else mocks.meetings.isMeetingEnded.mockReturnValue(true)
+    release({})
+    await entering
+    expect(mocks.push).not.toHaveBeenCalled()
+  })
+  it.each(['invited', 'accepted'])('hides recovered %s invitations and join offers for a known ended meeting', async recipient_status => {
+    mocks.session.user.id = 'alice'
+    mocks.meetings.isMeetingEnded.mockReturnValue(true)
+    mocks.api.get.mockResolvedValue({ data: call({ status: 'accepted', recipient_status, meeting_id: 'ended', meeting_status: 'active' }) })
+    await store.load('call')
+    expect(store.incoming).toEqual([])
+    expect(store.available).toEqual([])
+    expect(mocks.sound).not.toHaveBeenCalled()
+  })
+  it.each(['cancel', 'accept', 'logout', 'expire'])('does not ring after delayed audio activation and %s', async outcome => {
+    mocks.session.user.id = 'alice'
+    let release
+    mocks.prepareSound.mockReturnValue(new Promise(resolve => { release = resolve }))
+    const original = call()
+    mocks.api.get.mockResolvedValue({ data: original })
+    await store.load('call')
+    if (outcome === 'logout') store.reset()
+    if (outcome === 'cancel') {
+      mocks.api.get.mockResolvedValue({ data: { ...original, status: 'cancelled' } })
+      await store.load('call')
+    }
+    if (outcome === 'accept') {
+      mocks.api.get.mockResolvedValue({ data: { ...original, status: 'accepted', recipient_status: 'accepted' } })
+      await store.load('call')
+    }
+    if (outcome === 'expire') await vi.advanceTimersByTimeAsync(61000)
+    release(true)
+    await vi.advanceTimersByTimeAsync(0)
+    expect(mocks.sound).not.toHaveBeenCalled()
+  })
+
+  it('hydrates the meeting before discarding an accepted call missing from discovery, and retries failures', async () => {
+    const accepted = call({ status: 'accepted', meeting_id: 'meeting', meeting_status: 'active' })
+    mocks.api.get.mockResolvedValueOnce({ data: accepted })
+    await store.load('call')
+    mocks.api.get.mockResolvedValue({ data: [] })
+    mocks.meetings.ensureMeetingLoaded.mockRejectedValueOnce(new Error('offline'))
+    await store.refresh()
+    expect(store.calls).toHaveLength(1)
+    await store.refresh()
+    expect(store.calls).toHaveLength(0)
+    expect(mocks.meetings.ensureMeetingLoaded).toHaveBeenCalledWith('meeting', { force: true })
+  })
   it('rings immediately and every four seconds, without restarting on duplicate loads', async () => {
     mocks.session.user.id = 'alice'
     mocks.api.get.mockResolvedValue({ data: call() })
@@ -63,14 +117,108 @@ describe('meeting call signaling', () => {
   beforeEach(() => {
     vi.useFakeTimers()
     vi.resetAllMocks()
+    mocks.prepareSound.mockResolvedValue(true)
+    mocks.meetings.reconcileConnectedMeeting.mockResolvedValue(undefined)
+    mocks.meetings.ensureMeetingLoaded.mockResolvedValue(undefined)
+    mocks.meetings.isMeetingEnded.mockReturnValue(false)
     setActivePinia(createPinia())
     mocks.session.user.id = 'caller'
     mocks.meetings.activeMeetingId = null
-    mocks.meetings.join.mockResolvedValue({})
+    mocks.meetings.join.mockImplementation(async id => { mocks.meetings.activeMeetingId = id; return {} })
     mocks.push.mockResolvedValue(undefined)
     store = useMeetingCallsStore()
   })
-  afterEach(() => { store.$dispose(); vi.useRealTimers() })
+  afterEach(() => { store.$dispose(); vi.useRealTimers(); vi.unstubAllGlobals() })
+
+  it('discovers an unknown incoming call without navigation and coalesces list requests', async () => {
+    mocks.session.user.id = 'alice'
+    mocks.api.get.mockResolvedValue({ data: [] })
+    store.startRecovery()
+    store.startRecovery()
+    await store.refresh()
+    expect(mocks.api.get).toHaveBeenCalledExactlyOnceWith('/meeting-calls')
+    const incoming = call()
+    mocks.api.get.mockImplementation(async path => ({ data: path === '/meeting-calls' ? [incoming] : incoming }))
+    await vi.advanceTimersByTimeAsync(5000)
+    expect(store.incoming).toHaveLength(1)
+    expect(mocks.sound).toHaveBeenCalledExactlyOnceWith('incoming')
+    expect(mocks.meetings.join).not.toHaveBeenCalled()
+  })
+
+  it('discovers while hidden and refreshes immediately on tab return', async () => {
+    const doc = new EventTarget()
+    doc.visibilityState = 'hidden'
+    vi.stubGlobal('document', doc)
+    mocks.api.get.mockResolvedValue({ data: [] })
+    store.startRecovery()
+    await vi.advanceTimersByTimeAsync(15000)
+    expect(mocks.api.get).toHaveBeenCalledTimes(4)
+    doc.visibilityState = 'visible'
+    doc.dispatchEvent(new Event('visibilitychange'))
+    await store.refresh()
+    expect(mocks.api.get).toHaveBeenCalledTimes(5)
+    store.reset()
+    doc.dispatchEvent(new Event('visibilitychange'))
+    await vi.advanceTimersByTimeAsync(10000)
+    expect(mocks.api.get).toHaveBeenCalledTimes(5)
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('does not start discovery without an authenticated user', async () => {
+    const id = mocks.session.user.id
+    delete mocks.session.user.id
+    store.startRecovery()
+    await vi.advanceTimersByTimeAsync(10000)
+    expect(mocks.api.get).not.toHaveBeenCalled()
+    expect(vi.getTimerCount()).toBe(0)
+    mocks.session.user.id = id
+  })
+
+  it('keeps a new session refresh separate from a stale list after logout', async () => {
+    let resolveOld, resolveNew
+    mocks.api.get.mockReturnValueOnce(new Promise(done => { resolveOld = done }))
+    const old = store.refresh()
+    store.reset()
+    mocks.api.get.mockReturnValueOnce(new Promise(done => { resolveNew = done }))
+    const current = store.refresh()
+    resolveOld({ data: [call()] })
+    await old
+    const concurrent = store.refresh()
+    expect(mocks.api.get).toHaveBeenCalledTimes(2)
+    resolveNew({ data: [] })
+    await Promise.all([current, concurrent])
+    expect(store.calls).toEqual([])
+    expect(mocks.api.get).toHaveBeenCalledTimes(2)
+  })
+
+  it('retries discovery after a failed request without overlapping slow requests', async () => {
+    mocks.api.get.mockRejectedValueOnce(new Error('offline'))
+    store.startRecovery()
+    await vi.advanceTimersByTimeAsync(0)
+    let resolve
+    mocks.api.get.mockReturnValueOnce(new Promise(done => { resolve = done }))
+    await vi.advanceTimersByTimeAsync(15000)
+    expect(mocks.api.get).toHaveBeenCalledTimes(2)
+    store.reset()
+    resolve({ data: [call()] })
+    await vi.advanceTimersByTimeAsync(5000)
+    expect(store.calls).toEqual([])
+    expect(mocks.sound).not.toHaveBeenCalled()
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('preserves the call and its timer even when audio throws', async () => {
+    mocks.session.user.id = 'alice'
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    mocks.sound.mockImplementation(() => { throw new Error('audio unavailable') })
+    mocks.api.get.mockResolvedValue({ data: call() })
+    try {
+      await store.load('call')
+      expect(store.incoming).toHaveLength(1)
+      await vi.advanceTimersByTimeAsync(4000)
+      expect(mocks.sound).toHaveBeenCalledTimes(2)
+    } finally { warning.mockRestore() }
+  })
 
   it('stays in the chat with no media join while ringing', async () => {
     const data = call({ created_new: true })

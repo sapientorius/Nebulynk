@@ -142,7 +142,7 @@ test('registered invite deduplicates existing invitees and cancel revokes guest 
   assert.equal(h.events.at(-1).payload.status, 'cancelled')
 })
 
-test('registered end commits archive and participant state before room cleanup and emits unchanged payloads', async t => {
+test('registered end commits and emits its terminal payload before room cleanup', async t => {
   const h = await harness(t)
   const meeting = await h.service.create({ source_channel_id: 'source', initial_user_ids: ['invited'] }, h.params)
   h.events.length = 0
@@ -151,7 +151,7 @@ test('registered end commits archive and participant state before room cleanup a
     assert.equal(channelId, meeting.chat_channel_id)
     assert.equal((await db('meetings').where('id', meeting.id).first()).status, 'ended')
     assert.equal((await db('channels').where('id', channelId).first()).is_archived, true)
-    assert.equal(h.events.length, 0)
+    assert.deepEqual(h.events.map(entry => entry.event), ['ended'])
     cleanupObserved = true
     throw new Error('synthetic room cleanup failure')
   })
@@ -160,21 +160,22 @@ test('registered end commits archive and participant state before room cleanup a
   assert.equal(cleanupObserved, true)
   assert.equal((await db('meeting_participants').where('meeting_id', meeting.id).whereNotNull('left_at')).length, 1)
   assert.equal((await db('meeting_participants').where({ meeting_id: meeting.id, user_id: 'invited' }).first()).left_at, null)
-  assert.deepEqual(h.events.map(entry => entry.event), ['channel', 'ended'])
-  assert.deepEqual(h.events[1].payload, {
+  assert.deepEqual(h.events.map(entry => entry.event), ['ended', 'channel'])
+  assert.deepEqual(h.events[0].payload, {
     meetingId: meeting.id, chatChannelId: meeting.chat_channel_id, endedAt: new Date(ended.ended_at).toISOString(),
+    sourceChannelId: 'source',
     endedBy: 'host', status: 'ended', chatChannelArchived: true
   })
 })
 
-test('voice-row failure after end commit preserves archived state without early end events', async t => {
+test('voice-row failure after end commit does not suppress its confirmed end event', async t => {
   const h = await harness(t)
   const meeting = await h.service.create({ source_channel_id: 'source' }, h.params)
   await db('voice_participants').insert({ id: 'voice-host', channel_id: meeting.chat_channel_id, user_id: 'host' })
   h.events.length = 0
   await failWrite(t, 'voice_participants', 'DELETE')
-  await assert.rejects(h.service.patch(meeting.id, { action: 'end' }, h.params), /synthetic AP-04 database failure/)
+  assert.equal((await h.service.patch(meeting.id, { action: 'end' }, h.params)).status, 'ended')
   assert.equal((await db('meetings').where('id', meeting.id).first()).status, 'ended')
   assert.equal((await db('channels').where('id', meeting.chat_channel_id).first()).is_archived, true)
-  assert.deepEqual(h.events, [])
+  assert.deepEqual(h.events.map(entry => entry.event), ['ended', 'channel'])
 })

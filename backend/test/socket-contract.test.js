@@ -119,7 +119,19 @@ test('socket contract: meeting invitations without target users are not broadcas
   assert.equal(invited({}), null)
 })
 
-for (const event of ['joined', 'ended', 'artifacts-queued', 'artifacts-updated']) {
+test('socket contract: meeting end uses member personal channels and preserves its payload', async () => {
+  const harness = createAppHarness()
+  harness.app.get = () => table => table === 'meetings'
+    ? { where: () => ({ first: async () => ({ chat_channel_id: 'private-meeting-chat', source_channel_id: 'source' }) }) }
+    : { whereIn: () => ({ distinct: async () => [{ user_id: 'member' }] }) }
+  channels(harness.app)
+  const payload = Object.freeze({ meetingId: 'meeting-one', chatChannelId: 'private-meeting-chat', sourceChannelId: 'source', status: 'ended' })
+  const publish = harness.getPublishHandler('meetings', 'ended')
+  assert.deepEqual((await publish(payload)).map(channel => channel.name), ['user/member'])
+  assert.equal(payload.sourceChannelId, 'source')
+})
+
+for (const event of ['joined', 'artifacts-queued', 'artifacts-updated']) {
   test(`socket contract: meeting ${event} stays within its chat room and preserves its payload`, () => {
     const harness = createAppHarness()
     channels(harness.app)

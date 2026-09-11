@@ -7,8 +7,8 @@ describe('static source contract: MessageList meeting card hydration', () => {
     const source = readFileSync(resolve('src/components/MessageList.vue'), 'utf8')
 
     expect(source).toContain("const requiresFullDetail = Boolean(meeting && meeting.status === 'ended' && meeting.detail_level !== 'full')")
-    expect(source).toContain("if (meeting && !requiresFullDetail) return")
-    expect(source).toContain("requiresFullDetail ? { detail: 'full' } : {}")
+    expect(source).toContain("if (meeting && !requiresFullDetail && !requiresStatus) return")
+    expect(source).toContain("requiresFullDetail ? { detail: 'full' } : requiresStatus ? { force: true } : {}")
     expect(source).toContain('this.meetingsStore.ensureMeetingLoaded(')
   })
 

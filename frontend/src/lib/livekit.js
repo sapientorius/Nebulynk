@@ -10,6 +10,7 @@ import {
 
 let room = null
 let callbacks = {}
+const roomDisconnections = new WeakMap()
 const configuredLivekitUrl = import.meta.env.VITE_LIVEKIT_URL?.trim() || ''
 const useFakeLivekit = import.meta.env.VITE_FAKE_LIVEKIT === 'true'
 const BACKGROUND_BLUR_ASSET_PATHS = Object.freeze({
@@ -557,6 +558,8 @@ export async function connectToRoom(token, serverUrl) {
     adaptiveStream: true,
     dynacast: true
   })
+  const connectedRoom = room
+  const connectionCallbacks = callbacks
 
   // Set up event listeners
   room.on(RoomEvent.ParticipantConnected, (participant) => {
@@ -642,11 +645,12 @@ export async function connectToRoom(token, serverUrl) {
     callbacks.onTrackUnmuted?.(participant.identity)
   })
 
-  room.on(RoomEvent.Disconnected, () => {
+  room.on(RoomEvent.Disconnected, (reason) => {
+    if (room !== connectedRoom) return
     localCameraTrack = null
     localCameraBlurEnabled = false
     cleanupLocalScreenShareState({ emitStopped: true })
-    callbacks.onDisconnected?.()
+    connectionCallbacks.onDisconnected?.({ reason, connection: connectedRoom })
   })
 
   // Connect and enable microphone
@@ -654,35 +658,52 @@ export async function connectToRoom(token, serverUrl) {
   if (!resolvedUrl) {
     throw new Error('Keine LiveKit-URL konfiguriert')
   }
-  await room.connect(resolvedUrl, token)
+  await connectedRoom.connect(resolvedUrl, token)
+  if (room !== connectedRoom) {
+    await connectedRoom.disconnect(true)
+    return
+  }
   syncExistingRemoteMediaState()
   try {
-    await room.localParticipant.setMicrophoneEnabled(true)
+    await connectedRoom.localParticipant.setMicrophoneEnabled(true)
   } catch (error) {
     // Joining the room succeeded; keep listen-only mode when mic activation fails.
     console.warn('[Voice] Microphone activation failed, continuing in listen-only mode:', error)
   }
 }
 
-export async function disconnectFromRoom(options = {}) {
+export function disconnectFromRoom(options = {}) {
+  if (!room) return Promise.resolve()
+  const targetRoom = room
+  if (roomDisconnections.has(targetRoom)) return roomDisconnections.get(targetRoom)
+  const task = disconnectOwnedRoom(options).finally(() => roomDisconnections.delete(targetRoom))
+  roomDisconnections.set(targetRoom, task)
+  return task
+}
+
+async function disconnectOwnedRoom(options = {}) {
   const { suppressErrors = false } = options
   if (!room) return
+  const disconnectingRoom = room
+  const disconnectCallbacks = callbacks
 
   await stopScreenShare({ suppressErrors: true, skipCallback: true })
+  if (room !== disconnectingRoom) return
   await stopCamera({ suppressErrors: true, skipCallback: true })
+  if (room !== disconnectingRoom) return
 
   if (useFakeLivekit) {
     room = null
     localCameraTrack = null
     localCameraBlurEnabled = false
     cleanupLocalScreenShareState()
-    callbacks.onDisconnected?.()
+    disconnectCallbacks.onDisconnected?.({ connection: disconnectingRoom })
     return
   }
 
   let disconnectError = null
   try {
-    await room.disconnect(true)
+    await disconnectingRoom.disconnect(true)
   } catch (error) {
     disconnectError = error
     if (!suppressErrors) {
@@ -690,12 +711,12 @@ export async function disconnectFromRoom(options = {}) {
     }
     console.warn('[Voice] Room disconnect failed during handover:', error)
   } finally {
-    room = null
-    localCameraTrack = null
-    localCameraBlurEnabled = false
-    cleanupLocalScreenShareState()
-    if (disconnectError) {
-      callbacks.onDisconnected?.()
+    if (room === disconnectingRoom) {
+      room = null
+      localCameraTrack = null
+      localCameraBlurEnabled = false
+      cleanupLocalScreenShareState()
+      if (disconnectError) disconnectCallbacks.onDisconnected?.({ connection: disconnectingRoom })
     }
   }
 }

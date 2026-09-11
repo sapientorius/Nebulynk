@@ -118,6 +118,9 @@ export const useMeetingsStore = defineStore('meetings', () => {
   const pendingMeetingLoads = new Map()
   const pendingSourceMeetingLoads = new Map()
   const sourceHistoryAccessGenerations = new Map()
+  const terminalMeetings = new Map()
+  const endingConnections = new Map()
+  let connectedMeetingRequest = null
   let recoveryRefreshTimeoutId = null
   let activationGeneration = 0
   let runtimeGeneration = 0
@@ -174,6 +177,9 @@ export const useMeetingsStore = defineStore('meetings', () => {
 
   function reset() {
     runtimeGeneration++
+    terminalMeetings.clear()
+    endingConnections.clear()
+    connectedMeetingRequest = null
     meetings.value = []
     clearActive()
     callRuntime.stop()
@@ -243,6 +249,7 @@ export const useMeetingsStore = defineStore('meetings', () => {
 
   function upsertMeeting(meeting) {
     if (!meeting?.id) return
+    meeting = preserveTerminalMeeting(meeting)
     const index = meetings.value.findIndex((entry) => entry.id === meeting.id)
     const existing = index === -1 ? null : meetings.value[index]
     const nextMeeting = mergeMeetingRecords(existing, meeting)
@@ -257,6 +264,61 @@ export const useMeetingsStore = defineStore('meetings', () => {
     }
 
     ensureMeetingChannel(nextMeeting)
+    if (isTerminal(nextMeeting)) cleanupEndedMeeting(nextMeeting).catch(() => {})
+    return nextMeeting
+  }
+
+  function isTerminal(meeting) {
+    return ['ended', 'cancelled'].includes(meeting?.status)
+  }
+
+  function isMeetingEnded(meetingId) {
+    const meeting = getMeetingById(meetingId)
+    return terminalMeetings.has(meetingId) || isTerminal(meeting)
+  }
+
+  function preserveTerminalMeeting(meeting) {
+    if (isTerminal(meeting)) {
+      const previous = terminalMeetings.get(meeting.id) || {}
+      terminalMeetings.set(meeting.id, {
+        ...previous, status: meeting.status,
+        ...(meeting.ended_at ? { ended_at: meeting.ended_at } : {}),
+        ...(meeting.ended_by ? { ended_by: meeting.ended_by } : {}),
+        ...(meeting.chat_channel_id ? { chat_channel_id: meeting.chat_channel_id } : {})
+      })
+    }
+    const terminal = terminalMeetings.get(meeting.id)
+    return terminal ? { ...meeting, ...terminal, chat_channel: { ...meeting.chat_channel, is_archived: true } } : meeting
+  }
+
+  async function cleanupEndedMeeting(meeting) {
+    clearIncomingCall(meeting.id)
+    const chatId = meeting.chat_channel_id
+    if (!chatId) return
+    if (endingConnections.has(meeting.id)) return endingConnections.get(meeting.id)
+    const voiceStore = useVoiceStore()
+    // Clear peer indicators immediately; media teardown must not delay the card.
+    voiceStore.clearChannelState(chatId)
+    if (voiceStore.channelId !== chatId) return
+    const task = Promise.resolve(voiceStore.leave({ playLeaveSfx: false, notifyErrors: false, skipBackendLeave: true }))
+      .catch(() => {}).finally(() => {
+        if (endingConnections.get(meeting.id) === task) endingConnections.delete(meeting.id)
+      })
+    endingConnections.set(meeting.id, task)
+    return task
+  }
+
+  function reconcileConnectedMeeting() {
+    if (connectedMeetingRequest) return connectedMeetingRequest
+    const channelId = useVoiceStore().channelId
+    const meeting = pickMeetingByChatChannelId(meetings.value, channelId)
+      || (channelId && activeMeeting.value?.chat_channel_id === channelId ? activeMeeting.value : null)
+    if (!meeting || isTerminal(meeting)) return Promise.resolve()
+    const task = ensureMeetingLoaded(meeting.id, { force: true }).finally(() => {
+      if (connectedMeetingRequest === task) connectedMeetingRequest = null
+    })
+    connectedMeetingRequest = task
+    return task
   }
 
   function scheduleRecoveryRefresh(includeEnded = true) {
@@ -271,8 +333,7 @@ export const useMeetingsStore = defineStore('meetings', () => {
   function mergeMeetingRealtimePatch(meetingId, patch = {}) {
     if (!meetingId) return null
 
-    const existing = getMeetingById(meetingId)
-    if (!existing) return null
+    const existing = getMeetingById(meetingId) || { id: meetingId }
 
     const nextMeeting = {
       ...existing,
@@ -293,6 +354,8 @@ export const useMeetingsStore = defineStore('meetings', () => {
   function removeOrArchiveMeetingLocally(meetingId, eventPayload = {}) {
     return mergeMeetingRealtimePatch(meetingId, {
       status: eventPayload.status || 'ended',
+      ...(eventPayload.chatChannelId ? { chat_channel_id: eventPayload.chatChannelId } : {}),
+      ...(eventPayload.sourceChannelId ? { source_channel_id: eventPayload.sourceChannelId } : {}),
       ended_at: eventPayload.endedAt || null,
       ended_by: eventPayload.endedBy || null,
       chat_channel: {
@@ -333,6 +396,7 @@ export const useMeetingsStore = defineStore('meetings', () => {
   }
 
   async function refresh(includeEnded = false, extraParams = {}, retryOnHistoryAccessChange = true) {
+    const requestGeneration = runtimeGeneration
     const revision = historyAccessRevision.value
     try {
       const { data } = await api.get('/meetings', {
@@ -340,6 +404,7 @@ export const useMeetingsStore = defineStore('meetings', () => {
           ? { include_ended: true, $limit: 100, ...extraParams }
           : { $limit: 100, ...extraParams }
       })
+      if (requestGeneration !== runtimeGeneration) return
       if (revision !== historyAccessRevision.value) {
         if (retryOnHistoryAccessChange) {
           return refresh(includeEnded, extraParams, false)
@@ -347,9 +412,10 @@ export const useMeetingsStore = defineStore('meetings', () => {
         return
       }
       const previousById = new Map(meetings.value.map((meeting) => [meeting.id, meeting]))
-      meetings.value = asList(data).map((meeting) => mergeMeetingRecords(previousById.get(meeting.id), meeting))
+      meetings.value = asList(data).map((meeting) => mergeMeetingRecords(previousById.get(meeting.id), preserveTerminalMeeting(meeting)))
       for (const meeting of meetings.value) {
         ensureMeetingChannel(meeting)
+        if (isTerminal(meeting)) cleanupEndedMeeting(meeting).catch(() => {})
       }
 
       if (activeMeetingId.value) {
@@ -364,6 +430,7 @@ export const useMeetingsStore = defineStore('meetings', () => {
   }
 
   async function loadOverviewBuckets(options = {}, retryOnHistoryAccessChange = true) {
+    const requestGeneration = runtimeGeneration
     const revision = historyAccessRevision.value
     const requestedPastVisibleCount = Number(options.pastVisibleCount)
     const pastVisibleCount = Number.isFinite(requestedPastVisibleCount)
@@ -399,6 +466,7 @@ export const useMeetingsStore = defineStore('meetings', () => {
       })
     ])
 
+    if (requestGeneration !== runtimeGeneration) return { upcoming: [], live: [], past: [], pastHasMore: false }
     if (revision !== historyAccessRevision.value) {
       if (retryOnHistoryAccessChange) {
         return loadOverviewBuckets(options, false)
@@ -411,9 +479,9 @@ export const useMeetingsStore = defineStore('meetings', () => {
       }
     }
 
-    const upcoming = asList(upcomingResponse.data)
-    const live = asList(liveResponse.data)
-    const pastWithProbe = asList(pastResponse.data)
+    const upcoming = asList(upcomingResponse.data).map(preserveTerminalMeeting)
+    const live = asList(liveResponse.data).map(preserveTerminalMeeting)
+    const pastWithProbe = asList(pastResponse.data).map(preserveTerminalMeeting)
     const pastHasMore = pastWithProbe.length > pastVisibleCount
     const past = pastHasMore
       ? pastWithProbe.slice(0, pastVisibleCount)
@@ -432,6 +500,7 @@ export const useMeetingsStore = defineStore('meetings', () => {
   }
 
   async function get(meetingId, { retryOnHistoryAccessChange = true, isCurrent = () => true } = {}) {
+    const requestGeneration = runtimeGeneration
     const knownMeeting = getMeetingById(meetingId)
     const sourceChannelId = knownMeeting?.source_channel_id || null
     const generation = sourceChannelId
@@ -439,7 +508,7 @@ export const useMeetingsStore = defineStore('meetings', () => {
       : null
     const revision = historyAccessRevision.value
     const { data } = await api.get(`/meetings/${meetingId}`)
-    if (!isCurrent()) return null
+    if (!isCurrent() || requestGeneration !== runtimeGeneration) return null
     const responseSourceChannelId = data?.source_channel_id || sourceChannelId
     const sourceAccessChanged = responseSourceChannelId && (
       generation !== null
@@ -452,8 +521,7 @@ export const useMeetingsStore = defineStore('meetings', () => {
       }
       return null
     }
-    upsertMeeting(data)
-    return data
+    return upsertMeeting(data)
   }
 
   function getMeetingById(meetingId) {
@@ -484,7 +552,7 @@ export const useMeetingsStore = defineStore('meetings', () => {
 
     const request = get(meetingId)
       .finally(() => {
-        pendingMeetingLoads.delete(meetingId)
+        if (pendingMeetingLoads.get(meetingId) === request) pendingMeetingLoads.delete(meetingId)
       })
 
     pendingMeetingLoads.set(meetingId, request)
@@ -493,6 +561,7 @@ export const useMeetingsStore = defineStore('meetings', () => {
 
   async function fetchActiveBySourceChannel(sourceChannelId) {
     if (!sourceChannelId) return null
+    const requestGeneration = runtimeGeneration
     const { data } = await api.get('/meetings', {
       params: {
         source_channel_id: sourceChannelId,
@@ -501,7 +570,8 @@ export const useMeetingsStore = defineStore('meetings', () => {
       }
     })
 
-    const list = asList(data)
+    if (requestGeneration !== runtimeGeneration) return null
+    const list = asList(data).map(preserveTerminalMeeting)
     const meeting = list.find((entry) => entry.status === 'active') || null
     if (meeting) {
       upsertMeeting(meeting)
@@ -511,6 +581,7 @@ export const useMeetingsStore = defineStore('meetings', () => {
 
   async function fetchBySourceChannel(sourceChannelId, options = {}) {
     if (!sourceChannelId) return []
+    const requestGeneration = runtimeGeneration
     const {
       includeEnded = true,
       detail = 'summary',
@@ -541,11 +612,12 @@ export const useMeetingsStore = defineStore('meetings', () => {
       }
     })
       .then(({ data }) => {
+        if (requestGeneration !== runtimeGeneration) return []
         if (generation !== getSourceHistoryAccessGeneration(sourceChannelId)) {
           return fetchBySourceChannel(sourceChannelId, options)
         }
 
-        const list = asList(data)
+        const list = asList(data).map(preserveTerminalMeeting)
         for (const meeting of list) {
           upsertMeeting(meeting)
         }
@@ -672,20 +744,22 @@ export const useMeetingsStore = defineStore('meetings', () => {
   }
 
   async function join(meetingId, options = {}) {
+    const requestGeneration = runtimeGeneration
     const { data } = await api.patch(`/meetings/${meetingId}`, {
       action: 'join',
       ...options
     })
-    const meeting = data.meeting
+    if (requestGeneration !== runtimeGeneration) return null
+    const meeting = upsertMeeting(data.meeting)
     const voicePayload = data.voice
-
-    upsertMeeting(meeting)
+    if (isTerminal(meeting)) return { ...data, meeting }
     activeMeetingId.value = meeting.id
     activeMeeting.value = meeting
     clearIncomingCall(meeting.id)
 
     const channelsStore = useChannelsStore()
     await channelsStore.select(meeting.chat_channel_id)
+    if (requestGeneration !== runtimeGeneration || terminalMeetings.has(meeting.id)) return null
 
     const voiceStore = useVoiceStore()
     try {
@@ -693,7 +767,8 @@ export const useMeetingsStore = defineStore('meetings', () => {
         ...voicePayload,
         channelName: resolveMeetingDisplayTitle(meeting, { tFn: t })
       }, {
-        requestMicrophonePermission: true
+        requestMicrophonePermission: true,
+        isCurrent: () => requestGeneration === runtimeGeneration && !terminalMeetings.has(meeting.id)
       })
     } catch (error) {
       console.error('Meeting joined, but voice connection failed:', error)
@@ -707,19 +782,12 @@ export const useMeetingsStore = defineStore('meetings', () => {
   }
 
   async function end(meetingId, reason = null) {
+    const requestGeneration = runtimeGeneration
     const payload = reason ? { action: 'end', reason } : { action: 'end' }
     const { data } = await api.patch(`/meetings/${meetingId}`, payload)
+    if (requestGeneration !== runtimeGeneration) return null
     upsertMeeting(data)
-    clearIncomingCall(meetingId)
-
-    const voiceStore = useVoiceStore()
-    if (voiceStore.channelId === data.chat_channel_id) {
-      await voiceStore.leave({
-        playLeaveSfx: false,
-        notifyErrors: false,
-        skipBackendLeave: true
-      })
-    }
+    await cleanupEndedMeeting(data)
 
     return data
   }
@@ -968,30 +1036,10 @@ export const useMeetingsStore = defineStore('meetings', () => {
 
   async function handleMeetingEnded(eventPayload) {
     if (!eventPayload?.meetingId) return
-    clearIncomingCall(eventPayload.meetingId)
-
-    const endedMeeting = meetings.value.find((entry) => entry.id === eventPayload.meetingId)
-      || (activeMeetingId.value === eventPayload.meetingId ? activeMeeting.value : null)
-    const endedChatChannelId = eventPayload.chatChannelId || endedMeeting?.chat_channel_id || null
-
-    const voiceStore = useVoiceStore()
-    if (endedChatChannelId && voiceStore.channelId === endedChatChannelId) {
-      try {
-        await voiceStore.leave({
-          playLeaveSfx: false,
-          notifyErrors: false,
-          skipBackendLeave: true
-        })
-      } catch {
-        // Ignore; meeting cleanup should still continue.
-      }
-    }
-
-    removeOrArchiveMeetingLocally(eventPayload.meetingId, eventPayload)
-    if (endedChatChannelId) {
-      voiceStore.clearChannelState(endedChatChannelId)
-    }
-
+    const generation = runtimeGeneration
+    const meeting = removeOrArchiveMeetingLocally(eventPayload.meetingId, eventPayload)
+    await cleanupEndedMeeting(meeting)
+    if (runtimeGeneration !== generation) return
     ensureMeetingLoaded(eventPayload.meetingId, { force: true }).catch(() => {
       scheduleRecoveryRefresh(true)
     })
@@ -1091,6 +1139,8 @@ export const useMeetingsStore = defineStore('meetings', () => {
     handleMeetingInvited,
     handleMeetingJoined,
     handleMeetingEnded,
+    reconcileConnectedMeeting,
+    isMeetingEnded,
     handleArtifactsQueued,
     handleArtifactsUpdated,
     handleRecordingStateUpdated

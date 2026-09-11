@@ -98,6 +98,83 @@ vi.mock('../../src/stores/notifications.js', () => ({
 }))
 
 describe('meetings store', () => {
+  it('remembers terminal status even when a subsequent list omits the meeting', async () => {
+    const store = useMeetingsStore()
+    store.upsertMeeting({ id: 'ended', status: 'ended', chat_channel_id: 'chat' })
+    apiMock.get.mockResolvedValue({ data: [] })
+    await store.refresh(false)
+    expect(store.getMeetingById('ended')).toBeNull()
+    expect(store.isMeetingEnded('ended')).toBe(true)
+    store.reset()
+    expect(store.isMeetingEnded('ended')).toBe(false)
+  })
+  it('marks ended immediately and ignores a pending older detail and list response', async () => {
+    const store = useMeetingsStore()
+    const active = { id: 'meeting', status: 'active', chat_channel_id: 'chat' }
+    store.upsertMeeting(active)
+    let detail, list, leave
+    apiMock.get.mockImplementation(path => new Promise(resolve => { if (path === '/meetings') list = resolve; else detail = resolve }))
+    voiceStoreMock.channelId = 'chat'
+    voiceStoreMock.leave.mockReturnValue(new Promise(resolve => { leave = resolve }))
+    const loading = store.ensureMeetingLoaded('meeting', { force: true })
+    const refreshing = store.refresh()
+    const ending = store.handleMeetingEnded({ meetingId: 'meeting', chatChannelId: 'chat' })
+    expect(store.getMeetingById('meeting').status).toBe('ended')
+    detail({ data: active })
+    list({ data: [active] })
+    await Promise.all([loading, refreshing])
+    expect(store.getMeetingById('meeting').status).toBe('ended')
+    expect(voiceStoreMock.leave).toHaveBeenCalledOnce()
+    // Subsequent forced load resolves ended after cleanup.
+    apiMock.get.mockResolvedValue({ data: { ...active, status: 'ended' } })
+    voiceStoreMock.channelId = null
+    leave()
+    await ending
+    store.$dispose()
+  })
+
+  it('does not connect from an older join response after the end event', async () => {
+    const store = useMeetingsStore()
+    let release
+    apiMock.patch.mockReturnValue(new Promise(resolve => { release = resolve }))
+    apiMock.get.mockResolvedValue({ data: { id: 'meeting', status: 'ended', chat_channel_id: 'chat' } })
+    const joining = store.join('meeting')
+    await store.handleMeetingEnded({ meetingId: 'meeting', chatChannelId: 'chat' })
+    release({ data: { meeting: { id: 'meeting', status: 'active', chat_channel_id: 'chat' }, voice: {} } })
+    await joining
+    expect(voiceStoreMock.connectWithPayload).not.toHaveBeenCalled()
+    expect(store.getMeetingById('meeting').status).toBe('ended')
+  })
+
+  it('reconciles the connected meeting outside its view and shares the request', async () => {
+    const store = useMeetingsStore()
+    store.upsertMeeting({ id: 'meeting', status: 'active', chat_channel_id: 'chat' })
+    voiceStoreMock.channelId = 'chat'
+    let release
+    apiMock.get.mockReturnValue(new Promise(resolve => { release = resolve }))
+    const one = store.reconcileConnectedMeeting()
+    const two = store.reconcileConnectedMeeting()
+    expect(apiMock.get).toHaveBeenCalledOnce()
+    release({ data: { id: 'meeting', status: 'ended', chat_channel_id: 'chat' } })
+    await Promise.all([one, two])
+    expect(voiceStoreMock.leave).toHaveBeenCalledOnce()
+    expect(store.activeMeetingId).toBeNull()
+    expect(store.getMeetingById('meeting').status).toBe('ended')
+  })
+
+  it('does not apply a pending connected meeting read after logout', async () => {
+    const store = useMeetingsStore()
+    store.upsertMeeting({ id: 'meeting', status: 'active', chat_channel_id: 'chat' })
+    voiceStoreMock.channelId = 'chat'
+    let release
+    apiMock.get.mockReturnValue(new Promise(resolve => { release = resolve }))
+    const pending = store.reconcileConnectedMeeting()
+    store.reset()
+    release({ data: { id: 'meeting', status: 'ended', chat_channel_id: 'chat' } })
+    await pending
+    expect(store.meetings).toEqual([])
+    expect(voiceStoreMock.leave).not.toHaveBeenCalled()
+  })
   it.each(['reset', '$dispose'])('does not restart ringing from an invitation response after %s', async action => {
     vi.useFakeTimers()
     let resolve
@@ -299,7 +376,8 @@ describe('meetings store', () => {
       channelName: 'Weekly Sync',
       participants: []
     }, {
-      requestMicrophonePermission: true
+      requestMicrophonePermission: true,
+      isCurrent: expect.any(Function)
     })
   })
 

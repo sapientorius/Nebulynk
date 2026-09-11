@@ -178,7 +178,7 @@ describe('realtime socket contract', () => {
     emit('notifications created', notification)
     emit('notifications created', notification)
     await flushAsyncWork()
-    expect(callsMock.load).toHaveBeenCalledTimes(2)
+    expect(callsMock.load).toHaveBeenCalledTimes(3)
     expect(callsMock.load).toHaveBeenCalledWith('call-1')
     expect(stores.notificationsStore.ingestIncomingNotification).toHaveBeenCalledOnce()
     expect(sfxMock.playSfx).not.toHaveBeenCalled()

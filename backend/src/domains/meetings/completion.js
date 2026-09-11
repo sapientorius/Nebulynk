@@ -44,8 +44,20 @@ export async function end({ repository, reads, authorization, effects, artifacts
     }
   })
 
-  await effects.stopRecordings({ meetingId: id })
-  await repository.endDeleteVoiceParticipants({ meeting })
+  effects.emitMeeting('ended', {
+    meetingId: id,
+    chatChannelId: meeting.chat_channel_id,
+    sourceChannelId: meeting.source_channel_id,
+    endedAt: nowIso,
+    endedBy: user.id,
+    status: 'ended',
+    chatChannelArchived: true
+  })
+
+  try { await effects.stopRecordings({ meetingId: id }) }
+  catch (error) { logger.warn('Meeting recording cleanup failed', { meetingId: id, error: error.message }) }
+  try { await repository.endDeleteVoiceParticipants({ meeting }) }
+  catch (error) { logger.warn('Meeting voice participant cleanup failed', { meetingId: id, error: error.message }) }
 
   try {
     await effects.removeRoom(meeting.chat_channel_id)
@@ -61,15 +73,6 @@ export async function end({ repository, reads, authorization, effects, artifacts
   if (updatedChannel) {
     effects.emitChannel('patched', updatedChannel)
   }
-
-  effects.emitMeeting('ended', {
-    meetingId: id,
-    chatChannelId: meeting.chat_channel_id,
-    endedAt: nowIso,
-    endedBy: user.id,
-    status: 'ended',
-    chatChannelArchived: true
-  })
 
   artifacts.emitArtifactsQueued(meeting, {
     artifactTypes: queuedArtifactTypesForEvent,
@@ -113,6 +116,7 @@ export async function cancel({ repository, reads, authorization, effects, getNow
     chatChannelId: meeting.chat_channel_id,
     endedBy: user.id,
     status: 'cancelled',
+    sourceChannelId: meeting.source_channel_id,
     chatChannelArchived: true
   })
 

@@ -1,35 +1,29 @@
 ﻿<template>
   <transition name="incoming-call-fade">
     <div v-if="currentCall" class="incoming-call-overlay" data-testid="incoming-call-overlay">
-      <n-card size="small" class="incoming-call-card">
-        <n-space vertical :size="6">
-          <div class="incoming-call-title">{{ $t('ui.components.incoming_call') }}</div>
-          <div class="incoming-call-context">
-            <strong>{{ displaySourceName }}</strong>
-            <span v-if="currentCall.title">- {{ currentCall.title }}</span>
-          </div>
-          <div class="incoming-call-countdown">
-            {{ $t('ui.components.auto_decline_in') }} {{ remainingSeconds }}s
-          </div>
-          <n-space :size="8" justify="end">
-            <n-button size="small" :disabled="accepting || declining" @click="declineCall">
-              {{ $t('ui.components.decline') }}
-            </n-button>
-            <n-button type="primary" size="small" :loading="accepting" :disabled="declining" @click="acceptCall">
-              {{ $t('ui.components.accept') }}
-            </n-button>
-          </n-space>
-        </n-space>
-      </n-card>
+      <CallInvitationCard :name="displaySourceName" :context="currentCall.title || ''"
+        :status="$t('ui.components.incoming_call')" :seconds="remainingSeconds">
+        <n-button type="error" secondary :loading="declining" :disabled="accepting || declining" @click="declineCall">
+          <template #icon><n-icon><CloseOutline /></n-icon></template>
+          {{ $t('ui.components.decline') }}
+        </n-button>
+        <n-button type="success" :loading="accepting" :disabled="accepting || declining" @click="acceptCall">
+          <template #icon><n-icon><CallOutline /></n-icon></template>
+          {{ $t('ui.components.accept') }}
+        </n-button>
+      </CallInvitationCard>
     </div>
   </transition>
 </template>
 
 <script>
 import { useMeetingsStore } from '../stores/meetings.js'
+import { CallOutline, CloseOutline } from '@vicons/ionicons5'
+import CallInvitationCard from './CallInvitationCard.vue'
 
 export default {
   name: 'IncomingCallOverlay',
+  components: { CallInvitationCard, CallOutline, CloseOutline },
   data() {
     return {
       tickingNow: Date.now(),
@@ -105,31 +99,7 @@ export default {
   right: 20px;
   bottom: 20px;
   z-index: 2200;
-  width: min(360px, calc(100vw - 24px));
-}
-
-.incoming-call-card {
-  background: var(--app-overlay);
-  border: 1px solid var(--app-border-strong);
-}
-
-.incoming-call-title {
-  font-size: 13px;
-  font-weight: 600;
-  opacity: 0.95;
-}
-
-.incoming-call-context {
-  font-size: 13px;
-  opacity: 0.9;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.incoming-call-countdown {
-  font-size: 12px;
-  opacity: 0.65;
+  width: min(380px, calc(100vw - 40px));
 }
 
 .incoming-call-fade-enter-active,
@@ -140,5 +110,8 @@ export default {
 .incoming-call-fade-enter-from,
 .incoming-call-fade-leave-to {
   opacity: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .incoming-call-fade-enter-active, .incoming-call-fade-leave-active { transition: none; }
 }
 </style>

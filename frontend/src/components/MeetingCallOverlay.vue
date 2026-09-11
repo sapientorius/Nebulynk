@@ -1,23 +1,27 @@
 <template>
-  <div v-if="visibleCalls.length" :class="channelId ? 'meeting-call-banner' : 'meeting-call-overlays'" aria-live="polite">
-    <n-card v-for="call in visibleCalls" :key="call.id" size="small" :data-testid="channelId ? 'chat-call-banner' : call.caller_id === selfId ? 'outgoing-call' : 'incoming-meeting-call'">
-      <n-space vertical :size="8">
-        <strong>{{ call.status === 'accepted' && call.recipient_status !== 'invited' ? $t('calls.ready') : call.caller_id === selfId ? $t('calls.ringing') : $t('ui.components.incoming_call') }}</strong>
-        <span>{{ call.source_name || call.caller_name }}<template v-if="call.title"> · {{ call.title }}</template></span>
-        <span v-if="call.status === 'ringing' || call.recipient_status === 'invited'">{{ seconds(call) }}s</span>
-        <n-space justify="end">
-          <template v-if="call.caller_id !== selfId && call.recipient_status === 'invited'">
-            <n-button :disabled="!!busy[call.id]" @click="act(call, 'decline')">{{ $t('ui.components.decline') }}</n-button>
-            <n-button type="primary" :loading="busy[call.id] === 'accept'" :disabled="!!busy[call.id]" @click="act(call, 'accept')">{{ $t('ui.components.accept') }}</n-button>
-          </template>
-          <n-button v-else-if="call.status === 'ringing'" :loading="!!busy[call.id]" :disabled="!!busy[call.id]" @click="act(call, 'cancel')">{{ $t('common.cancel') }}</n-button>
-          <template v-else>
-            <n-button @click="dismissed.push(call.id)">{{ $t('common.close') }}</n-button>
-            <n-button type="primary" :loading="!!opening[call.id]" @click="open(call)">{{ $t('calls.open') }}</n-button>
-          </template>
-        </n-space>
-      </n-space>
-    </n-card>
+  <div v-if="visibleCalls.length" :class="channelId ? 'meeting-call-banner' : 'meeting-call-overlays'">
+    <CallInvitationCard v-for="call in visibleCalls" :key="call.id"
+      :compact="!!channelId" :outgoing="call.caller_id === selfId"
+      :name="displayName(call)" :context="displayContext(call)"
+      :status="call.status === 'accepted' && call.recipient_status !== 'invited' ? $t('calls.ready') : call.caller_id === selfId ? $t('calls.ringing') : $t('ui.components.incoming_call')"
+      :seconds="call.status === 'ringing' || call.recipient_status === 'invited' ? seconds(call) : null"
+      :data-testid="channelId ? 'chat-call-banner' : call.caller_id === selfId ? 'outgoing-call' : 'incoming-meeting-call'">
+      <template v-if="call.caller_id !== selfId && call.recipient_status === 'invited'">
+        <n-button type="error" secondary :loading="busy[call.id] === 'decline'" :disabled="!!busy[call.id]" @click="act(call, 'decline')">
+          <template #icon><n-icon><CloseOutline /></n-icon></template>{{ $t('ui.components.decline') }}
+        </n-button>
+        <n-button type="success" :loading="busy[call.id] === 'accept'" :disabled="!!busy[call.id]" @click="act(call, 'accept')">
+          <template #icon><n-icon><CallOutline /></n-icon></template>{{ $t('ui.components.accept') }}
+        </n-button>
+      </template>
+      <n-button v-else-if="call.status === 'ringing'" type="error" secondary :loading="!!busy[call.id]" :disabled="!!busy[call.id]" @click="act(call, 'cancel')">
+        <template #icon><n-icon><CloseOutline /></n-icon></template>{{ $t('common.cancel') }}
+      </n-button>
+      <template v-else>
+        <n-button @click="dismissed.push(call.id)">{{ $t('common.close') }}</n-button>
+        <n-button type="primary" :loading="!!opening[call.id]" @click="open(call)">{{ $t('calls.open') }}</n-button>
+      </template>
+    </CallInvitationCard>
   </div>
 </template>
 
@@ -25,9 +29,12 @@
 import { useMeetingCallsStore } from '../stores/meeting-calls.js'
 import { useSessionStore } from '../stores/session.js'
 import { getApiErrorMessage } from '../lib/api-error.js'
+import { CallOutline, CloseOutline } from '@vicons/ionicons5'
+import CallInvitationCard from './CallInvitationCard.vue'
 
 export default {
   name: 'MeetingCallOverlay',
+  components: { CallInvitationCard, CallOutline, CloseOutline },
   props: { channelId: { type: String, default: null } },
   data: () => ({ opening: {}, dismissed: [] }),
   computed: {
@@ -50,6 +57,12 @@ export default {
     }
   },
   methods: {
+    displayName(call) {
+      return (call.caller_id === this.selfId ? call.source_name : call.caller_name) || call.source_name || this.$t('ui.components.unknown_channel')
+    },
+    displayContext(call) {
+      return [call.source_name !== this.displayName(call) ? call.source_name : '', call.title].filter(Boolean).join(' · ')
+    },
     seconds(call) { return Math.max(0, Math.ceil((new Date(call.expires_at).getTime() - this.callsStore.now) / 1000)) },
     async act(call, action) {
       try { await this.callsStore.act(call.id, action) }
@@ -76,7 +89,7 @@ export default {
   position: fixed;
   right: 20px;
   bottom: 160px;
-  width: min(360px, calc(100vw - 40px));
+  width: min(380px, calc(100vw - 40px));
   max-height: calc(100dvh - 180px);
   overflow-y: auto;
   display: grid;

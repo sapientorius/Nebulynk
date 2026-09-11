@@ -28,6 +28,7 @@ import { RouterView } from 'vue-router'
 import { getCurrentLocale } from './lib/i18n.js'
 import { isDesktopManagerWindow, isLocalDesktopAppOrigin } from './lib/runtime.js'
 import { useThemeStore } from './stores/index.js'
+import { initializeSfxAudio } from './lib/sfx.js'
 
 const IncomingCallOverlay = defineAsyncComponent(() => import('./components/IncomingCallOverlay.vue'))
 const MeetingCallOverlay = defineAsyncComponent(() => import('./components/MeetingCallOverlay.vue'))
@@ -61,7 +62,8 @@ export default {
   components: { AppContent },
   data() {
     return {
-      stopWatchingSystemTheme: null
+      stopWatchingSystemTheme: null,
+      stopSfxAudio: null
     }
   },
   computed: {
@@ -111,9 +113,11 @@ export default {
     })
   },
   mounted() {
+    this.stopSfxAudio = initializeSfxAudio()
     this.stopWatchingSystemTheme = this.themeStore.watchSystemTheme()
   },
   beforeUnmount() {
+    this.stopSfxAudio?.()
     this.stopWatchingSystemTheme?.()
   }
 }

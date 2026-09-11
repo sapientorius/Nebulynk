@@ -10,9 +10,9 @@ const mocks = vi.hoisted(() => ({
 }))
 vi.mock('../../src/lib/api.js', () => ({ default: mocks.api }))
 vi.mock('../../src/stores/session.js', () => ({ useSessionStore: () => ({ user: { id: 'alice' } }) }))
-vi.mock('../../src/stores/meetings.js', () => ({ useMeetingsStore: () => ({ join: mocks.join, activeMeetingId: null }) }))
+vi.mock('../../src/stores/meetings.js', () => ({ useMeetingsStore: () => ({ join: mocks.join, activeMeetingId: null, isMeetingEnded: () => false }) }))
 vi.mock('../../src/router/index.js', () => ({ default: { push: mocks.push } }))
-vi.mock('../../src/lib/sfx.js', () => ({ playSfx: mocks.sound, SFX_EVENTS: { CALL_INCOMING: 'incoming' } }))
+vi.mock('../../src/lib/sfx.js', () => ({ playSfx: mocks.sound, prepareSfxAudio: async () => true, SFX_EVENTS: { CALL_INCOMING: 'incoming' } }))
 
 let context, store, wrappers, current
 beforeEach(async () => {
@@ -68,4 +68,34 @@ it('filters by chat and keeps both surfaces actionable after a failed request', 
   expect(window.$message.error).toHaveBeenCalled()
   expect(button(banner, 'Accept').attributes('disabled')).toBeUndefined()
   expect(button(overlay, 'Accept').attributes('disabled')).toBeUndefined()
+})
+
+it('renders a global invitation and rings on arrival without a chat banner or user interaction', async () => {
+  const overlay = await render()
+  expect(overlay.find('[data-testid=incoming-meeting-call]').exists()).toBe(false)
+  await store.load('call')
+  await flushPromises()
+  expect(overlay.get('[data-testid=incoming-meeting-call]').text()).toContain('Bob')
+  expect(overlay.get('.call-avatar').text()).toBe('B')
+  expect(overlay.get('.call-time-label').text()).toContain('Time remaining')
+  expect(mocks.sound).toHaveBeenCalledExactlyOnceWith('incoming')
+  await store.load('call')
+  await flushPromises()
+  expect(overlay.findAll('[data-testid=incoming-meeting-call]')).toHaveLength(1)
+  expect(mocks.sound).toHaveBeenCalledTimes(1)
+})
+
+it('shows the caller and group context separately, and gives outgoing calls a cancel action', async () => {
+  current = { ...current, source_name: 'Design team', title: 'Review' }
+  const overlay = await render()
+  await store.load('call')
+  await flushPromises()
+  expect(overlay.get('.call-name').text()).toBe('Bob')
+  expect(overlay.get('.call-context').text()).toBe('Design team · Review')
+  current = { ...current, caller_id: 'alice', recipient_status: null }
+  await store.load('call')
+  await flushPromises()
+  expect(overlay.get('[data-testid=outgoing-call] .call-name').text()).toBe('Design team')
+  expect(button(overlay, 'Cancel')).toBeTruthy()
+  expect(button(overlay, 'Accept')).toBeUndefined()
 })

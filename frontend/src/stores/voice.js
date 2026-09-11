@@ -40,6 +40,8 @@ import { requestMicrophonePermission } from '../lib/microphone-permission.js'
 import { useSessionStore } from './session.js'
 import { useChannelsStore } from './channels.js'
 import { useVideoBackgroundsStore } from './video-backgrounds.js'
+import { useMeetingsStore } from './meetings.js'
+import { DisconnectReason } from 'livekit-client'
 
 function asList(payload) {
   if (Array.isArray(payload)) return payload
@@ -186,10 +188,24 @@ export const useVoiceStore = defineStore('voice', () => {
   }
 
   function setupVoiceCallbacks() {
+    const callbackAttempt = activeConnectionAttempt
+    const callbackChannelId = channelId.value
     setCallbacks(createVoiceLiveKitCallbacks({
       getChannelId: () => channelId.value,
       setActiveSpeakers: ids => { activeSpeakers.value = ids },
-      resetDisconnectedMedia() {
+      resetDisconnectedMedia({ reason } = {}) {
+        if (callbackAttempt !== activeConnectionAttempt || callbackChannelId !== channelId.value) return
+        if (reason === DisconnectReason.ROOM_DELETED) {
+          const endedChannelId = channelId.value
+          leave({ playLeaveSfx: false, notifyErrors: false, skipBackendLeave: true }).catch(() => {})
+          const cleanupAttempt = activeConnectionAttempt
+          useMeetingsStore().findMeetingByChatChannelId(endedChannelId).then(meeting => {
+            if (meeting && cleanupAttempt === activeConnectionAttempt) {
+              return useMeetingsStore().ensureMeetingLoaded(meeting.id, { force: true })
+            }
+          }).catch(() => {})
+          return
+        }
         connected.value = false
         activeSpeakers.value = []
         clearScreenShares(channelId.value)
@@ -250,6 +266,8 @@ export const useVoiceStore = defineStore('voice', () => {
   }
 
   async function connectWithPayload(payload, options = {}) {
+    const isAllowed = options.isCurrent || (() => true)
+    if (!isAllowed()) return false
     const targetChannelId = options.channelId || payload?.channelId || channelId.value
     if (!targetChannelId) {
       throw new Error('Missing channel for voice connection')
@@ -272,20 +290,25 @@ export const useVoiceStore = defineStore('voice', () => {
       let microphonePermission = null
       if (options.requestMicrophonePermission === true) {
         microphonePermission = await preflightMicrophonePermission()
-        if (!isCurrentConnectionAttempt(connectionAttemptId)) {
+        if (!isCurrentConnectionAttempt(connectionAttemptId) || !isAllowed()) {
           return false
         }
       }
 
       try {
+        if (!isAllowed()) return false
         await connectToRoom(payload.token, payload.url)
       } catch (error) {
+        if (!isCurrentConnectionAttempt(connectionAttemptId) || !isAllowed()) return false
         console.warn('Initial voice connect failed, retrying once:', error)
         await connectToRoom(payload.token, payload.url)
       }
 
       if (!isCurrentConnectionAttempt(connectionAttemptId)) {
-        await disconnectFromRoom({ suppressErrors: true })
+        return false
+      }
+      if (!isAllowed()) {
+        await leave({ playLeaveSfx: false, notifyErrors: false, skipBackendLeave: true })
         return false
       }
 
@@ -325,7 +348,7 @@ export const useVoiceStore = defineStore('voice', () => {
   }
 
   function reset() {
-    activeConnectionAttempt = 0
+    activeConnectionAttempt++
     channelId.value = null
     channelName.value = null
     participants.value = {}
@@ -346,6 +369,7 @@ export const useVoiceStore = defineStore('voice', () => {
     backgroundBlurError.value = null
     cameraEnabled.value = false
     backgroundBlurApplied.value = false
+    backgroundImageApplied.value = false
     activeCameraDeviceId.value = null
     meetingVideoEnabled.value = false
     allRemoteCameraSubscriptionsEnabled.value = true
@@ -569,12 +593,24 @@ export const useVoiceStore = defineStore('voice', () => {
     if (!currentChannelId) return
 
     cancelPendingConnection()
+    const leaveAttempt = activeConnectionAttempt
+    if (skipBackendLeave) {
+      // Capture adapter ownership before clearing UI; completion must not touch a later call.
+      const disconnecting = disconnectFromRoom({ suppressErrors: true })
+      micActivation.destroy()
+      clearChannelState(currentChannelId)
+      clearLocalConnection(currentChannelId)
+      await disconnecting
+      return
+    }
     await stopScreenShare({ notifyErrors: false })
+    if (leaveAttempt !== activeConnectionAttempt) return
     try {
       await stopCamera({ notifyErrors: false })
     } catch {
       // Leaving the room should continue even if camera state was already cleaned up remotely.
     }
+    if (leaveAttempt !== activeConnectionAttempt) return
     micActivation.destroy()
     let hadVoiceError = false
     const playVoiceErrorOnce = () => {
@@ -613,6 +649,12 @@ export const useVoiceStore = defineStore('voice', () => {
       }
     }
 
+    if (leaveAttempt !== activeConnectionAttempt) return
+    clearLocalConnection(currentChannelId)
+    if (playLeaveSfx) playSfx(SFX_EVENTS.VOICE_LEAVE_SELF)
+  }
+
+  function clearLocalConnection(currentChannelId) {
     channelId.value = null
     channelName.value = null
     muted.value = false
@@ -628,6 +670,7 @@ export const useVoiceStore = defineStore('voice', () => {
     clearCameraTracks(currentChannelId)
     cameraEnabled.value = false
     backgroundBlurApplied.value = false
+    backgroundImageApplied.value = false
     activeCameraDeviceId.value = null
     meetingVideoEnabled.value = false
     allRemoteCameraSubscriptionsEnabled.value = true
@@ -636,9 +679,6 @@ export const useVoiceStore = defineStore('voice', () => {
     screenShareError.value = null
     cameraError.value = null
     backgroundBlurError.value = null
-    if (playLeaveSfx) {
-      playSfx(SFX_EVENTS.VOICE_LEAVE_SELF)
-    }
   }
 
   async function reconnectIfNeeded() {

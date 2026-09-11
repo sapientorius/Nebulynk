@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useVoiceStore } from '../../src/stores/voice.js'
+import { DisconnectReason } from 'livekit-client'
+
+const meetingsMock = vi.hoisted(() => ({ findMeetingByChatChannelId: vi.fn(), ensureMeetingLoaded: vi.fn().mockResolvedValue(null) }))
+vi.mock('../../src/stores/meetings.js', () => ({ useMeetingsStore: () => meetingsMock }))
 
 const apiMock = vi.hoisted(() => ({
   get: vi.fn(),
@@ -101,6 +105,56 @@ vi.mock('../../src/stores/channels.js', () => ({
 }))
 
 describe('voice store reconnect behavior', () => {
+  it('clears a deleted meeting room immediately and ignores completion after a new connection', async () => {
+    const store = useVoiceStore()
+    await store.connectWithPayload({ token: 'token', url: 'ws://livekit.local', channelId: 'old' })
+    const oldCallbacks = livekitMock.setCallbacks.mock.calls.at(-1)[0]
+    let release
+    livekitMock.disconnectFromRoom.mockReturnValueOnce(new Promise(resolve => { release = resolve }))
+    meetingsMock.findMeetingByChatChannelId.mockResolvedValue({ id: 'meeting' })
+    oldCallbacks.onDisconnected({ reason: DisconnectReason.ROOM_DELETED, connection: {} })
+    expect(store.channelId).toBeNull()
+    expect(store.connected).toBe(false)
+    expect(store.participants.old).toEqual([])
+    await store.connectWithPayload({ token: 'next', url: 'ws://livekit.local', channelId: 'new' })
+    release()
+    await Promise.resolve()
+    oldCallbacks.onDisconnected({ reason: DisconnectReason.ROOM_DELETED, connection: {} })
+    expect(store.channelId).toBe('new')
+    expect(store.connected).toBe(true)
+    expect(apiMock.delete).not.toHaveBeenCalled()
+  })
+
+  it('retains the channel for a temporary disconnect', async () => {
+    const store = useVoiceStore()
+    await store.connectWithPayload({ token: 'token', url: 'ws://livekit.local', channelId: 'chat' })
+    livekitMock.setCallbacks.mock.calls.at(-1)[0].onDisconnected({ reason: DisconnectReason.SIGNAL_CLOSE })
+    expect(store.channelId).toBe('chat')
+    expect(store.connected).toBe(false)
+  })
+
+  it('reloads the authoritative meeting status after room deletion', async () => {
+    const store = useVoiceStore()
+    meetingsMock.findMeetingByChatChannelId.mockResolvedValue({ id: 'meeting' })
+    await store.connectWithPayload({ token: 'token', url: 'ws://livekit.local', channelId: 'chat' })
+    livekitMock.setCallbacks.mock.calls.at(-1)[0].onDisconnected({ reason: DisconnectReason.ROOM_DELETED })
+    await vi.waitFor(() => expect(meetingsMock.ensureMeetingLoaded).toHaveBeenCalledWith('meeting', { force: true }))
+    expect(store.channelId).toBeNull()
+    expect(store.connected).toBe(false)
+  })
+
+  it('does not disconnect a newer room when an older connect finishes late', async () => {
+    const store = useVoiceStore()
+    let release
+    livekitMock.connectToRoom.mockReturnValueOnce(new Promise(resolve => { release = resolve }))
+    const old = store.connectWithPayload({ token: 'token', url: 'ws://livekit.local', channelId: 'old' })
+    await store.connectWithPayload({ token: 'next', url: 'ws://livekit.local', channelId: 'new' })
+    release()
+    expect(await old).toBe(false)
+    expect(store.channelId).toBe('new')
+    expect(store.connected).toBe(true)
+    expect(livekitMock.disconnectFromRoom).not.toHaveBeenCalled()
+  })
   beforeEach(() => {
     apiMock.get.mockReset()
     apiMock.post.mockReset()

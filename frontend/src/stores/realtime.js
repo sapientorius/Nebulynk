@@ -57,6 +57,8 @@ export function setupRealtimeListeners(socket, {
 }) {
   if (!socket) return
 
+  const meetingCallsStore = useMeetingCallsStore()
+
   let channelsRefreshTimerId = null
   let dmsRefreshTimerId = null
 
@@ -84,6 +86,10 @@ export function setupRealtimeListeners(socket, {
 
   function handleIncomingNotification(notification) {
     if (!notification?.id) return
+    // A notification already loaded by HTTP can still recover a missed call event.
+    if (notification.type === 'meeting_call' && notification.call_id) {
+      meetingCallsStore.load(notification.call_id).catch(() => {})
+    }
 
     logDesktopNotificationDiagnostic('[desktop-notify:incoming]', {
       id: notification.id,
@@ -103,9 +109,6 @@ export function setupRealtimeListeners(socket, {
     }
 
     notificationsStore.ingestIncomingNotification(notification)
-    if (notification.type === 'meeting_call' && notification.call_id) {
-      useMeetingCallsStore().load(notification.call_id).catch(() => {})
-    }
     maybeDispatchDesktopNotification(notification).catch((error) => {
       logDesktopNotificationDiagnostic('[desktop-notify:skip]', {
         id: notification.id,
@@ -208,7 +211,7 @@ export function setupRealtimeListeners(socket, {
   }
 
   socket.on('messages created', (message) => {
-    if (message.call_id) useMeetingCallsStore().load(message.call_id).catch(() => {})
+    if (message.call_id) meetingCallsStore.load(message.call_id).catch(() => {})
     const isOwnMessage = message.user_id === sessionStore.user?.id
     if (message.channel_id === channelsStore.activeChannelId) {
       messagesStore.addMessageIfMissing(message)
@@ -415,7 +418,7 @@ export function setupRealtimeListeners(socket, {
   })
 
   socket.on('meeting-calls changed', ({ id }) => {
-    if (id) useMeetingCallsStore().load(id).catch(() => {})
+    if (id) meetingCallsStore.load(id).catch(() => {})
   })
 
   socket.on('meetings created', (meeting) => {
@@ -432,7 +435,7 @@ export function setupRealtimeListeners(socket, {
 
   socket.on('meetings ended', (payload) => {
     meetingsStore?.handleMeetingEnded(payload)
-    useMeetingCallsStore().refresh().catch(() => {})
+    meetingCallsStore.refresh().catch(() => {})
   })
 
   socket.on('meetings artifacts-queued', (payload) => {

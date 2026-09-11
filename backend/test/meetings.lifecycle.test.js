@@ -970,25 +970,26 @@ test('meetings realtime: end emits additive ended payload and queues only config
     user: { id: 'host-2', is_admin: false }
   })
 
-  const endedAt = emitted[1]?.payload?.endedAt
+  const endedAt = emitted[0]?.payload?.endedAt
 
   assert.deepEqual(emitted, [
-    {
-      service: 'channels',
-      eventName: 'patched',
-      payload: { id: 'chat-2', is_archived: true }
-    },
     {
       service: 'meetings',
       eventName: 'ended',
       payload: {
         meetingId: 'meeting-end-1',
         chatChannelId: 'chat-2',
+        sourceChannelId: 'source-2',
         endedAt,
         endedBy: 'host-2',
         status: 'ended',
         chatChannelArchived: true
       }
+    },
+    {
+      service: 'channels',
+      eventName: 'patched',
+      payload: { id: 'chat-2', is_archived: true }
     },
     {
       service: 'meetings',

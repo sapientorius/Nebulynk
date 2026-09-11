@@ -485,6 +485,8 @@ export const useSessionStore = defineStore('session', () => {
     const adminStore = useAdminStore()
     const voiceStore = useVoiceStore()
     const meetingsStore = useMeetingsStore()
+    const meetingCallsStore = useMeetingCallsStore()
+    meetingCallsStore.startRecovery()
     const voiceMessageArtifactsStore = useVoiceMessageArtifactsStore()
     const messageSummariesStore = useMessageSummariesStore()
 
@@ -519,8 +521,10 @@ export const useSessionStore = defineStore('session', () => {
       stopSocketAuthenticatedSync = subscribeToSocketAuthenticated(async (authenticatedSocket) => {
         if (authenticatedSocket !== socket) return
         presenceSyncPending.value = true
-        await refreshPresence().catch(() => {})
-        await useMeetingCallsStore().refresh().catch(() => {})
+        await Promise.all([
+          refreshPresence().catch(() => {}),
+          meetingCallsStore.refresh().catch(() => {})
+        ])
         await Promise.resolve(voiceStore.reconnectIfNeeded()).catch(() => {})
         foregroundResumeSync.requestSync('socket-authenticated', {
           immediate: true,

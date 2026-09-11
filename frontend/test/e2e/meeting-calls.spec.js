@@ -3,6 +3,7 @@ import { readSharedState } from './shared-state.js'
 import { loginViaApi } from './auth-helpers.js'
 import { resolveBackendUrl } from './test-urls.js'
 
+
 async function login(page, email, password) {
   await page.goto('/login')
   await page.getByTestId('login-email').fill(email)
@@ -205,3 +206,124 @@ test('the personal notes channel still starts immediately', async ({ page }) => 
   await expect(page.getByTestId('outgoing-call')).toHaveCount(0)
   await page.getByRole('button', { name: /^End meeting$|^Meeting beenden$/ }).click()
 })
+
+for (const loseEndEvent of [false, true]) {
+  test(`ending a meeting clears the other participant connection and source card${loseEndEvent ? ' after lost end events' : ' immediately'}`, async ({ page, browser }) => {
+    const credentials = await readSharedState()
+    await login(page, credentials.adminEmail, credentials.adminPassword)
+    const context = await browser.newContext({ baseURL: new URL(page.url()).origin })
+    let meetingToEnd = null
+    let endHeaders = null
+    try {
+      const recipient = await context.newPage()
+      let dropped = 0
+      await recipient.routeWebSocket(/socket\.io\//, socket => {
+        const server = socket.connectToServer()
+        server.onMessage(message => {
+          const payload = message.toString()
+          if (loseEndEvent && (payload.includes('meetings ended') || payload.includes('meetings artifacts-'))) {
+            dropped++
+            return
+          }
+          socket.send(message)
+        })
+      })
+      await login(recipient, credentials.inviteEmail, credentials.invitePassword)
+      const admin = await loginViaApi(page.request, { email: credentials.adminEmail, password: credentials.adminPassword })
+      const member = await loginViaApi(recipient.request, { email: credentials.inviteEmail, password: credentials.invitePassword })
+      endHeaders = { Authorization: `Bearer ${admin.accessToken}` }
+      const response = await page.request.post(resolveBackendUrl('/dms'), {
+        headers: { Authorization: `Bearer ${admin.accessToken}` }, data: { user_ids: [member.user.id] }
+      })
+      expect(response.ok()).toBe(true)
+      const dm = await response.json()
+      await page.goto(`/channels/${dm.id}`)
+      await recipient.goto(`/channels/${dm.id}`)
+      await page.getByRole('button', { name: /^Call$|^Anrufen$/ }).click()
+      await recipient.getByTestId('incoming-meeting-call').getByRole('button', { name: /Accept|Annehmen/ }).click()
+      await expect(page.getByTestId('meeting-view')).toBeVisible()
+      await expect(recipient.getByTestId('meeting-view')).toBeVisible()
+      const meetingId = new URL(page.url()).pathname.split('/').pop()
+      meetingToEnd = meetingId
+      // Navigate through the sidebar, keeping the recipient's media session alive.
+      await recipient.locator('.dm-item').filter({ has: recipient.getByText(admin.user.display_name, { exact: true }) }).click()
+      await expect(recipient).toHaveURL(new RegExp(`/channels/${dm.id}$`))
+      await expect(recipient.getByTestId('voice-status-connected')).toBeVisible()
+      const card = recipient.locator(`[data-testid="meeting-card"][data-meeting-id="${meetingId}"]`)
+      await expect(card.getByTestId('meeting-card-join')).toBeVisible()
+      // No recipient interaction from here: the event or global reconciliation must clean up.
+      await page.getByRole('button', { name: /^End meeting$|^Meeting beenden$/ }).click()
+      await expect(recipient.getByTestId('voice-controls')).toHaveCount(0, { timeout: loseEndEvent ? 7000 : 2000 })
+      await expect(card.getByTestId('meeting-card-status')).toHaveText(/Ended|Beendet/)
+      await expect(card.getByTestId('meeting-card-join')).toHaveCount(0)
+      if (loseEndEvent) expect(dropped).toBeGreaterThan(0)
+    } finally {
+      if (meetingToEnd) await page.request.patch(resolveBackendUrl(`/meetings/${meetingToEnd}`), {
+        headers: endHeaders, data: { action: 'end' }
+      }).catch(() => {})
+      await context.close()
+    }
+  })
+}
+
+
+for (const { loseEvents, settings } of [{ loseEvents: false }, { loseEvents: true }, { loseEvents: false, settings: true }]) {
+  test(`incoming calls reach an idle recipient in ${settings ? 'settings' : 'another channel'}${loseEvents ? ' after lost events' : ' immediately'}`, async ({ page, browser }) => {
+    const credentials = await readSharedState()
+    await login(page, credentials.adminEmail, credentials.adminPassword)
+    const context = await browser.newContext({ baseURL: new URL(page.url()).origin })
+    try {
+      const recipient = await context.newPage()
+      await recipient.addInitScript(() => {
+        window.__callSoundContexts = []
+        const start = AudioBufferSourceNode.prototype.start
+        AudioBufferSourceNode.prototype.start = function (...args) {
+          window.__callSoundContexts.push(this.context)
+          return start.apply(this, args)
+        }
+      })
+      let callEvents = 0
+      let callReads = 0
+      await recipient.routeWebSocket(/socket\.io\//, socket => {
+        const server = socket.connectToServer()
+        server.onMessage(message => {
+          const payload = message.toString()
+          if (payload.includes('meeting-calls changed')) callEvents++
+          if (loseEvents && (payload.includes('meeting-calls changed') || payload.includes('meeting_call'))) return
+          socket.send(message)
+        })
+      })
+      recipient.on('request', request => {
+        if (/\/meeting-calls\/[^/?]+$/.test(request.url())) callReads++
+      })
+      await login(recipient, credentials.inviteEmail, credentials.invitePassword)
+      if (settings) {
+        await recipient.goto('/settings')
+        await expect(recipient.getByTestId('settings-view')).toBeVisible()
+      }
+      const idleUrl = recipient.url()
+      const admin = await loginViaApi(page.request, { email: credentials.adminEmail, password: credentials.adminPassword })
+      const member = await loginViaApi(recipient.request, { email: credentials.inviteEmail, password: credentials.invitePassword })
+      const response = await page.request.post(resolveBackendUrl('/dms'), {
+        headers: { Authorization: `Bearer ${admin.accessToken}` }, data: { user_ids: [member.user.id] }
+      })
+      expect(response.ok()).toBe(true)
+      const dm = await response.json()
+      expect(new URL(idleUrl).pathname).not.toBe(`/channels/${dm.id}`)
+      await page.goto(`/channels/${dm.id}`)
+      const soundCount = await recipient.evaluate(() => window.__callSoundContexts.length)
+      // No recipient clicks, navigation or reload from here until the overlay appears.
+      await page.getByRole('button', { name: /^Call$|^Anrufen$/ }).click()
+      await expect(recipient.getByTestId('incoming-meeting-call')).toBeVisible({ timeout: loseEvents ? 7000 : 2000 })
+      expect(recipient.url()).toBe(idleUrl)
+      expect(callEvents).toBeGreaterThan(0)
+      expect(callReads).toBeGreaterThan(0)
+      await expect.poll(() => recipient.evaluate(count => window.__callSoundContexts.slice(count).some(context => context.state === 'running'), soundCount)).toBe(true)
+      await expect(recipient.getByTestId('chat-call-banner')).toHaveCount(0)
+      await page.getByTestId('outgoing-call').getByRole('button', { name: /^Cancel$|^Abbrechen$/ }).click()
+      await expect(recipient.getByTestId('incoming-meeting-call')).toHaveCount(0)
+    } finally {
+      await context.close()
+    }
+  })
+}
