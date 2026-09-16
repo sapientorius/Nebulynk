@@ -130,6 +130,15 @@ const baseMessages = {
         useRecoveryCode: 'Use backup code',
         useAuthenticatorCode: 'Use authenticator code'
       },
+      session: {
+        title: 'You are already signed in',
+        description: 'Signed in as {name}',
+        unknownUser: 'this account',
+        buttons: {
+          continue: 'Continue',
+          logout: 'Log out'
+        }
+      },
       validation: {
         emailRequired: 'Email is required',
         passwordRequired: 'Password is required'
@@ -1017,6 +1026,15 @@ const baseMessages = {
         back: 'Zurueck',
         useRecoveryCode: 'Backup-Code verwenden',
         useAuthenticatorCode: 'Authenticator-Code verwenden'
+      },
+      session: {
+        title: 'Du bist bereits eingeloggt',
+        description: 'Eingeloggt als {name}',
+        unknownUser: 'dieser Account',
+        buttons: {
+          continue: 'Weiter',
+          logout: 'Ausloggen'
+        }
       },
       validation: {
         emailRequired: 'E-Mail ist erforderlich',

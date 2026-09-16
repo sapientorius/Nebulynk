@@ -98,6 +98,28 @@ async function expectNoHorizontalAuthOverflow(page) {
 }
 
 test.describe('login and registration flip card', () => {
+  test('offers a restored browser session and lets the user continue or log out', async ({ page }) => {
+    await ensureAdmin(page, adminCredentials)
+    await mockRegistrationConfig(page, enabledRegistrationConfig)
+
+    await page.goto('/login')
+    await page.getByTestId('login-email').fill(adminCredentials.adminEmail)
+    await page.getByTestId('login-password').fill(adminCredentials.adminPassword)
+    await page.getByTestId('login-submit').click()
+    await expect(page).toHaveURL(/\/channels/)
+
+    await page.goto('/login')
+    await expect(page.getByTestId('login-active-session')).toBeVisible()
+    await expect(page.getByTestId('login-active-session-user')).toContainText(adminCredentials.adminDisplayName)
+
+    await page.getByTestId('login-session-continue').click()
+    await expect(page).toHaveURL(/\/channels/)
+
+    await page.goto('/login')
+    await page.getByTestId('login-session-logout').click()
+    await expect(page.getByTestId('login-email')).toBeVisible()
+  })
+
   test('flips through the URL, supports direct registration, history, and reduced motion', async ({ page }) => {
     await ensureAdmin(page, adminCredentials)
     await mockRegistrationConfig(page, enabledRegistrationConfig)
