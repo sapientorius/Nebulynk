@@ -139,6 +139,7 @@ function createHarness(dbOptions = {}) {
     }
   })
   app.set('postgresqlClient', db)
+  app.set('meetingRecordingRetentionManager', dbOptions.meetingRecordingRetentionManager)
   app.set('authentication', { secret: 'test-auth-secret' })
   app.set('env', dbOptions.env || { KLIPY_API_KEY: '' })
   app.use('users', {
@@ -170,6 +171,8 @@ test('platform.find hook-chain: returns current platform settings map', async ()
     default_meeting_history_access: 'all_channel_members',
     auto_away_minutes: '15',
     meeting_video_enabled: 'true',
+    meeting_recording_retention_days: '60',
+    meeting_recording_storage_limit_gib: 'unlimited',
     upload_max_file_size_mb: '20',
     image_upload_max_dimension_px: '1920',
     image_upload_quality: '82',
@@ -312,6 +315,25 @@ test('platform.patch hook-chain: rejects invalid auto-away payload', async () =>
   )
 })
 
+test('platform.patch hook-chain: rejects invalid meeting recording retention limits', async () => {
+  const { app } = createHarness()
+  const params = {
+    provider: 'rest',
+    authenticated: true,
+    user: { id: 'admin-1', is_admin: true },
+    resolvedPermissions: new Set(['*'])
+  }
+
+  await assert.rejects(
+    app.service('platform').patch(null, { meetingRecordingRetentionDays: 0 }, params),
+    BadRequest
+  )
+  await assert.rejects(
+    app.service('platform').patch(null, { meetingRecordingStorageLimitGiB: 0 }, params),
+    BadRequest
+  )
+})
+
 test('platform.patch hook-chain: rejects invalid upload setting payload', async () => {
   const { app } = createHarness()
 
@@ -399,6 +421,8 @@ test('platform.patch hook-chain: updates default locale and auto-away timeout fo
       defaultLanguage: 'de',
       defaultMeetingLanguage: 'fr',
       defaultMeetingHistoryAccess: 'active_participants',
+      meetingRecordingRetentionDays: 90,
+      meetingRecordingStorageLimitGiB: 10,
       autoAwayMinutes: 25,
       meetingVideoEnabled: false,
       uploadMaxFileSizeMb: 64,
@@ -433,6 +457,8 @@ test('platform.patch hook-chain: updates default locale and auto-away timeout fo
   assert.equal(settingsMap.get('default_meeting_history_access'), 'active_participants')
   assert.equal(settingsMap.get('auto_away_minutes'), '25')
   assert.equal(settingsMap.get('meeting_video_enabled'), 'false')
+  assert.equal(settingsMap.get('meeting_recording_retention_days'), '90')
+  assert.equal(settingsMap.get('meeting_recording_storage_limit_gib'), '10')
   assert.equal(settingsMap.get('upload_max_file_size_mb'), '64')
   assert.equal(settingsMap.get('image_upload_max_dimension_px'), '2560')
   assert.equal(settingsMap.get('image_upload_quality'), '76')
@@ -456,6 +482,8 @@ test('platform.patch hook-chain: updates default locale and auto-away timeout fo
   assert.equal(result.default_meeting_history_access, 'active_participants')
   assert.equal(result.auto_away_minutes, '25')
   assert.equal(result.meeting_video_enabled, 'false')
+  assert.equal(result.meeting_recording_retention_days, '90')
+  assert.equal(result.meeting_recording_storage_limit_gib, '10')
   assert.equal(result.upload_max_file_size_mb, '64')
   assert.equal(result.image_upload_max_dimension_px, '2560')
   assert.equal(result.image_upload_quality, '76')
@@ -475,6 +503,35 @@ test('platform.patch hook-chain: updates default locale and auto-away timeout fo
   assert.equal(result.theme_custom_css_global, ':root { --brand-test: 1; }')
   assert.equal(result.theme_dark_custom_css, 'body { color: white; }')
   assert.equal(result.theme_light_custom_css, 'body { color: black; }')
+})
+
+test('platform.patch hook-chain: stores unlimited recording limits and runs cleanup immediately', async () => {
+  let cleanupRuns = 0
+  const { app, settingsMap } = createHarness({
+    meetingRecordingRetentionManager: {
+      async run() { cleanupRuns += 1 }
+    }
+  })
+
+  const result = await app.service('platform').patch(
+    null,
+    {
+      meetingRecordingRetentionDays: null,
+      meetingRecordingStorageLimitGiB: null
+    },
+    {
+      provider: 'rest',
+      authenticated: true,
+      user: { id: 'admin-1', is_admin: true },
+      resolvedPermissions: new Set(['*'])
+    }
+  )
+
+  assert.equal(settingsMap.get('meeting_recording_retention_days'), 'unlimited')
+  assert.equal(settingsMap.get('meeting_recording_storage_limit_gib'), 'unlimited')
+  assert.equal(result.meeting_recording_retention_days, 'unlimited')
+  assert.equal(result.meeting_recording_storage_limit_gib, 'unlimited')
+  assert.equal(cleanupRuns, 1)
 })
 
 test('platform.patch hook-chain: stores Klipy key encrypted and returns only status', async () => {

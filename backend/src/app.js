@@ -45,6 +45,7 @@ import { processDueMessageReminders } from './services/message-reminders/process
 import { assertUserAccountActive } from './lib/account-state.js'
 import { PlatformUpdateManager } from './lib/platform-updates.js'
 import { StorageUsageManager } from './lib/storage-usage.js'
+import { MeetingRecordingRetentionManager } from './lib/meeting-recording-retention.js'
 import {
   getApiSecurityHeaders,
   resolveAuthenticationSecret,
@@ -172,6 +173,7 @@ const db = knex({
 app.set('postgresqlClient', db)
 app.set('platformUpdateManager', new PlatformUpdateManager(app))
 app.set('storageUsageManager', new StorageUsageManager(app))
+app.set('meetingRecordingRetentionManager', new MeetingRecordingRetentionManager(app))
 
 // Set up authentication
 app.configure(authentication)
@@ -357,6 +359,10 @@ app.hooks({
           logger.error('Meeting intelligence processing failed:', { error: error.message })
         }
       }, intervalMs: 15_000, immediate: true })
+
+      runtime.register({ name: 'meeting-recording-retention', run: async () => {
+        await app.get('meetingRecordingRetentionManager').run()
+      }, intervalMs: 8 * 60 * 60 * 1000, immediate: true })
 
       runtime.register({ name: 'message-reminders', run: async () => {
         try {

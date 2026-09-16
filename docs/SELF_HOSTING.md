@@ -290,6 +290,21 @@ example, PostgreSQL WAL and temporary files, Garage/S3 metadata, replication or
 versioning overhead, container layers, and logs. Use your database, object
 storage, Docker, and host monitoring for physical capacity planning.
 
+## Meeting-recording retention
+
+Platform administrators configure recording retention in **Admin → Meetings**.
+The default keeps completed meeting recordings for 60 days; it can be set to at
+least one day or to unlimited. A separate optional limit caps the combined
+recording storage; 10 GiB is a practical starting point. The default storage
+limit is unlimited.
+
+Nebulynk applies changed limits immediately, at backend startup, and every eight
+hours afterward. It first deletes recordings older than the retention period and
+then removes the oldest completed meetings until the recording storage is within
+the configured limit. All participant-audio files for a meeting are deleted as a
+unit. Existing transcripts and summaries remain available, but the deleted
+meeting can no longer be transcribed again with another model.
+
 ## Acceptance checks, troubleshooting, and updates
 
 After the first deployment and after infrastructure changes, check that:

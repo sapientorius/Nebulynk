@@ -98,6 +98,8 @@ test('platform domain: find maps settings table rows to key-value payload', asyn
     default_meeting_history_access: 'all_channel_members',
     auto_away_minutes: '15',
     meeting_video_enabled: 'true',
+    meeting_recording_retention_days: '60',
+    meeting_recording_storage_limit_gib: 'unlimited',
     upload_max_file_size_mb: '20',
     image_upload_max_dimension_px: '1920',
     image_upload_quality: '82',

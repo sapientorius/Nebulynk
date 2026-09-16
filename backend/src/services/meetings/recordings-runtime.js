@@ -172,10 +172,15 @@ export async function applyEgressUpdate(app, egressInfo, existingRecording = nul
         failure_message: null,
         updated_at: nowIso
       })
+    const completedRecording = {
+      ...recording,
+      status: MEETING_RECORDING_STATUS.READY,
+      storage_key: fileInfo.storageKey || recording.storage_key
+    }
+    await app.get('meetingRecordingRetentionManager')?.hydrateRecordingSize(completedRecording)
     await emitMeetingRecordingStateUpdated(app, recording.meeting_id)
     return {
-      ...recording,
-      status: MEETING_RECORDING_STATUS.READY
+      ...completedRecording
     }
   }
 

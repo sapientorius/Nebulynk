@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 
 function extractMeetingSummaryPayloadBlocks(source) {
-  return [...source.matchAll(/artifact_type: 'summary',[\s\S]*?payload:\s*\{([\s\S]*?)\n\s*\},\n\s*created_at/g)]
+  return [...source.matchAll(/artifact_type: 'summary',[\s\S]*?payload:\s*\{([\s\S]*?)\r?\n\s*\},\r?\n\s*created_at/g)]
     .map((match) => match[1])
 }
 

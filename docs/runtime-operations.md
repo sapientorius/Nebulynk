@@ -34,6 +34,7 @@ previous invocation finishes before scheduling the next delay:
 | Status expiry, auto-away, idle meetings, overdue scheduled meetings | 60 seconds | After first delay |
 | Guest expiry | 300 seconds | After first delay |
 | Transcription followed by summaries | 15 seconds | Immediately |
+| Meeting-recording retention | 8 hours | Immediately |
 | Message reminders | 30 seconds | Immediately |
 
 The existing platform update manager retains its scheduler and lease logic;
