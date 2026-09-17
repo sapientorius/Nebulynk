@@ -1,4 +1,26 @@
+import { expect } from '@playwright/test'
 import { resolveBackendUrl } from './test-urls.js'
+
+export async function openLoginForm(page) {
+  await page.goto('/login')
+  await expect(page.getByTestId('login-view')).toBeVisible()
+
+  const loginEmail = page.getByTestId('login-email')
+  const activeSession = page.getByTestId('login-active-session')
+
+  await expect.poll(async () => {
+    if (await activeSession.isVisible().catch(() => false)) return 'session'
+    if (await loginEmail.isVisible().catch(() => false)) return 'form'
+    return ''
+  }).not.toBe('')
+
+  if (await activeSession.isVisible()) {
+    await page.getByTestId('login-session-logout').click()
+  }
+
+  await expect(loginEmail).toBeVisible()
+  return loginEmail
+}
 
 export async function loginViaApi(request, { email, password, remember = false }) {
   const response = await request.post(resolveBackendUrl('/authentication'), {
