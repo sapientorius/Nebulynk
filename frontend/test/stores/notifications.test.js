@@ -12,6 +12,10 @@ const pwaMock = vi.hoisted(() => ({
   waitForAppServiceWorkerReady: vi.fn()
 }))
 
+const appBadgeMock = vi.hoisted(() => ({
+  syncAppBadge: vi.fn().mockResolvedValue(false)
+}))
+
 const runtimeState = vi.hoisted(() => ({
   desktop: false,
   workspaceDesktop: false
@@ -37,6 +41,8 @@ vi.mock('../../src/lib/api.js', () => ({
 }))
 
 vi.mock('../../src/lib/pwa.js', () => pwaMock)
+
+vi.mock('../../src/lib/app-badge.js', () => appBadgeMock)
 
 vi.mock('../../src/lib/desktop-workspace-bridge.js', () => ({
   getDesktopWorkspaceNotificationState: getDesktopWorkspaceNotificationStateMock,
@@ -78,6 +84,8 @@ function resetApiMock() {
   apiMock.patch.mockReset()
   apiMock.delete.mockReset()
   pwaMock.waitForAppServiceWorkerReady.mockReset()
+  appBadgeMock.syncAppBadge.mockReset()
+  appBadgeMock.syncAppBadge.mockResolvedValue(false)
   getDesktopNotificationPermissionMock.mockReset()
   requestDesktopNotificationPermissionMock.mockReset()
   updateDesktopProfileNotificationPreferencesMock.mockReset()
@@ -182,6 +190,26 @@ describe('notifications store', () => {
 
     expect(store.notifications).toHaveLength(2)
     expect(store.unreadCount).toBe(6)
+    expect(appBadgeMock.syncAppBadge).toHaveBeenCalledWith(6)
+  })
+
+  it('syncs the app badge after realtime, read, bulk-read, and reset updates', async () => {
+    const store = useNotificationsStore()
+    apiMock.patch.mockResolvedValue({ data: {} })
+
+    store.notifications = [{ id: 'notification-1', is_read: false }]
+    store.unreadCount = 1
+    await store.markRead('notification-1')
+    store.ingestIncomingNotification({ id: 'notification-2', is_read: false })
+    await store.markAllRead()
+    store.reset()
+
+    expect(appBadgeMock.syncAppBadge.mock.calls).toEqual([
+      [0],
+      [1],
+      [0],
+      [0]
+    ])
   })
 
   it('auto-marks message notifications read once and decrements by backend updated count', async () => {
@@ -215,6 +243,7 @@ describe('notifications store', () => {
     expect(store.notifications[1].is_read).toBe(true)
     expect(store.notifications[2].is_read).toBe(false)
     expect(store.unreadCount).toBe(2)
+    expect(appBadgeMock.syncAppBadge).toHaveBeenLastCalledWith(2)
   })
 
   it('batches visible message notification reads into one request and updates local unread state', async () => {

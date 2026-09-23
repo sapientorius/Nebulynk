@@ -1,6 +1,55 @@
 import { describe, expect, it, vi } from 'vitest'
 
 describe('PWA share target service worker', () => {
+  it('updates the app badge from a push unread count without delaying the notification', async () => {
+    vi.resetModules()
+    const listeners = new Map()
+    const setAppBadge = vi.fn().mockResolvedValue(undefined)
+    const showNotification = vi.fn().mockResolvedValue(undefined)
+    const workerScope = {
+      importScripts: vi.fn(),
+      addEventListener(type, handler) {
+        listeners.set(type, handler)
+      },
+      navigator: { setAppBadge },
+      registration: { showNotification },
+      location: {
+        origin: 'https://chat.example.test'
+      },
+      skipWaiting: vi.fn(),
+      clients: {
+        claim: vi.fn()
+      }
+    }
+    vi.stubGlobal('self', workerScope)
+
+    await import('../../public/sw.js')
+
+    let work = null
+    listeners.get('push')({
+      data: {
+        json: () => ({
+          title: 'Alice',
+          body: 'hello',
+          url: '/channels/channel-1',
+          unreadCount: 3
+        })
+      },
+      waitUntil(value) {
+        work = Promise.resolve(value)
+      }
+    })
+
+    await work
+
+    expect(setAppBadge).toHaveBeenCalledWith(3)
+    expect(showNotification).toHaveBeenCalledWith('Alice', expect.objectContaining({
+      body: 'hello',
+      data: { url: '/channels/channel-1' }
+    }))
+    vi.unstubAllGlobals()
+  })
+
   it('stores share POSTs and redirects to the authenticated handoff route', async () => {
     vi.resetModules()
     const listeners = new Map()

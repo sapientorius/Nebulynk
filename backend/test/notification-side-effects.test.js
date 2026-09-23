@@ -30,7 +30,61 @@ test('flush and stop wait for an already active push batch and all queued batche
 })
 
 function createUsersDb(users = []) {
+  return createTestDb({ users })
+}
+
+function createTestDb({ users = [], notifications = [] } = {}) {
   return (table) => {
+    if (table === 'notifications') {
+      const builder = {
+        _userIds: [],
+        _isRead: undefined,
+        whereIn(column, values) {
+          if (column !== 'user_id') {
+            throw new Error(`Unexpected whereIn column: ${column}`)
+          }
+          builder._userIds = values
+          return builder
+        },
+        where(column, value) {
+          if (column !== 'is_read') {
+            throw new Error(`Unexpected where column: ${column}`)
+          }
+          builder._isRead = value
+          return builder
+        },
+        groupBy(column) {
+          if (column !== 'user_id') {
+            throw new Error(`Unexpected groupBy column: ${column}`)
+          }
+          return builder
+        },
+        select(...columns) {
+          if (columns.length !== 1 || columns[0] !== 'user_id') {
+            throw new Error(`Unexpected notification select columns: ${columns.join(',')}`)
+          }
+          return builder
+        },
+        async count(alias) {
+          if (alias?.count !== '*') {
+            throw new Error(`Unexpected count alias: ${JSON.stringify(alias)}`)
+          }
+          const counts = new Map()
+          for (const notification of notifications) {
+            if (!builder._userIds.includes(notification.user_id)) continue
+            if (notification.is_read !== builder._isRead) continue
+            counts.set(notification.user_id, (counts.get(notification.user_id) || 0) + 1)
+          }
+          return [...counts.entries()].map(([user_id, count]) => ({
+            user_id,
+            count: String(count)
+          }))
+        }
+      }
+
+      return builder
+    }
+
     if (table !== 'users') {
       throw new Error(`Unexpected table: ${table}`)
     }
@@ -69,9 +123,16 @@ test('notification side effects dispatcher schedules socket and push work off th
   const app = {
     get(key) {
       if (key !== 'postgresqlClient') throw new Error(`Unexpected app.get(${key})`)
-      return createUsersDb([
-        { id: 'user-1', status: 'online', preferred_locale: 'en' }
-      ])
+      return createTestDb({
+        users: [
+          { id: 'user-1', status: 'online', preferred_locale: 'en' }
+        ],
+        notifications: [
+          { user_id: 'user-1', is_read: false },
+          { user_id: 'user-1', is_read: false },
+          { user_id: 'user-1', is_read: true }
+        ]
+      })
     },
     service(name) {
       if (name !== 'notifications') throw new Error(`Unexpected service(${name})`)
@@ -123,6 +184,7 @@ test('notification side effects dispatcher schedules socket and push work off th
   assert.equal(pushed.length, 1)
   assert.equal(pushed[0].userId, 'user-1')
   assert.equal(pushed[0].payload.url, '/channels/channel-1')
+  assert.equal(pushed[0].payload.unreadCount, 2)
 })
 
 test('notification side effects dispatcher skips dnd push and swallows socket/push failures', async () => {
@@ -377,7 +439,8 @@ test('notification side effects dispatcher routes registration alerts to registr
     payload: {
       title: 'Registration awaiting approval',
       body: 'New Member has registered and is awaiting approval.',
-      url: '/admin?tab=registration'
+      url: '/admin?tab=registration',
+      unreadCount: 0
     }
   }])
 })
