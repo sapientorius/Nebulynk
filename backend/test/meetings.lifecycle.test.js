@@ -912,7 +912,25 @@ test('meetings realtime: end emits additive ended payload and queues only config
           async insert(row) {
             artifactOperations.push({ type: 'insert', row })
             return undefined
+          },
+          async first() {
+            return { id: 'transcript-artifact' }
           }
+        }
+      }
+
+      if (table === 'meeting_transcription_jobs') {
+        return {
+          where() { return this },
+          del: async () => 0,
+          insert: async () => undefined
+        }
+      }
+
+      if (table === 'meeting_recordings') {
+        return {
+          where() { return this },
+          select: async () => meetingRecordingRows
         }
       }
 
@@ -1031,6 +1049,7 @@ test('meetings realtime: end emits additive ended payload and queues only config
       patch: {
         status: 'processing',
         updated_at: artifactOperations[2].patch.updated_at,
+        transcription_generation: artifactOperations[2].patch.transcription_generation,
         payload: null
       }
     }

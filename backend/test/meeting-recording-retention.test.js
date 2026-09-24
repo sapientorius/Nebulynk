@@ -5,7 +5,7 @@ import { MeetingRecordingRetentionManager } from '../src/lib/meeting-recording-r
 
 const GIB = 1024 * 1024 * 1024
 
-function createHarness({ settings = {}, rows = [], sizes = {}, deleteError = null } = {}) {
+function createHarness({ settings = {}, rows = [], artifacts = [], sizes = {}, deleteError = null } = {}) {
   const deletedMeetingIds = []
   const deletedObjects = []
   const sizeUpdates = []
@@ -30,6 +30,7 @@ function createHarness({ settings = {}, rows = [], sizes = {}, deleteError = nul
           return Object.entries(settings).map(([key, value]) => ({ key, value }))
         }
         if (table === 'meeting_recordings') return currentRows.map((row) => ({ ...row }))
+        if (table === 'meeting_artifacts') return artifacts.map((row) => ({ ...row }))
         return []
       },
       async update(patch) {
@@ -92,6 +93,18 @@ function createHarness({ settings = {}, rows = [], sizes = {}, deleteError = nul
 
   return { manager, currentRows, deletedMeetingIds, deletedObjects, sizeUpdates, get invalidated() { return invalidated } }
 }
+
+test('retention protects recordings while a transcript is queued or being retried', async () => {
+  const harness = createHarness({
+    settings: { meeting_recording_retention_days: '1', meeting_recording_storage_limit_gib: 'unlimited' },
+    rows: [recording('pending-audio', 'pending-meeting', '2026-09-01T12:00:00.000Z')],
+    artifacts: [{ meeting_id: 'pending-meeting', artifact_type: 'transcript', status: 'processing' }],
+    sizes: { 'pending-audio.mp4': 20 }
+  })
+  assert.deepEqual(await harness.manager.run(), { state: 'completed', deletedMeetingCount: 0 })
+  assert.equal(harness.currentRows.length, 1)
+  assert.deepEqual(harness.deletedObjects, [])
+})
 
 function recording(id, meetingId, meetingEndedAt, options = {}) {
   return {

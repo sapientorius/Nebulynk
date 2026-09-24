@@ -1,5 +1,13 @@
 # Self-Hosting with Docker
 
+The production Compose overlay includes a `transcription-worker` service. It
+uses the backend image without publishing a port, waits for the backend's
+database migrations, and processes one recording at a time. On the first update,
+keep transcription disabled until both containers are healthy, then enable it
+to resume existing pending transcript artifacts. See the
+[Coolify worker upgrade notes](COOLIFY.md#transcription-worker-and-first-upgrade)
+for limits and retry behavior.
+
 This guide explains how to run your own Nebulynk instance. It is intended for
 administrators who can manage domains, TLS certificates, and server backups.
 For a fully managed deployment, follow the dedicated

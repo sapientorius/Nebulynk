@@ -127,6 +127,11 @@ export class MeetingRecordingRetentionManager {
         'meetings.ended_at as meeting_ended_at'
       )
     const groups = groupRecordings(rows)
+    const activeTranscriptArtifacts = await this.db('meeting_artifacts')
+      .where('artifact_type', 'transcript')
+      .whereIn('status', ['pending', 'processing'])
+      .select('meeting_id')
+    const protectedMeetingIds = new Set(activeTranscriptArtifacts.map((artifact) => artifact.meeting_id))
 
     for (const group of groups) {
       for (const recording of group.recordings) {
@@ -142,6 +147,7 @@ export class MeetingRecordingRetentionManager {
     const deletableGroups = groups
       .filter((group) => (
         group.meetingStatus === 'ended'
+        && !protectedMeetingIds.has(group.meetingId)
         && timestampMs(group.endedAt) !== null
         && group.recordings.every((recording) => !isActiveMeetingRecordingStatus(recording.status))
       ))

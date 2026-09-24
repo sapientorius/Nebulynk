@@ -868,9 +868,20 @@ export async function processPendingMeetingTranscripts(app) {
 }
 
 export {
+  applyWhisperSegmentFilters,
+  buildFallbackSegment,
+  buildMistralContextBias,
+  buildRecordingPauseWarnings,
+  buildTranscriptWarnings,
   buildTranscriptText,
+  chooseTranscriptLanguage,
+  createFilterSummary,
   isLikelySubtitleCreditHallucination,
+  mergeFilterSummary,
   mergeMeetingTranscriptSegments,
   mergeSpeakerTranscriptSegments,
+  normalizeRelativeSegment,
+  readWhisperHardeningConfig,
+  resolveRecordingStart,
   resolveWhisperSegmentDropReason
 }

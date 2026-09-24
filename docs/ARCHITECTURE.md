@@ -114,6 +114,13 @@ backend completely before starting its replacement; overlapping/rolling backend
 deployments are unsupported even with a desired replica count of one. Configure
 the orchestrator accordingly and allow a maintenance window.
 
+Meeting transcription runs in one separate worker process. The API updates
+recording state, reconciles pending LiveKit egress, and continues to generate
+meeting summaries. PostgreSQL stores per-recording jobs, chunk checkpoints,
+leases, retry times, and a completion event. The API delivers that event through
+its existing meeting Socket.IO channel. The worker does not start the Feathers
+HTTP app or run its presence and voice cleanup.
+
 The backend handles SIGTERM/SIGINT with a 60-second shutdown budget; container
 stop grace is 75 seconds. Wait for `GET /health/ready` to return HTTP 200 before
 routing traffic. Startup clears shared voice participants and stale presence;

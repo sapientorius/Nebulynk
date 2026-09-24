@@ -128,6 +128,7 @@ test('meetings artifacts: queue helpers insert, update, and reset payloads', asy
     meeting_id: 'meeting-1',
     artifact_type: 'transcript',
     status: 'processing',
+    transcription_generation: 'transcript-artifact',
     payload: null,
     created_at: NOW_ISO,
     updated_at: NOW_ISO

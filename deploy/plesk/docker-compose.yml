@@ -107,6 +107,37 @@ services:
       - livekit
       - livekit-egress
 
+  transcription-worker:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+      args:
+        NODE_IMAGE: ${NEBULYNK_NODE_IMAGE:-node:22.23.1-alpine3.24}
+    command: ["node", "src/transcription-worker.js"]
+    stop_grace_period: 75s
+    mem_limit: ${TRANSCRIPTION_WORKER_MEMORY_LIMIT:-1536m}
+    cpus: ${TRANSCRIPTION_WORKER_CPUS:-1.0}
+    healthcheck:
+      test: ["CMD", "node", "src/transcription-worker-health.js"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+    env_file:
+      - ${NEBULYNK_ENV_FILE:?NEBULYNK_ENV_FILE must be set}
+    environment:
+      NODE_ENV: production
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      STORAGE_S3_ENDPOINT: http://garage:3900
+      MEETING_RECORDINGS_S3_ENDPOINT: http://garage:3900
+      MEETING_RECORDINGS_BUCKET: ${MEETING_RECORDINGS_BUCKET:-files}
+      TRANSCRIPTION_MAX_TEMP_BYTES: ${TRANSCRIPTION_MAX_TEMP_BYTES:-2147483648}
+    depends_on:
+      backend:
+        condition: service_healthy
+
   frontend:
     build:
       context: .
