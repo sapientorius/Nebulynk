@@ -99,7 +99,7 @@ test('livekit webhook route runs participant side effects only after receiver va
   }
 })
 
-test('livekit webhook route queues transcript work after validated egress updates', async () => {
+test('livekit webhook route only updates recording state after validated egress updates', async () => {
   const calls = []
   const harness = await createHarness({
     getWebhookReceiver: () => ({
@@ -114,12 +114,6 @@ test('livekit webhook route queues transcript work after validated egress update
     async applyEgressUpdate(app, egressInfo) {
       calls.push(`apply:${egressInfo.egressId}`)
       return { id: 'recording-1' }
-    },
-    async processPendingMeetingTranscripts() {
-      calls.push('transcripts')
-    },
-    async processPendingMeetingSummaries() {
-      calls.push('summaries')
     }
   })
 
@@ -135,9 +129,7 @@ test('livekit webhook route queues transcript work after validated egress update
     assert.equal(response.status, 200)
     assert.deepEqual(calls, [
       'receive',
-      'apply:egress-1',
-      'transcripts',
-      'summaries'
+      'apply:egress-1'
     ])
   } finally {
     await harness.close()

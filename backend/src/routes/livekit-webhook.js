@@ -1,8 +1,6 @@
 import { getWebhookReceiver } from '../lib/livekit.js'
 import { removeVoiceParticipant } from '../services/voice/voice.js'
 import { markMeetingIdleByChatChannelId } from '../services/meetings/idle-timeout.js'
-import { processPendingMeetingTranscripts } from '../services/meetings/transcript-processor.js'
-import { processPendingMeetingSummaries } from '../services/meetings/summary-processor.js'
 import { applyEgressUpdate } from '../services/meetings/recordings-runtime.js'
 import { logger } from '../logger.js'
 import { buildErrorBody } from '../lib/errors.js'
@@ -13,8 +11,6 @@ export function configureLivekitWebhook(app, options = {}) {
   const handlers = {
     removeVoiceParticipant: options.removeVoiceParticipant || removeVoiceParticipant,
     markMeetingIdleByChatChannelId: options.markMeetingIdleByChatChannelId || markMeetingIdleByChatChannelId,
-    processPendingMeetingTranscripts: options.processPendingMeetingTranscripts || processPendingMeetingTranscripts,
-    processPendingMeetingSummaries: options.processPendingMeetingSummaries || processPendingMeetingSummaries,
     applyEgressUpdate: options.applyEgressUpdate || applyEgressUpdate
   }
 
@@ -60,11 +56,7 @@ export function configureLivekitWebhook(app, options = {}) {
         case 'egress_started':
         case 'egress_updated':
         case 'egress_ended': {
-          const updatedRecording = await handlers.applyEgressUpdate(app, event.egressInfo)
-          if (updatedRecording) {
-            await handlers.processPendingMeetingTranscripts(app)
-            await handlers.processPendingMeetingSummaries(app)
-          }
+          await handlers.applyEgressUpdate(app, event.egressInfo)
           break
         }
       }

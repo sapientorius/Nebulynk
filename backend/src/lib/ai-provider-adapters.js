@@ -301,6 +301,7 @@ export async function transcribeAudio({
   file,
   contextBias = null,
   language = null,
+  signal = null,
   fetchFn = globalThis.fetch,
   env = process.env,
   lookupFn
@@ -363,7 +364,8 @@ export async function transcribeAudio({
   const response = await fetchFn(endpoint, {
     method: 'POST',
     headers: buildHeaders(providerType, apiKey),
-    body: form
+    body: form,
+    ...(signal ? { signal } : {})
   })
 
   const payload = await parseJsonResponse(response)

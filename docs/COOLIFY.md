@@ -188,6 +188,30 @@ stop grace is 75 seconds. Wait for `GET /health/ready` to return HTTP 200 before
 routing traffic. Startup clears shared voice participants and stale presence;
 existing LiveKit media does not imply seamless API-session recovery.
 
+## Transcription worker and first upgrade
+
+The Compose deployment adds one `transcription-worker` container using the backend
+image. It has no public domain or port and starts after the backend becomes
+healthy. It processes one recording at a time with a default limit of 1.5 GiB
+memory and one CPU. Temporary audio stays inside the worker container and is
+removed after processing or a restart. The default temporary recording limit is
+2 GiB. Adjust `TRANSCRIPTION_WORKER_MEMORY_LIMIT`, `TRANSCRIPTION_WORKER_CPUS`,
+or `TRANSCRIPTION_MAX_TEMP_BYTES` only after checking host capacity.
+
+For the first upgrade, leave the transcription AI function disabled, back up
+PostgreSQL and Garage, and deploy during the backend maintenance window described
+above. Check that the backend and `transcription-worker` are healthy, then enable
+transcription in the admin settings. Existing transcript artifacts in `pending`
+or `processing` are migrated to the durable queue and processed oldest first.
+Meetings that ended while transcription was disabled and never received a
+transcript artifact are not queued retrospectively.
+
+Watch the worker's logs for completed chunk indices and retry errors. A failed
+recording is retried at most twice after its first attempt, with five and then
+30 minutes of delay. The API should remain healthy even if Docker reports an OOM
+for the worker. A permanently failed transcript can be restarted through the
+existing host or admin action after resolving the cause.
+
 See [runtime operations and isolated capacity verification](runtime-operations.md)
 for lifecycle ownership, recovery limits, exact rollout steps and reproducible
 local Docker tests. Redis rate limiting does not enable multiple API instances.

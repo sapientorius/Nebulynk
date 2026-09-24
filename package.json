@@ -44,6 +44,8 @@
     "test:backend:rtk": "rtk npm run test:rtk --workspace=backend",
     "test:backend:integration": "npm run test:integration --workspace=backend",
     "test:backend:integration:rtk": "rtk npm run test:integration:rtk --workspace=backend",
+    "test:transcription:isolation": "node scripts/test-transcription-isolation.mjs",
+    "test:transcription:isolation:rtk": "rtk node scripts/test-transcription-isolation.mjs",
     "test:frontend": "npm run test --workspace=frontend",
     "test:frontend:rtk": "rtk npm run test:rtk --workspace=frontend",
     "test:e2e": "npm run test:e2e --workspace=frontend",

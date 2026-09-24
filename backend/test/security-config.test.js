@@ -389,6 +389,9 @@ test('Coolify compose passes generated production configuration to every consume
 
   assert.equal(services.postgres.environment.POSTGRES_PASSWORD, 'generated-postgres-secret')
   assert.equal(services.backend.environment.POSTGRES_PASSWORD, 'generated-postgres-secret')
+  assert.equal(services['transcription-worker'].environment.POSTGRES_PASSWORD, 'generated-postgres-secret')
+  assert.equal(services['transcription-worker'].environment.AI_SECRET_KEY, 'generated-ai-secret')
+  assert.equal(services['transcription-worker'].ports, undefined)
 
   assert.equal(services.garage.environment.GARAGE_RPC_SECRET, 'a'.repeat(64))
   assert.equal(services.garage.environment.GARAGE_RPC_SECRET.length, 64)
@@ -454,7 +457,8 @@ test('Dokploy compose passes explicit production configuration to every consumer
     'livekit',
     'livekit-egress',
     'postgres',
-    'redis'
+    'redis',
+    'transcription-worker'
   ])
   assert.deepEqual(Object.keys(volumes).sort(), [
     'nebulynk_garage_data',
@@ -549,7 +553,7 @@ test('Dokploy template packages a reproducible native-domain import', async () =
   assert.deepEqual([...icon.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10])
 
   const remoteBuildContext = 'context: "https://github.com/sapientorius/Nebulynk.git#${NEBULYNK_SOURCE_REF:-stable}"'
-  assert.equal(compose.split(remoteBuildContext).length - 1, 5)
+  assert.equal(compose.split(remoteBuildContext).length - 1, 6)
   assert.match(compose, /^\s+- "7881:7881"$/m)
   assert.match(compose, /^\s+- "7882:7882\/udp"$/m)
   assert.doesNotMatch(compose, /^\s*(?:container_name|networks|labels):/m)
@@ -638,7 +642,8 @@ test('Dokploy template renders its generated development contract when Docker Co
     'livekit',
     'livekit-egress',
     'postgres',
-    'redis'
+    'redis',
+    'transcription-worker'
   ])
   assert.equal(
     services.frontend.build.context,
