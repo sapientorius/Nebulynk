@@ -321,6 +321,14 @@ After the first deployment and after infrastructure changes, check that:
 5. If enabled, SMTP delivery, push notifications, and AI integrations work
    without exposing their secrets in the browser or logs.
 
+When an administrator saves an active AI function, Nebulynk sends a small
+synthetic test request to the selected provider and activates the configuration
+only after a successful response. Image generation produces a real test image
+and can incur API charges. A failed or timed-out test leaves the previous active
+configuration in place. Existing AI configurations show as unverified after
+upgrading; save the active function to test it. A failed meeting summary can be
+retried from the meeting history after correcting its AI configuration.
+
 Useful Docker commands are `docker compose -p nebulynk ps` and
 `docker compose -p nebulynk logs -f livekit livekit-egress`. In Coolify, use
 the logs of the affected resource. Before every update, verify backups and a

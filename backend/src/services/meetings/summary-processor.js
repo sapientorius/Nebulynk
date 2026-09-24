@@ -258,6 +258,7 @@ export async function processPendingMeetingSummaries(app) {
         apiKey: runtime.apiKey,
         baseUrl: runtime.providerInstance.base_url,
         model: runtime.functionConfig.model,
+        ...runtime.requestOptions,
         systemPrompt: 'You create grounded business meeting summaries for Nebulynk. Only use provided meeting evidence and always return valid JSON.',
         userPrompt: buildPrompt(context),
         capability: 'meeting_summary',

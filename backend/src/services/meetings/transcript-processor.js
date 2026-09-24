@@ -536,6 +536,7 @@ async function transcribeMeetingRecording({
       apiKey: runtime.apiKey,
       baseUrl: runtime.providerInstance.base_url,
       model: runtime.functionConfig.model,
+      ...runtime.requestOptions,
       file: {
         buffer: chunk.buffer,
         mime: chunk.mime

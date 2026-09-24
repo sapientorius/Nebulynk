@@ -289,6 +289,7 @@ export class VoiceMessageArtifactsService {
       apiKey: transcriptionRuntime.apiKey,
       baseUrl: transcriptionRuntime.providerInstance.base_url,
       model: transcriptionRuntime.functionConfig.model,
+      ...transcriptionRuntime.requestOptions,
       file: {
         buffer: storedFile.buffer,
         mime: storedFile.mime || file.mime_type
@@ -305,6 +306,7 @@ export class VoiceMessageArtifactsService {
       apiKey: summaryRuntime.apiKey,
       baseUrl: summaryRuntime.providerInstance.base_url,
       model: summaryRuntime.functionConfig.model,
+      ...summaryRuntime.requestOptions,
       systemPrompt: 'You create concise private summaries of short voice messages for Nebulynk. Use only the supplied transcript and return valid JSON.',
       userPrompt: buildSummaryPrompt({
         transcript,

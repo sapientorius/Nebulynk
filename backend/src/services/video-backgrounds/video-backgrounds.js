@@ -116,6 +116,7 @@ export class VideoBackgroundsService {
       apiKey: runtime.apiKey,
       baseUrl: runtime.providerInstance.base_url,
       model: runtime.functionConfig.model,
+      ...runtime.requestOptions,
       prompt,
       fetchFn: this.app.get('fetch') || globalThis.fetch
     })

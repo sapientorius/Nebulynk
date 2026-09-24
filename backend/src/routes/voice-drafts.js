@@ -92,10 +92,10 @@ export async function polishVoiceDraftTranscript({ app, db, transcript, language
       apiKey: runtime.apiKey,
       baseUrl: runtime.providerInstance.base_url,
       model: runtime.functionConfig.model,
+      ...runtime.requestOptions,
       systemPrompt: 'You turn raw voice-to-text transcripts into polished editable Nebulynk chat messages. Return valid JSON only.',
       userPrompt: buildCleanupPrompt({ transcript: rawText, language }),
       capability: 'meeting_summary',
-      temperature: 0,
       validateObject: normalizeCleanupDraft
     })
 
@@ -231,6 +231,7 @@ export function configureVoiceDraftRoutes(app) {
         apiKey: runtime.apiKey,
         baseUrl: runtime.providerInstance.base_url,
         model: runtime.functionConfig.model,
+        ...runtime.requestOptions,
         file: {
           buffer,
           mime: uploadedFile.mimetype

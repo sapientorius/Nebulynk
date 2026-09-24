@@ -579,6 +579,7 @@ export class MessageSummariesService {
         apiKey: runtime.apiKey,
         baseUrl: runtime.providerInstance.base_url,
         model: runtime.functionConfig.model,
+        ...runtime.requestOptions,
         systemPrompt: 'You create concise private chat summaries for Nebulynk. Use only the supplied chat messages and return valid JSON.',
         userPrompt: buildPrompt({
           channel,
