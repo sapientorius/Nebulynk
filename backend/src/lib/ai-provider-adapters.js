@@ -3,6 +3,22 @@ import {
   providerSupportsCapability
 } from './ai-config.js'
 import { badRequest } from './errors.js'
+import { logger } from '../logger.js'
+
+export const AI_REQUEST_PROFILE_VERSION = 1
+
+export function createAiRequestProfile(value = null) {
+  let source = value
+  if (typeof source === 'string') {
+    try { source = JSON.parse(source) } catch { source = null }
+  }
+  return {
+    version: AI_REQUEST_PROFILE_VERSION,
+    omit: source?.version === AI_REQUEST_PROFILE_VERSION && Array.isArray(source.omit)
+      ? [...new Set(source.omit.filter((item) => typeof item === 'string'))]
+      : []
+  }
+}
 
 function isWhisperLikeModel(modelId) {
   return /whisper/i.test(modelId)
@@ -120,16 +136,78 @@ function filterModelsForCapability(models, capability) {
 async function parseJsonResponse(response) {
   if (!response.ok) {
     let detail = response.statusText
+    let providerCode = null
+    let providerParam = null
     try {
       const payload = await response.json()
       detail = payload?.error?.message || payload?.message || detail
+      providerCode = payload?.error?.code || null
+      providerParam = payload?.error?.param || null
     } catch {
       // Keep statusText fallback.
     }
-    throw new Error(`${response.status} ${detail}`.trim())
+    const error = new Error(`${response.status} ${detail}`.trim())
+    error.status = response.status
+    error.providerCode = providerCode
+    error.providerParam = providerParam
+    throw error
   }
 
   return response.json()
+}
+
+function unsupportedOptionalParameter(error, optionalFields) {
+  if (error?.status !== 400 && error?.status !== 422) return null
+  const code = String(error?.providerCode || '')
+  const message = String(error?.message || '')
+  if (!['unsupported_parameter', 'unsupported_value', 'invalid_request_error'].includes(code)
+    && !/unsupported|not supported|does not support|unknown parameter|unrecognized parameter/i.test(message)) return null
+  if (code === 'invalid_request_error'
+    && !/unsupported|not supported|does not support|unknown parameter|unrecognized parameter/i.test(message)) return null
+
+  const rawParam = String(error?.providerParam || '').replace(/\[\]$/, '')
+  if (rawParam) return optionalFields.find((field) => field.replace(/\[\]$/, '') === rawParam) || null
+  return optionalFields.find((field) => {
+    const normalized = field.replace(/\[\]$/, '')
+    return new RegExp(`\\b${normalized}\\b`).test(message)
+  }) || null
+}
+
+async function requestWithProfile({ fetchFn, url, options, buildBody, optionalFields, requestProfile, onProfileAdapted, providerType, model, functionKey }) {
+  const profile = createAiRequestProfile(requestProfile)
+  const omitted = new Set(profile.omit)
+  let adapted = false
+  for (let attempt = 0; attempt <= optionalFields.length; attempt += 1) {
+    try {
+      const response = await fetchFn(url, { ...options, body: buildBody(omitted) })
+      const payload = await parseJsonResponse(response)
+      if (adapted) {
+        const nextProfile = { version: AI_REQUEST_PROFILE_VERSION, omit: [...omitted].sort() }
+        if (requestProfile && typeof requestProfile === 'object') Object.assign(requestProfile, nextProfile)
+        try {
+          await onProfileAdapted?.(nextProfile)
+        } catch {
+          logger.warn('AI request profile could not be persisted', { providerType, model, functionKey })
+        }
+      }
+      return payload
+    } catch (error) {
+      const field = unsupportedOptionalParameter(error, optionalFields)
+      if (!field || omitted.has(field)) {
+        logger.warn('AI model request failed', {
+          providerType, model, functionKey, status: error?.status || null,
+          providerCode: error?.providerCode || null, providerParam: error?.providerParam || null
+        })
+        throw error
+      }
+      omitted.add(field)
+      adapted = true
+      logger.warn('AI model rejected an optional request parameter', {
+        providerType, model, functionKey, parameter: field, providerCode: error.providerCode
+      })
+    }
+  }
+  throw new Error('AI request parameter adaptation exhausted')
 }
 
 function buildHeaders(providerType, apiKey) {
@@ -301,6 +379,10 @@ export async function transcribeAudio({
   file,
   contextBias = null,
   language = null,
+  functionKey = 'transcription',
+  requestProfile = null,
+  onProfileAdapted = null,
+  signal = undefined,
   fetchFn = globalThis.fetch,
   env = process.env,
   lookupFn
@@ -337,36 +419,34 @@ export async function transcribeAudio({
             ? 'webm'
             : 'ogg'
   const blob = new Blob([file?.buffer || new Uint8Array()], { type: mime })
-  const form = new FormData()
-
-  form.append('file', blob, `meeting-recording.${extension}`)
-  form.append('model', String(model || '').trim())
-
-  if (providerType === 'mistral') {
-    form.append('timestamp_granularities[]', 'segment')
-    if (contextBias) {
-      form.append('context_bias', contextBias)
+  const payload = await requestWithProfile({
+    fetchFn,
+    url: endpoint,
+    options: { method: 'POST', headers: buildHeaders(providerType, apiKey), signal },
+    optionalFields: ['response_format', 'timestamp_granularities[]', 'chunking_strategy', 'language', 'context_bias'],
+    requestProfile,
+    onProfileAdapted,
+    providerType,
+    model,
+    functionKey,
+    buildBody: (omit) => {
+      const form = new FormData()
+      form.append('file', blob, `meeting-recording.${extension}`)
+      form.append('model', String(model || '').trim())
+      if (providerType === 'mistral') {
+        if (!omit.has('timestamp_granularities[]')) form.append('timestamp_granularities[]', 'segment')
+        if (contextBias && !omit.has('context_bias')) form.append('context_bias', contextBias)
+      } else {
+        if (!omit.has('response_format')) form.append('response_format', shouldRequestVerboseJson(providerType, model) ? 'verbose_json' : 'json')
+        if (modelSupportsTimestampGranularities(providerType, model) && !omit.has('timestamp_granularities[]')) {
+          form.append('timestamp_granularities[]', 'segment')
+        }
+        if (shouldUseOpenAiServerChunking(providerType, model) && !omit.has('chunking_strategy')) form.append('chunking_strategy', 'auto')
+        if (language && !omit.has('language')) form.append('language', language)
+      }
+      return form
     }
-  } else {
-    form.append('response_format', shouldRequestVerboseJson(providerType, model) ? 'verbose_json' : 'json')
-    if (modelSupportsTimestampGranularities(providerType, model)) {
-      form.append('timestamp_granularities[]', 'segment')
-    }
-    if (shouldUseOpenAiServerChunking(providerType, model)) {
-      form.append('chunking_strategy', 'auto')
-    }
-    if (language) {
-      form.append('language', language)
-    }
-  }
-
-  const response = await fetchFn(endpoint, {
-    method: 'POST',
-    headers: buildHeaders(providerType, apiKey),
-    body: form
   })
-
-  const payload = await parseJsonResponse(response)
   return {
     text: typeof payload?.text === 'string' ? payload.text : '',
     language: typeof payload?.language === 'string' ? payload.language : null,
@@ -383,8 +463,11 @@ export async function generateStructuredObject({
   systemPrompt,
   userPrompt,
   capability = 'meeting_summary',
-  temperature = 0,
+  functionKey = 'meeting_summary',
   validateObject = null,
+  requestProfile = null,
+  onProfileAdapted = null,
+  signal = undefined,
   fetchFn = globalThis.fetch,
   env = process.env,
   lookupFn
@@ -413,38 +496,31 @@ export async function generateStructuredObject({
 
   let payload = null
   if (providerType === 'anthropic') {
-    const response = await fetchFn(getAnthropicMessagesEndpoint(resolvedBaseUrl), {
-      method: 'POST',
-      headers: {
-        ...buildHeaders(providerType, apiKey),
-        'content-type': 'application/json'
-      },
-      body: JSON.stringify({
+    const result = await requestWithProfile({
+      fetchFn,
+      url: getAnthropicMessagesEndpoint(resolvedBaseUrl),
+      options: { method: 'POST', headers: { ...buildHeaders(providerType, apiKey), 'content-type': 'application/json' }, signal },
+      optionalFields: [], requestProfile, onProfileAdapted, providerType, model, functionKey,
+      buildBody: () => JSON.stringify({
         model: normalizedModel,
         system: normalizedSystemPrompt,
         messages: [{
           role: 'user',
           content: normalizedUserPrompt
         }],
-        max_tokens: 2048,
-        temperature
+        max_tokens: 2048
       })
     })
-
-    payload = extractJsonObject(extractAnthropicContent(await parseJsonResponse(response)))
+    payload = extractJsonObject(extractAnthropicContent(result))
   } else {
-    const response = await fetchFn(getChatCompletionsEndpoint(resolvedBaseUrl), {
-      method: 'POST',
-      headers: {
-        ...buildHeaders(providerType, apiKey),
-        'content-type': 'application/json'
-      },
-      body: JSON.stringify({
+    const result = await requestWithProfile({
+      fetchFn,
+      url: getChatCompletionsEndpoint(resolvedBaseUrl),
+      options: { method: 'POST', headers: { ...buildHeaders(providerType, apiKey), 'content-type': 'application/json' }, signal },
+      optionalFields: ['response_format'], requestProfile, onProfileAdapted, providerType, model, functionKey,
+      buildBody: (omit) => JSON.stringify({
         model: normalizedModel,
-        temperature,
-        response_format: {
-          type: 'json_object'
-        },
+        ...(!omit.has('response_format') ? { response_format: { type: 'json_object' } } : {}),
         messages: [
           {
             role: 'system',
@@ -457,8 +533,7 @@ export async function generateStructuredObject({
         ]
       })
     })
-
-    payload = extractJsonObject(extractOpenAiContent(await parseJsonResponse(response)))
+    payload = extractJsonObject(extractOpenAiContent(result))
   }
 
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
@@ -480,6 +555,10 @@ export async function generateImage({
   prompt,
   size = '1536x1024',
   quality = 'auto',
+  functionKey = 'image_generation',
+  requestProfile = null,
+  onProfileAdapted = null,
+  signal = undefined,
   fetchFn = globalThis.fetch,
   env = process.env,
   lookupFn
@@ -504,21 +583,19 @@ export async function generateImage({
   const resolvedBaseUrl = await assertProviderBaseUrlAllowed({ providerType, baseUrl, env, lookupFn })
   const normalizedModel = String(model || '').trim()
   const normalizedPrompt = String(prompt || '').trim()
-  const response = await fetchFn(getImageGenerationsEndpoint(resolvedBaseUrl), {
-    method: 'POST',
-    headers: {
-      ...buildHeaders(providerType, apiKey),
-      'content-type': 'application/json'
-    },
-    body: JSON.stringify({
+  const payload = await requestWithProfile({
+    fetchFn,
+    url: getImageGenerationsEndpoint(resolvedBaseUrl),
+    options: { method: 'POST', headers: { ...buildHeaders(providerType, apiKey), 'content-type': 'application/json' }, signal },
+    optionalFields: ['quality'], requestProfile, onProfileAdapted, providerType, model, functionKey,
+    buildBody: (omit) => JSON.stringify({
       model: normalizedModel,
       prompt: normalizedPrompt,
       n: 1,
       size,
-      quality
+      ...(!omit.has('quality') ? { quality } : {})
     })
   })
-  const payload = await parseJsonResponse(response)
   const imageBase64 = payload?.data?.[0]?.b64_json
   if (typeof imageBase64 !== 'string' || !imageBase64.trim()) {
     throw new Error('Image generation returned no image payload')

@@ -6,6 +6,7 @@ import {
   getManualMeetingSummaryRuntime
 } from '../../lib/meeting-recordings.js'
 import { listQueuedMeetingArtifactTypes } from '../../services/ai-function-configs/ai-function-configs.js'
+import { queueTranscriptRecordingJobs } from '../../services/meetings/transcription-jobs.js'
 import {
   filterVisibleMeetingArtifacts,
   isRegeneratableTranscriptRecording
@@ -60,9 +61,11 @@ export class MeetingArtifactsDomainService {
     nowIso,
     resetPayload = true
   }) {
+    const generation = artifactType === 'transcript' ? this.createIdFn() : null
     const patchData = {
       status: 'processing',
-      updated_at: nowIso
+      updated_at: nowIso,
+      ...(generation ? { transcription_generation: generation } : {})
     }
 
     if (resetPayload) {
@@ -77,18 +80,29 @@ export class MeetingArtifactsDomainService {
       .update(patchData)
 
     if (updatedArtifacts) {
+      if (generation) {
+        const artifact = await trx('meeting_artifacts')
+          .where({ meeting_id: meetingId, artifact_type: artifactType })
+          .first('id')
+        await queueTranscriptRecordingJobs(trx, { artifactId: artifact.id, meetingId, generation })
+      }
       return
     }
 
+    const artifactId = this.createIdFn()
     await trx('meeting_artifacts').insert({
-      id: this.createIdFn(),
+      id: artifactId,
       meeting_id: meetingId,
       artifact_type: artifactType,
       status: 'processing',
+      ...(generation ? { transcription_generation: generation } : {}),
       ...(resetPayload ? { payload: null } : {}),
       created_at: nowIso,
       updated_at: nowIso
     })
+    if (generation) {
+      await queueTranscriptRecordingJobs(trx, { artifactId, meetingId, generation })
+    }
   }
 
   emitArtifactsQueued(meeting, {

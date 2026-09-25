@@ -1,5 +1,6 @@
 import { createId } from '@paralleldrive/cuid2'
 import { decryptSecret } from './ai-secrets.js'
+import { createAiRequestProfile } from './ai-provider-adapters.js'
 
 export const MEETING_RECORDING_STATUS = {
   PENDING: 'pending',
@@ -180,6 +181,23 @@ async function getAiRuntime(db, app, functionKey, { enabledOnly = true } = {}) {
   return {
     functionConfig,
     providerInstance,
-    apiKey: decryptSecret(app, providerSecret.encrypted_secret)
+    apiKey: decryptSecret(app, providerSecret.encrypted_secret),
+    requestOptions: {
+      functionKey,
+      requestProfile: createAiRequestProfile(functionConfig.request_profile),
+      onProfileAdapted: async (requestProfile) => {
+        await db('ai_function_configs')
+          .where({
+            function_key: functionKey,
+            provider_instance_id: providerInstance.id,
+            model: functionConfig.model
+          })
+          .update({
+            request_profile: JSON.stringify(requestProfile),
+            verified_at: new Date().toISOString(),
+            verification_error: null
+          })
+      }
+    }
   }
 }

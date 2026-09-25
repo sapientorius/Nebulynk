@@ -133,6 +133,10 @@ export class StorageUsageManager {
     return this._scan()
   }
 
+  invalidate() {
+    this.snapshot = null
+  }
+
   async _scan() {
     if (this.scanPromise) return this.scanPromise
 

@@ -89,7 +89,7 @@
                     :placeholder="$t('ui.components.admin.select_model')"
                     :disabled="!functionForms[functionKey].provider_instance_id"
                     filterable
-                    @update:value="functionForms[functionKey].model = $event"
+                    @update:value="onFunctionModelChange(functionKey, $event)"
                   />
                   <n-space align="center" justify="space-between" style="width: 100%">
                     <span class="ai-model-status" data-testid="ai-model-status">
@@ -109,6 +109,21 @@
                 </n-space>
               </n-form-item>
             </n-form>
+
+            <n-space align="center" :size="8" data-testid="ai-verification-status">
+              <n-tag :type="getVerificationStatus(functionKey) === 'verified' ? 'success' : 'warning'">
+                {{ $t(`ui.components.admin.model_${getVerificationStatus(functionKey)}`) }}
+              </n-tag>
+              <span v-if="getVerifiedAt(functionKey)" class="ai-model-status">
+                {{ new Date(getVerifiedAt(functionKey)).toLocaleString() }}
+              </span>
+            </n-space>
+            <span v-if="getVerificationError(functionKey)" class="ai-verification-error" data-testid="ai-verification-error">
+              {{ getVerificationError(functionKey) }}
+            </span>
+            <span v-if="functionKey === 'image_generation' && functionForms[functionKey].enabled" class="ai-model-status">
+              {{ $t('ui.components.admin.model_image_probe_cost') }}
+            </span>
 
             <n-space justify="end">
               <n-button
@@ -179,6 +194,7 @@
 
 <script>
 import { useAdminStore } from '../../stores/index.js'
+import { getApiErrorParams } from '../../lib/api-error.js'
 
 const FUNCTION_KEYS = ['transcription', 'meeting_summary', 'chat_summary', 'image_generation']
 const PROVIDER_TYPE_OPTIONS = [
@@ -198,6 +214,7 @@ export default {
       savingProvider: false,
       deletingProviderId: null,
       savingFunctionKey: null,
+      verificationFailuresByFunction: {},
       loadingModelsByFunction: {},
       functionForms: {
         transcription: {
@@ -270,6 +287,25 @@ export default {
     },
     getFunctionLabel(functionKey) {
       return this.$t(`ui.components.admin.${functionKey}`)
+    },
+    getSavedFunctionConfig(functionKey) {
+      return this.functionConfigs.find((config) => config.function_key === functionKey) || null
+    },
+    getVerificationStatus(functionKey) {
+      const saved = this.getSavedFunctionConfig(functionKey)
+      const form = this.functionForms[functionKey]
+      if (!saved || saved.provider_instance_id !== form.provider_instance_id || saved.model !== form.model || saved.enabled !== form.enabled) {
+        return 'unverified'
+      }
+      return saved.verification_status === 'verified' ? 'verified' : 'unverified'
+    },
+    getVerifiedAt(functionKey) {
+      return this.getVerificationStatus(functionKey) === 'verified'
+        ? this.getSavedFunctionConfig(functionKey)?.verified_at
+        : null
+    },
+    getVerificationError(functionKey) {
+      return this.verificationFailuresByFunction[functionKey] || this.getSavedFunctionConfig(functionKey)?.verification_error || null
     },
     getCapability(functionKey) {
       if (functionKey === 'transcription') return 'transcription'
@@ -381,7 +417,10 @@ export default {
           await this.adminStore.createAiProviderInstance(payload)
         }
 
-        await this.adminStore.refreshAiProviderInstances()
+        await Promise.all([
+          this.adminStore.refreshAiProviderInstances(),
+          this.adminStore.refreshAiFunctionConfigs()
+        ])
         this.showProviderModal = false
         window.$message?.success(this.$t('ui.components.admin.provider_saved'))
       } catch (error) {
@@ -405,11 +444,16 @@ export default {
       }
     },
     async onFunctionProviderChange(functionKey, providerInstanceId) {
+      this.verificationFailuresByFunction[functionKey] = null
       this.functionForms[functionKey].provider_instance_id = providerInstanceId
       this.functionForms[functionKey].model = null
       if (providerInstanceId) {
         await this.loadModels(functionKey)
       }
+    },
+    onFunctionModelChange(functionKey, model) {
+      this.functionForms[functionKey].model = model
+      this.verificationFailuresByFunction[functionKey] = null
     },
     async loadModels(functionKey, { refresh = false } = {}) {
       const providerInstanceId = this.functionForms[functionKey].provider_instance_id
@@ -437,6 +481,7 @@ export default {
     },
     async saveFunction(functionKey) {
       this.savingFunctionKey = functionKey
+      this.verificationFailuresByFunction[functionKey] = null
       try {
         const payload = {
           enabled: this.functionForms[functionKey].enabled,
@@ -449,6 +494,7 @@ export default {
         window.$message?.success(this.$t('ui.components.admin.function_saved'))
       } catch (error) {
         console.error('Failed to save AI function config:', error)
+        this.verificationFailuresByFunction[functionKey] = getApiErrorParams(error).reason || error.message
         window.$message?.error(error.message || this.$t('ui.components.admin.saving_failed'))
       } finally {
         this.savingFunctionKey = null
@@ -489,6 +535,11 @@ export default {
   font-size: 13px;
   opacity: 0.72;
   line-height: 1.5;
+}
+
+.ai-verification-error {
+  color: #e88080;
+  font-size: 13px;
 }
 
 .ai-function-header {

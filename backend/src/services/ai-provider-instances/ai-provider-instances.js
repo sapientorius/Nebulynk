@@ -4,6 +4,7 @@ import { checkPermission } from '../../hooks/check-permission.js'
 import { validate } from '../../schemas/validators.js'
 import { badRequest, notFound } from '../../lib/errors.js'
 import { encryptSecret } from '../../lib/ai-secrets.js'
+import { verifyAiFunctionConfiguration } from '../../lib/ai-compatibility.js'
 import {
   assertProviderBaseUrlAllowed,
   getProviderMetadata,
@@ -45,6 +46,10 @@ export class AiProviderInstancesService {
 
   get lookupFn() {
     return this.options.lookupFn
+  }
+
+  get verifyConfiguration() {
+    return this.options.verifyConfiguration || verifyAiFunctionConfiguration
   }
 
   async find() {
@@ -139,16 +144,49 @@ export class AiProviderInstancesService {
 
     patchData.updated_at = new Date().toISOString()
 
+    const activeFunctions = await this.db('ai_function_configs')
+      .where({ provider_instance_id: id, enabled: true })
+      .select('*')
+    const nextEnabled = Object.prototype.hasOwnProperty.call(data, 'enabled') ? data.enabled : existing.enabled
+    if (!nextEnabled && activeFunctions.length > 0) {
+      throw badRequest('api.ai.provider_instance_in_use', { id }, 'Aktive AI-Funktionen verwenden diesen Provider')
+    }
+
+    const keyChanged = typeof data.api_key === 'string' && data.api_key.trim().length > 0
+    const baseUrlChanged = Object.prototype.hasOwnProperty.call(patchData, 'base_url')
+      && patchData.base_url !== existing.base_url
+    const verificationByFunction = new Map()
+    if (keyChanged || baseUrlChanged || (!existing.enabled && nextEnabled)) {
+      const nextInstance = { ...existing, ...patchData }
+      for (const functionConfig of activeFunctions) {
+        const verification = await this.verifyConfiguration({
+          db: this.db,
+          app: this.app,
+          providerInstance: nextInstance,
+          functionKey: functionConfig.function_key,
+          model: functionConfig.model,
+          ...(keyChanged ? { apiKey: data.api_key, secretUpdatedAt: patchData.updated_at } : {})
+        })
+        verificationByFunction.set(functionConfig.function_key, verification)
+      }
+    }
+
     await this.db.transaction(async (trx) => {
       await trx('ai_provider_instances').where('id', id).update(patchData)
 
-      if (typeof data.api_key === 'string' && data.api_key.trim().length > 0) {
+      if (keyChanged) {
         await trx('ai_provider_secrets')
           .where('provider_instance_id', id)
           .update({
             encrypted_secret: encryptSecret(this.app, data.api_key),
             updated_at: patchData.updated_at
           })
+      }
+      for (const [functionKey, verification] of verificationByFunction) {
+        await trx('ai_function_configs').where('function_key', functionKey).update({
+          ...verification,
+          updated_at: patchData.updated_at
+        })
       }
     })
 

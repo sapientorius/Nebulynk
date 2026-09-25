@@ -86,6 +86,29 @@ it('opens query evidence in the history surface and ignores an old evidence load
   expect(wrapper.find('[data-testid=summary-content]').exists()).toBe(true)
   expect(wrapper.find('[data-testid=transcript-content]').exists()).toBe(false)
 })
+
+it('shows the admin regeneration action for a failed transcript', async () => {
+  meeting.status = 'ended'
+  meeting.artifacts = [{ artifact_type: 'transcript', status: 'failed', payload: {} }]
+  meeting.admin_artifact_menu = {
+    visible: true,
+    can_regenerate_transcript: true,
+    can_regenerate_summary: false,
+    can_download_audio: false
+  }
+  const generateTranscript = vi.spyOn(useMeetingsStore(), 'generateTranscript').mockResolvedValue(meeting)
+  const wrapper = await render()
+
+  await wrapper.get('[data-testid=meeting-admin-artifact-menu-trigger]').trigger('click')
+  await flushPromises()
+  const menu = new DOMWrapper(document.body.querySelector('[data-testid=meeting-admin-artifact-menu]'))
+  expect(menu.find('[data-testid=meeting-admin-regenerate-summary]').exists()).toBe(false)
+  expect(menu.find('[data-testid=meeting-admin-download-audio]').exists()).toBe(false)
+  await menu.get('[data-testid=meeting-admin-regenerate-transcript]').trigger('click')
+  await flushPromises()
+
+  expect(generateTranscript).toHaveBeenCalledWith('one', { reason: 'admin_regenerate' })
+})
 function button(wrapper, label) {
   const found = wrapper.findAll('button').find(b => b.text() === label)
   expect(found, `button ${label}`).toBeTruthy()

@@ -12,6 +12,10 @@ import {
 import { UPLOAD_SETTING_KEYS } from '../../lib/upload-settings.js'
 import { THEME_SETTING_KEYS } from '../../lib/theme-settings.js'
 import { DEFAULT_CHANNEL_NAME } from '../../lib/default-channel-membership.js'
+import {
+  MEETING_RECORDING_LIMIT_UNLIMITED,
+  MEETING_RECORDING_RETENTION_SETTING_KEYS
+} from '../../lib/meeting-recording-retention-settings.js'
 
 const THEME_PATCH_SETTING_MAP = {
   themePrimaryColor: THEME_SETTING_KEYS.primaryColor,
@@ -36,10 +40,11 @@ const THEME_PATCH_SETTING_MAP = {
 }
 
 export class PlatformDomainService {
-  constructor({ repository, usersService, klipySettings, createIdFn = createId }) {
+  constructor({ repository, usersService, klipySettings, meetingRecordingRetentionManager, createIdFn = createId }) {
     this.repository = repository
     this.usersService = usersService
     this.klipySettings = klipySettings
+    this.meetingRecordingRetentionManager = meetingRecordingRetentionManager
     this.createIdFn = createIdFn
   }
 
@@ -110,6 +115,10 @@ export class PlatformDomainService {
 
   async updateSettings(data) {
     const patch = normalizeSettingsPatch(data)
+    const shouldRunMeetingRecordingCleanup = (
+      Object.prototype.hasOwnProperty.call(patch, 'meetingRecordingRetentionDays')
+      || Object.prototype.hasOwnProperty.call(patch, 'meetingRecordingStorageLimitGiB')
+    )
 
     if (Object.prototype.hasOwnProperty.call(patch, 'defaultLanguage')) {
       await this.repository.updateSetting('default_locale', patch.defaultLanguage)
@@ -125,6 +134,22 @@ export class PlatformDomainService {
     }
     if (Object.prototype.hasOwnProperty.call(patch, 'defaultMeetingHistoryAccess')) {
       await this.repository.updateSetting('default_meeting_history_access', patch.defaultMeetingHistoryAccess)
+    }
+    if (Object.prototype.hasOwnProperty.call(patch, 'meetingRecordingRetentionDays')) {
+      await this.repository.updateSetting(
+        MEETING_RECORDING_RETENTION_SETTING_KEYS.retentionDays,
+        patch.meetingRecordingRetentionDays === null
+          ? MEETING_RECORDING_LIMIT_UNLIMITED
+          : String(patch.meetingRecordingRetentionDays)
+      )
+    }
+    if (Object.prototype.hasOwnProperty.call(patch, 'meetingRecordingStorageLimitGiB')) {
+      await this.repository.updateSetting(
+        MEETING_RECORDING_RETENTION_SETTING_KEYS.storageLimitGiB,
+        patch.meetingRecordingStorageLimitGiB === null
+          ? MEETING_RECORDING_LIMIT_UNLIMITED
+          : String(patch.meetingRecordingStorageLimitGiB)
+      )
     }
     if (Object.prototype.hasOwnProperty.call(patch, 'uploadMaxFileSizeMb')) {
       await this.repository.updateSetting(UPLOAD_SETTING_KEYS.maxFileSizeMb, String(patch.uploadMaxFileSizeMb))
@@ -150,6 +175,10 @@ export class PlatformDomainService {
       }
     }
 
-    return this.findSettings()
+    const settings = await this.findSettings()
+    if (shouldRunMeetingRecordingCleanup) {
+      await this.meetingRecordingRetentionManager?.run()
+    }
+    return settings
   }
 }

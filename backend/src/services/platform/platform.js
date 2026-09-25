@@ -37,7 +37,8 @@ export const platform = (app) => {
   const domainService = new PlatformDomainService({
     repository,
     usersService: app.service('users'),
-    klipySettings
+    klipySettings,
+    meetingRecordingRetentionManager: app.get('meetingRecordingRetentionManager')
   })
 
   app.use('platform', new PlatformService({ domainService }), {

@@ -14,6 +14,11 @@ import {
   normalizeThemeSettingsMap,
   normalizeThemeSettingsPatch
 } from '../../lib/theme-settings.js'
+import {
+  normalizeMeetingRecordingRetentionPatch,
+  normalizeMeetingRecordingRetentionSettingsMap,
+  normalizeMeetingRecordingStorageLimitPatch
+} from '../../lib/meeting-recording-retention-settings.js'
 
 export const DEFAULT_PLATFORM_NAME = 'Nebulynk'
 export const DEFAULT_DOMAIN = ''
@@ -43,6 +48,7 @@ export function mapSettingsRows(settingsRows) {
   }
   return {
     ...result,
+    ...normalizeMeetingRecordingRetentionSettingsMap(result),
     ...normalizeUploadSettingsMap(result),
     ...normalizeThemeSettingsMap(result)
   }
@@ -90,6 +96,16 @@ export function normalizeSettingsPatch(data = {}) {
     patch.defaultMeetingHistoryAccess = normalizeMeetingHistoryAccess(
       data.defaultMeetingHistoryAccess,
       DEFAULT_PLATFORM_MEETING_HISTORY_ACCESS
+    )
+  }
+  if (Object.prototype.hasOwnProperty.call(data, 'meetingRecordingRetentionDays')) {
+    patch.meetingRecordingRetentionDays = normalizeMeetingRecordingRetentionPatch(
+      data.meetingRecordingRetentionDays
+    )
+  }
+  if (Object.prototype.hasOwnProperty.call(data, 'meetingRecordingStorageLimitGiB')) {
+    patch.meetingRecordingStorageLimitGiB = normalizeMeetingRecordingStorageLimitPatch(
+      data.meetingRecordingStorageLimitGiB
     )
   }
   if (data.clearKlipyApiKey === true) {

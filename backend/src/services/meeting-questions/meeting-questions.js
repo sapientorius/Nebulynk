@@ -132,6 +132,7 @@ export class MeetingQuestionsService {
       apiKey: runtime.apiKey,
       baseUrl: runtime.providerInstance.base_url,
       model: runtime.functionConfig.model,
+      ...runtime.requestOptions,
       systemPrompt: 'You answer follow-up questions about a Nebulynk meeting. Use only the supplied meeting summary, transcript, and chat evidence. Return valid JSON.',
       userPrompt: JSON.stringify({
         instructions: {

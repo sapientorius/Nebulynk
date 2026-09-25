@@ -93,7 +93,37 @@
         </n-form>
       </template>
 
-      <n-form ref="loginForm" :model="form" :rules="rules" @submit.prevent="submit">
+      <div v-if="sessionCheckPending" class="session-status" data-testid="login-session-loading">
+        <n-spin size="small" />
+      </div>
+
+      <div v-else-if="restoredUser" class="session-status" data-testid="login-active-session">
+        <p class="session-status-title">{{ $t('login.session.title') }}</p>
+        <p class="session-status-copy" data-testid="login-active-session-user">
+          {{ $t('login.session.description', { name: restoredUserLabel }) }}
+        </p>
+        <n-button
+          type="primary"
+          block
+          :loading="sessionActionPending"
+          data-testid="login-session-continue"
+          @click="continueExistingSession"
+        >
+          {{ $t('login.session.buttons.continue') }}
+        </n-button>
+        <n-button
+          secondary
+          block
+          style="margin-top: 12px"
+          :loading="sessionActionPending"
+          data-testid="login-session-logout"
+          @click="logoutExistingSession"
+        >
+          {{ $t('login.session.buttons.logout') }}
+        </n-button>
+      </div>
+
+      <n-form v-else ref="loginForm" :model="form" :rules="rules" @submit.prevent="submit">
         <template v-if="!isTwoFactorStep">
           <n-form-item :label="$t('login.fields.email')" path="email">
             <n-input
@@ -164,7 +194,7 @@
         </template>
       </n-form>
 
-      <n-alert v-if="error" type="error" style="margin-top: 16px">
+      <n-alert v-if="error" type="error" style="margin-top: 16px" data-testid="login-error">
         {{ error }}
       </n-alert>
         </n-card>
@@ -192,6 +222,7 @@ import AuthFlipCard from '../components/AuthFlipCard.vue'
 import { buildNaiveThemeOverrides } from '../lib/theme-settings.js'
 import { useSelfRegistrationStore, useSessionStore, useThemeStore } from '../stores/index.js'
 import { translateApiError } from '../lib/api-error.js'
+import { getCurrentUser, restoreBrowserSession } from '../lib/api.js'
 import {
   addDesktopProfile,
   desktopState,
@@ -216,6 +247,9 @@ export default {
       registrationConfig: null,
       registrationConfigLoading: true,
       registrationConfigError: null,
+      sessionCheckPending: true,
+      sessionActionPending: false,
+      restoredUser: null,
       animationReady: false,
       animationFrame: null,
       form: {
@@ -293,6 +327,17 @@ export default {
         ? this.$t('login.buttons.useAuthenticatorCode')
         : this.$t('login.buttons.useRecoveryCode')
     },
+    restoredUserLabel() {
+      const displayName = typeof this.restoredUser?.display_name === 'string'
+        ? this.restoredUser.display_name.trim()
+        : ''
+      if (displayName) return displayName
+
+      const email = typeof this.restoredUser?.email === 'string'
+        ? this.restoredUser.email.trim()
+        : ''
+      return email || this.$t('login.session.unknownUser')
+    },
     rules() {
       return {
         email: { required: true, message: this.$t('login.validation.emailRequired'), trigger: 'blur' },
@@ -301,6 +346,8 @@ export default {
     }
   },
   async created() {
+    this.restoreExistingSession()
+
     try {
       const config = await this.selfRegistrationStore.loadConfig({ refresh: true })
       this.registrationConfig = config
@@ -323,6 +370,23 @@ export default {
     }
   },
   methods: {
+    async restoreExistingSession() {
+      if (this.isDesktopMode) {
+        this.sessionCheckPending = false
+        return
+      }
+
+      this.sessionCheckPending = true
+      this.restoredUser = null
+      try {
+        await restoreBrowserSession({ forceRefresh: true, silent: true })
+        this.restoredUser = getCurrentUser()
+      } catch {
+        // An expired or unavailable session simply leaves the normal login form available.
+      } finally {
+        this.sessionCheckPending = false
+      }
+    },
     resolvePostLoginRoute() {
       const returnTo = this.$route?.query?.returnTo
       if (typeof returnTo !== 'string' || !returnTo.startsWith('/share') || returnTo.startsWith('//')) {
@@ -334,6 +398,30 @@ export default {
     },
     async navigateAfterLogin() {
       await this.$router.push(this.resolvePostLoginRoute()).catch(() => {})
+    },
+    async continueExistingSession() {
+      this.sessionActionPending = true
+      this.error = null
+      try {
+        await this.sessionStore.init()
+        if (!this.sessionStore.user) {
+          this.restoredUser = null
+          return
+        }
+        await this.navigateAfterLogin()
+      } finally {
+        this.sessionActionPending = false
+      }
+    },
+    async logoutExistingSession() {
+      this.sessionActionPending = true
+      this.error = null
+      try {
+        await this.sessionStore.logout()
+      } finally {
+        this.restoredUser = null
+        this.sessionActionPending = false
+      }
     },
     async addDesktopServer() {
       try {
@@ -602,6 +690,24 @@ export default {
 .login-copy {
   position: relative;
   z-index: 1;
+}
+
+.session-status {
+  position: relative;
+  z-index: 1;
+}
+
+.session-status-title {
+  margin: 0;
+  color: rgba(242, 247, 255, 0.96);
+  font-size: 1.05rem;
+  font-weight: 650;
+}
+
+.session-status-copy {
+  margin: 8px 0 22px;
+  color: rgba(200, 214, 255, 0.74);
+  line-height: 1.55;
 }
 
 .login-kicker {

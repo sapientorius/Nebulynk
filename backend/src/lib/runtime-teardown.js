@@ -16,6 +16,7 @@ export async function teardownRuntime(app, next) {
     try { await work() } catch (error) { errors.push(error) }
   }
   await close(next)
+  await close(() => app.get('meetingRecordingRetentionManager')?.stop())
   await close(() => app.get('storageUsageManager')?.stop())
   for (const client of app.get('ownedStorageClients') || []) await close(() => client.destroy?.())
   await close(() => app.get('rateLimiter')?.close())

@@ -7,6 +7,7 @@ import {
   providerSupportsCapability
 } from '../../lib/ai-config.js'
 import { badRequest, notFound } from '../../lib/errors.js'
+import { verificationStatus, verifyAiFunctionConfiguration } from '../../lib/ai-compatibility.js'
 import { patchSchema } from './ai-function-configs.schema.js'
 
 export class AiFunctionConfigsService {
@@ -18,10 +19,29 @@ export class AiFunctionConfigsService {
     return this.options.Model
   }
 
+  get app() {
+    return this.options.app
+  }
+
+  get verifyConfiguration() {
+    return this.options.verifyConfiguration || verifyAiFunctionConfiguration
+  }
+
+  present(row, providerInstance, secretUpdatedAt) {
+    const publicRow = { ...row }
+    delete publicRow.request_profile
+    delete publicRow.verification_fingerprint
+    return { ...publicRow, verification_status: verificationStatus(row, providerInstance, secretUpdatedAt) }
+  }
+
   async find() {
     const rows = await this.db('ai_function_configs').orderBy('function_key', 'asc').select('*')
+    const providers = await this.db('ai_provider_instances').select('*')
+    const secrets = await this.db('ai_provider_secrets').select('provider_instance_id', 'updated_at')
+    const providerById = new Map(providers.map((row) => [row.id, row]))
+    const secretByProviderId = new Map(secrets.map((row) => [row.provider_instance_id, row]))
     return {
-      data: rows,
+      data: rows.map((row) => this.present(row, providerById.get(row.provider_instance_id), secretByProviderId.get(row.provider_instance_id)?.updated_at)),
       total: rows.length,
       limit: rows.length
     }
@@ -36,7 +56,13 @@ export class AiFunctionConfigsService {
     if (!row) {
       throw notFound('api.ai.function_config_not_found', { id }, 'AI-Funktionskonfiguration nicht gefunden')
     }
-    return row
+    const providerInstance = row.provider_instance_id
+      ? await this.db('ai_provider_instances').where('id', row.provider_instance_id).first()
+      : null
+    const secretRow = row.provider_instance_id
+      ? await this.db('ai_provider_secrets').where('provider_instance_id', row.provider_instance_id).first()
+      : null
+    return this.present(row, providerInstance, secretRow?.updated_at)
   }
 
   async patch(id, data) {
@@ -98,10 +124,27 @@ export class AiFunctionConfigsService {
       )
     }
 
+    let verification = {
+      request_profile: null,
+      verified_at: null,
+      verification_fingerprint: null,
+      verification_error: null
+    }
+    if (nextConfig.enabled) {
+      verification = await this.verifyConfiguration({
+        db: this.db,
+        app: this.app,
+        providerInstance,
+        functionKey,
+        model: nextConfig.model
+      })
+    }
+
     const patchData = {
       enabled: nextConfig.enabled ?? false,
       provider_instance_id: nextConfig.provider_instance_id || null,
       model: nextConfig.model || null,
+      ...verification,
       updated_at: new Date().toISOString()
     }
 
@@ -135,7 +178,8 @@ export async function listQueuedMeetingArtifactTypes(db) {
 
 export const aiFunctionConfigs = (app) => {
   app.use('ai-function-configs', new AiFunctionConfigsService({
-    Model: app.get('postgresqlClient')
+    Model: app.get('postgresqlClient'),
+    app
   }), {
     methods: ['find', 'get', 'patch'],
     events: []

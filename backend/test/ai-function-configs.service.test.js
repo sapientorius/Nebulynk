@@ -71,7 +71,9 @@ test('ai-function-configs service: enabling requires complete config and matchin
       updated_at: '2026-03-21T10:00:00.000Z'
     }]
   })
-  const service = new AiFunctionConfigsService({ Model: db })
+  const service = new AiFunctionConfigsService({ Model: db, verifyConfiguration: async () => ({
+    request_profile: { version: 1, omit: [] }, verified_at: new Date().toISOString(), verification_fingerprint: 'test'
+  }) })
 
   await assert.rejects(
     service.patch('transcription', { enabled: true }),
@@ -116,7 +118,9 @@ test('ai-function-configs service: enables transcription with an active OpenRout
       updated_at: '2026-03-21T10:00:00.000Z'
     }]
   })
-  const service = new AiFunctionConfigsService({ Model: db })
+  const service = new AiFunctionConfigsService({ Model: db, verifyConfiguration: async () => ({
+    request_profile: { version: 1, omit: [] }, verified_at: new Date().toISOString(), verification_fingerprint: 'test'
+  }) })
 
   const result = await service.patch('transcription', {
     enabled: true,
@@ -175,7 +179,9 @@ test('ai-function-configs service: chat summaries use text-summary model capabil
       updated_at: '2026-03-21T10:00:00.000Z'
     }]
   })
-  const service = new AiFunctionConfigsService({ Model: db })
+  const service = new AiFunctionConfigsService({ Model: db, verifyConfiguration: async () => ({
+    request_profile: { version: 1, omit: [] }, verified_at: new Date().toISOString(), verification_fingerprint: 'test'
+  }) })
 
   const result = await service.patch('chat_summary', {
     enabled: true,

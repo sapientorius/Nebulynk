@@ -39,12 +39,13 @@ import { configureSystemInfoRoutes } from './routes/system-info.js'
 import { endExpiredIdleMeetings } from './services/meetings/idle-timeout.js'
 import { expireMeetingCalls } from './services/meeting-calls/meeting-calls.js'
 import { endOverdueScheduledMeetings } from './services/meetings/overdue-scheduled.js'
-import { processPendingMeetingTranscripts } from './services/meetings/transcript-processor.js'
 import { processPendingMeetingSummaries } from './services/meetings/summary-processor.js'
+import { deliverPendingTranscriptEvents, reconcileQueuedMeetingRecordings } from './services/meetings/transcription-api-runtime.js'
 import { processDueMessageReminders } from './services/message-reminders/processor.js'
 import { assertUserAccountActive } from './lib/account-state.js'
 import { PlatformUpdateManager } from './lib/platform-updates.js'
 import { StorageUsageManager } from './lib/storage-usage.js'
+import { MeetingRecordingRetentionManager } from './lib/meeting-recording-retention.js'
 import {
   getApiSecurityHeaders,
   resolveAuthenticationSecret,
@@ -172,6 +173,7 @@ const db = knex({
 app.set('postgresqlClient', db)
 app.set('platformUpdateManager', new PlatformUpdateManager(app))
 app.set('storageUsageManager', new StorageUsageManager(app))
+app.set('meetingRecordingRetentionManager', new MeetingRecordingRetentionManager(app))
 
 // Set up authentication
 app.configure(authentication)
@@ -351,12 +353,31 @@ app.hooks({
 
       runtime.register({ name: 'meeting-intelligence', run: async () => {
         try {
-          await processPendingMeetingTranscripts(app)
           await processPendingMeetingSummaries(app)
         } catch (error) {
           logger.error('Meeting intelligence processing failed:', { error: error.message })
         }
       }, intervalMs: 15_000, immediate: true })
+
+      runtime.register({ name: 'meeting-transcription-events', run: async () => {
+        try {
+          await deliverPendingTranscriptEvents(app)
+        } catch (error) {
+          logger.error('Meeting transcript event delivery failed', { error: error.message })
+        }
+      }, intervalMs: 5_000, immediate: true })
+
+      runtime.register({ name: 'meeting-recording-reconciliation', run: async () => {
+        try {
+          await reconcileQueuedMeetingRecordings(app)
+        } catch (error) {
+          logger.error('Meeting recording reconciliation failed', { error: error.message })
+        }
+      }, intervalMs: 15_000, immediate: true })
+
+      runtime.register({ name: 'meeting-recording-retention', run: async () => {
+        await app.get('meetingRecordingRetentionManager').run()
+      }, intervalMs: 8 * 60 * 60 * 1000, immediate: true })
 
       runtime.register({ name: 'message-reminders', run: async () => {
         try {

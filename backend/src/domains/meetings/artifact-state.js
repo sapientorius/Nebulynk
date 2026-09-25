@@ -245,19 +245,21 @@ export function buildAdminArtifactMenuState({
   summaryArtifact = null,
   transcriptArtifact = null,
   viewerUser = null,
+  regeneratableTranscriptRecordingCount = 0,
   downloadableRecordingCount = 0
 }) {
-  const isAdmin = viewerUser?.is_admin === true
-  const visible = isAdmin
-    && meeting?.status === 'ended'
-    && summaryArtifact?.status === 'ready'
-    && transcriptArtifact?.status === 'ready'
-    && downloadableRecordingCount > 0
+  const isAdminEndedMeeting = viewerUser?.is_admin === true && meeting?.status === 'ended'
+  const canRegenerateTranscript = isAdminEndedMeeting
+    && (transcriptArtifact?.status === 'ready' || transcriptArtifact?.status === 'failed')
+    && regeneratableTranscriptRecordingCount > 0
+  const canRegenerateSummary = isAdminEndedMeeting
+    && (summaryArtifact?.status === 'ready' || summaryArtifact?.status === 'failed')
+  const canDownloadAudio = isAdminEndedMeeting && downloadableRecordingCount > 0
 
   return {
-    visible,
-    can_regenerate_transcript: visible,
-    can_regenerate_summary: visible,
-    can_download_audio: visible
+    visible: canRegenerateTranscript || canRegenerateSummary || canDownloadAudio,
+    can_regenerate_transcript: canRegenerateTranscript,
+    can_regenerate_summary: canRegenerateSummary,
+    can_download_audio: canDownloadAudio
   }
 }

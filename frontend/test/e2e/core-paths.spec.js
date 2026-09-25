@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { getAuthFromBrowserSession, loginViaApi } from './auth-helpers.js'
+import { getAuthFromBrowserSession, loginViaApi, openLoginForm } from './auth-helpers.js'
 import { readSharedState, writeSharedState } from './shared-state.js'
 import { resolveBackendUrl } from './test-urls.js'
 
@@ -17,9 +17,8 @@ let defaultPublicChannelId = null
 let adminAccessToken = null
 
 async function login(page, { email, password }) {
-  await page.goto('/login')
-  await expect(page.getByTestId('login-view')).toBeVisible()
-  await page.getByTestId('login-email').fill(email)
+  const loginEmail = await openLoginForm(page)
+  await loginEmail.fill(email)
   await page.getByTestId('login-password').fill(password)
   await page.getByTestId('login-submit').click()
   await expect(page).toHaveURL(/\/channels/)

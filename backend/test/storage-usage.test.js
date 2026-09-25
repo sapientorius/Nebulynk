@@ -300,3 +300,18 @@ test('storage usage retains a successful snapshot after a failed refresh and rep
   assert.equal(partial.object_storage.available, false)
   assert.equal(partial.total_bytes, null)
 })
+
+test('storage usage invalidation clears the cached snapshot after recording cleanup', async () => {
+  const storageClient = createStorageClient({
+    listResponses: {
+      'files||': { Contents: [{ Key: 'meeting-recordings/meeting-1/recording.mp4', Size: 10 }], IsTruncated: false }
+    }
+  })
+  const manager = createManager({ storageClient })
+
+  await manager.getUsage()
+  manager.invalidate()
+  await manager.getUsage()
+
+  assert.equal(storageClient.calls.filter((command) => command instanceof ListObjectsV2Command).length, 2)
+})

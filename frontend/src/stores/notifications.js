@@ -6,6 +6,7 @@ import {
   requestDesktopWorkspaceNotificationPermission,
   syncDesktopWorkspaceNotificationPreferences
 } from '../lib/desktop-workspace-bridge.js'
+import { syncAppBadge } from '../lib/app-badge.js'
 import { getDesktopNotificationPermission, requestDesktopNotificationPermission } from '../lib/desktop-notification-plugin.js'
 import { getActiveDesktopProfile, updateDesktopProfileNotificationPreferences } from '../lib/desktop-runtime.js'
 import { t } from '../lib/i18n.js'
@@ -58,9 +59,17 @@ export const useNotificationsStore = defineStore('notifications', () => {
   const lastUnreadCountsRefreshAt = ref(0)
   let unreadCountsRefreshPromise = null
 
+  function setUnreadCount(value) {
+    const nextCount = Number.isFinite(Number(value))
+      ? Math.max(0, Math.trunc(Number(value)))
+      : 0
+    unreadCount.value = nextCount
+    void syncAppBadge(nextCount)
+  }
+
   function reset() {
     notifications.value = []
-    unreadCount.value = 0
+    setUnreadCount(0)
     pushEnabled.value = false
     pushSubscriptionId.value = null
     notificationPermission.value = 'default'
@@ -154,9 +163,9 @@ export const useNotificationsStore = defineStore('notifications', () => {
       const { data } = await api.get('/notifications', { params: { $limit: 50 } })
       const items = asList(data)
       notifications.value = items
-      unreadCount.value = Number.isInteger(data?.unread_total)
+      setUnreadCount(Number.isInteger(data?.unread_total)
         ? data.unread_total
-        : items.filter((notification) => !notification.is_read).length
+        : items.filter((notification) => !notification.is_read).length)
     } catch (error) {
       console.error('Failed to load notifications:', error)
     }
@@ -168,7 +177,7 @@ export const useNotificationsStore = defineStore('notifications', () => {
       const notification = notifications.value.find((entry) => entry.id === id)
       if (notification && !notification.is_read) {
         notification.is_read = true
-        unreadCount.value = Math.max(0, unreadCount.value - 1)
+        setUnreadCount(unreadCount.value - 1)
       }
     } catch (error) {
       console.error('Failed to mark notification as read:', error)
@@ -181,7 +190,7 @@ export const useNotificationsStore = defineStore('notifications', () => {
       for (const notification of notifications.value) {
         notification.is_read = true
       }
-      unreadCount.value = 0
+      setUnreadCount(0)
     } catch (error) {
       console.error('Failed to mark all notifications as read:', error)
     }
@@ -208,7 +217,7 @@ export const useNotificationsStore = defineStore('notifications', () => {
 
       const updated = Number(data?.updated)
       const decrementBy = Number.isInteger(updated) ? updated : localUpdated
-      unreadCount.value = Math.max(0, unreadCount.value - decrementBy)
+      setUnreadCount(unreadCount.value - decrementBy)
       return decrementBy
     } catch (error) {
       console.error('Failed to auto-mark notifications as read:', error)
@@ -252,7 +261,7 @@ export const useNotificationsStore = defineStore('notifications', () => {
 
       const updated = Number(data?.updated)
       const decrementBy = Number.isInteger(updated) ? updated : localUpdated
-      unreadCount.value = Math.max(0, unreadCount.value - decrementBy)
+      setUnreadCount(unreadCount.value - decrementBy)
       return decrementBy
     } catch (error) {
       console.error('Failed to auto-mark notifications as read:', error)
@@ -437,7 +446,7 @@ export const useNotificationsStore = defineStore('notifications', () => {
     if (notifications.value.find((entry) => entry.id === notification.id)) return
 
     notifications.value.unshift(notification)
-    unreadCount.value++
+    setUnreadCount(unreadCount.value + 1)
   }
 
   return {

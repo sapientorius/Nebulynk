@@ -6,6 +6,7 @@ import {
   THEME_FONT_FAMILY_VALUES,
   THEME_MODE_VALUES
 } from '../../lib/theme-settings.js'
+import { MAX_MEETING_RECORDING_STORAGE_LIMIT_GIB } from '../../lib/meeting-recording-retention-settings.js'
 
 const hexColorSchema = {
   type: 'string',
@@ -41,6 +42,18 @@ export const patchSchema = {
     autoAwayMinutes: { type: 'integer', minimum: 1 },
     meetingVideoEnabled: { type: 'boolean' },
     defaultMeetingHistoryAccess: { type: 'string', enum: MEETING_HISTORY_ACCESS_VALUES },
+    meetingRecordingRetentionDays: {
+      anyOf: [
+        { type: 'integer', minimum: 1 },
+        { type: 'null' }
+      ]
+    },
+    meetingRecordingStorageLimitGiB: {
+      anyOf: [
+        { type: 'integer', minimum: 1, maximum: MAX_MEETING_RECORDING_STORAGE_LIMIT_GIB },
+        { type: 'null' }
+      ]
+    },
     uploadMaxFileSizeMb: { type: 'integer', minimum: 1, maximum: 1024 },
     imageUploadMaxDimensionPx: { type: 'integer', minimum: 256, maximum: 8192 },
     imageUploadQuality: { type: 'integer', minimum: 1, maximum: 100 },

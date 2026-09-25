@@ -1,5 +1,12 @@
 # Nebulynk on Plesk
 
+The Plesk Compose stack includes a private `transcription-worker` container.
+It starts after the backend is healthy, uses the same image, and has no public
+route. Keep transcription disabled during the first update; enable it after both
+containers are healthy to resume existing pending transcript artifacts. Its
+default limit is 1.5 GiB memory and one CPU. See the
+[worker upgrade notes](COOLIFY.md#transcription-worker-and-first-upgrade).
+
 The Plesk integration targets Plesk Obsidian on Linux x64 with the local Docker
 service. It deploys one Nebulynk instance behind one existing Plesk domain or
 subdomain.

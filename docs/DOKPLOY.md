@@ -1,5 +1,12 @@
 # Deploying Nebulynk with Dokploy
 
+The Compose application now includes a private `transcription-worker` service
+using the backend image. On the first update, keep the transcription AI function
+disabled until the backend and worker are healthy, then re-enable it. Existing
+pending transcript artifacts resume one recording at a time; the worker has a
+default 1.5 GiB memory limit and one CPU. See the
+[worker upgrade notes](COOLIFY.md#transcription-worker-and-first-upgrade).
+
 This guide deploys the complete Nebulynk stack from the official repository
 with Dokploy. It uses the dedicated
 `docker-compose.dokploy.yml` Compose application and Dokploy's native domain

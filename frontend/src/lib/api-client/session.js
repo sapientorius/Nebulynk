@@ -570,6 +570,7 @@ export function createApiSession({ http, getBaseUrl }, options = {}) {
 
   async function restoreBrowserSession(options = {}) {
     const forceRefresh = options?.forceRefresh === true
+    const silent = options?.silent === true
 
     if (!forceRefresh && authState.accessToken && authState.user) {
       return buildAuthReturnPayload()
@@ -587,7 +588,9 @@ export function createApiSession({ http, getBaseUrl }, options = {}) {
 
         if (!refreshed?.accessToken) {
           restoreWarningLogged = true
-          logSessionRestoreWarning('refresh_unavailable', new Error('Session refresh is unavailable'), diagnosticContext)
+          if (!silent) {
+            logSessionRestoreWarning('refresh_unavailable', new Error('Session refresh is unavailable'), diagnosticContext)
+          }
           if (authState.accessToken || authState.user || forceRefresh) {
             throw new Error('Session refresh is unavailable')
           }
@@ -609,7 +612,7 @@ export function createApiSession({ http, getBaseUrl }, options = {}) {
         return buildRefreshReturnPayload(refreshed)
       })()
         .catch((error) => {
-          if (!restoreWarningLogged) {
+          if (!silent && !restoreWarningLogged) {
             logSessionRestoreWarning('refresh_failed', error, diagnosticContext)
           }
           clearStoredAuth()

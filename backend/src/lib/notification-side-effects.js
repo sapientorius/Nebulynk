@@ -30,6 +30,20 @@ function buildPushTitle(notification, user) {
   return bt(user?.preferred_locale, 'push.mentionTitle', { actor: notification.actor_display_name })
 }
 
+async function getUnreadCountsByUser(db, userIds) {
+  const rows = await db('notifications')
+    .whereIn('user_id', userIds)
+    .where('is_read', false)
+    .groupBy('user_id')
+    .select('user_id')
+    .count({ count: '*' })
+
+  return new Map(rows.map((row) => [
+    row.user_id,
+    Number(row.count || 0)
+  ]))
+}
+
 export function createNotificationSideEffectsDispatcher(app, {
   sendPush = sendPushToUser,
   hasVisibleSession = hasVisibleChannelSession,
@@ -64,9 +78,12 @@ export function createNotificationSideEffectsDispatcher(app, {
     if (recipientIds.length === 0) return
 
     const db = app.get('postgresqlClient')
-    const users = await db('users')
-      .whereIn('id', recipientIds)
-      .select('id', 'status', 'preferred_locale')
+    const [users, unreadCountsByUser] = await Promise.all([
+      db('users')
+        .whereIn('id', recipientIds)
+        .select('id', 'status', 'preferred_locale'),
+      getUnreadCountsByUser(db, recipientIds)
+    ])
 
     const userById = {}
     for (const user of users) {
@@ -84,7 +101,8 @@ export function createNotificationSideEffectsDispatcher(app, {
         await sendPush(app, notification.user_id, {
           title,
           body: notification.message_snippet,
-          url: buildNotificationUrl(notification)
+          url: buildNotificationUrl(notification),
+          unreadCount: unreadCountsByUser.get(notification.user_id) || 0
         })
       } catch (error) {
         log.error('Failed to send notification push', {
