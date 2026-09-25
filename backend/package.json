@@ -6,8 +6,8 @@
   "description": "Nebulynk Backend API",
   "main": "src/index.js",
   "scripts": {
-    "dev": "node --watch src/index.js",
-    "dev:rtk": "rtk node --watch src/index.js",
+    "dev": "node scripts/dev.mjs",
+    "dev:rtk": "rtk node scripts/dev.mjs",
     "start": "node src/index.js",
     "start:transcription-worker": "node src/transcription-worker.js",
     "start:transcription-worker:rtk": "rtk node src/transcription-worker.js",

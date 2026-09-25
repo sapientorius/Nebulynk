@@ -166,7 +166,7 @@ test('meetings artifact state: transcript generation requires runtime, retryable
   }).reason, 'no_retryable_recordings')
 })
 
-test('meetings artifact state: admin menu only appears for ended meetings with ready artifacts and downloadable audio', () => {
+test('meetings artifact state: admin menu exposes each available ended-meeting action independently', () => {
   const meeting = {
     id: 'meeting-1',
     status: 'ended'
@@ -177,6 +177,7 @@ test('meetings artifact state: admin menu only appears for ended meetings with r
     summaryArtifact: { status: 'ready' },
     transcriptArtifact: { status: 'ready' },
     viewerUser: { id: 'admin-1', is_admin: true },
+    regeneratableTranscriptRecordingCount: 2,
     downloadableRecordingCount: 2
   }), {
     visible: true,
@@ -190,6 +191,7 @@ test('meetings artifact state: admin menu only appears for ended meetings with r
     summaryArtifact: { status: 'ready' },
     transcriptArtifact: { status: 'ready' },
     viewerUser: { id: 'host-1', is_admin: false },
+    regeneratableTranscriptRecordingCount: 2,
     downloadableRecordingCount: 2
   }), {
     visible: false,
@@ -197,6 +199,43 @@ test('meetings artifact state: admin menu only appears for ended meetings with r
     can_regenerate_summary: false,
     can_download_audio: false
   })
+
+  assert.deepEqual(buildAdminArtifactMenuState({
+    meeting,
+    summaryArtifact: { status: 'pending' },
+    transcriptArtifact: { status: 'failed' },
+    viewerUser: { id: 'admin-1', is_admin: true },
+    regeneratableTranscriptRecordingCount: 1
+  }), {
+    visible: true,
+    can_regenerate_transcript: true,
+    can_regenerate_summary: false,
+    can_download_audio: false
+  })
+
+  assert.deepEqual(buildAdminArtifactMenuState({
+    meeting,
+    summaryArtifact: { status: 'failed' },
+    transcriptArtifact: { status: 'processing' },
+    viewerUser: { id: 'admin-1', is_admin: true }
+  }), {
+    visible: true,
+    can_regenerate_transcript: false,
+    can_regenerate_summary: true,
+    can_download_audio: false
+  })
+
+  assert.equal(buildAdminArtifactMenuState({
+    meeting,
+    transcriptArtifact: { status: 'failed' },
+    viewerUser: { id: 'admin-1', is_admin: true }
+  }).visible, false)
+  assert.equal(buildAdminArtifactMenuState({
+    meeting: { ...meeting, status: 'active' },
+    transcriptArtifact: { status: 'failed' },
+    viewerUser: { id: 'admin-1', is_admin: true },
+    regeneratableTranscriptRecordingCount: 1
+  }).visible, false)
 })
 
 test('meetings artifact state: visible artifacts and retryable recordings preserve legacy rules', () => {

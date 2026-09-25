@@ -454,6 +454,7 @@ export async function enrichMeetingsWithDetails({
                 summaryArtifact,
                 transcriptArtifact,
                 viewerUser,
+                regeneratableTranscriptRecordingCount: retryableTranscriptRecordingCountByMeetingId[row.id] || 0,
                 downloadableRecordingCount: downloadableRecordingCountByMeetingId[row.id] || 0
               })
             }

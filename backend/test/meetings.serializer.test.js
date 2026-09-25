@@ -1039,7 +1039,7 @@ test('meetings serialization: transcript retry remains hidden from non-host view
   assert.equal('admin_artifact_menu' in meeting, false)
 })
 
-test('meetings serialization: admin full payload exposes ended-meeting artifact menu only when both artifacts are ready', async () => {
+test('meetings serialization: admin full payload exposes available ended-meeting artifact actions', async () => {
   const db = createRuntimeConfigDb({
     participants: [{
       meeting_id: 'meeting-1',
@@ -1092,5 +1092,42 @@ test('meetings serialization: admin full payload exposes ended-meeting artifact 
     can_regenerate_transcript: true,
     can_regenerate_summary: true,
     can_download_audio: true
+  })
+})
+
+test('meetings serialization: admin can regenerate a failed transcript from a stored failed recording', async () => {
+  const db = createRuntimeConfigDb({
+    artifacts: [{
+      meeting_id: 'meeting-1',
+      artifact_type: 'transcript',
+      status: 'failed',
+      payload: { failure_message: 'Provider failed' },
+      updated_at: '2026-03-13T10:32:00.000Z'
+    }],
+    recordings: [{
+      meeting_id: 'meeting-1',
+      status: MEETING_RECORDING_STATUS.FAILED,
+      failure_code: 'transcription_failed',
+      storage_bucket: 'recordings',
+      storage_key: 'meeting-1/audio.mp4'
+    }]
+  })
+
+  const [meeting] = await serializeMeetings({
+    db,
+    app: {},
+    rows: [meetingRow],
+    viewerUserId: 'admin-1',
+    viewerUser: { id: 'admin-1', is_admin: true },
+    detailLevel: 'full',
+    buildSourceDisplayNameIndex: async () => ({ 'source-1': 'General' }),
+    buildTranscriptionStateIndex: async () => ({})
+  })
+
+  assert.deepEqual(meeting.admin_artifact_menu, {
+    visible: true,
+    can_regenerate_transcript: true,
+    can_regenerate_summary: false,
+    can_download_audio: false
   })
 })

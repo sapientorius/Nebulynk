@@ -114,6 +114,7 @@
 
                         <div class="meeting-admin-artifact-menu" data-testid="meeting-admin-artifact-menu">
                           <n-button
+                            v-if="adminArtifactMenu?.can_regenerate_transcript"
                             text
                             size="small"
                             class="meeting-admin-artifact-action"
@@ -125,6 +126,7 @@
                             {{ $t('ui.views.regenerate_transcript') }}
                           </n-button>
                           <n-button
+                            v-if="adminArtifactMenu?.can_regenerate_summary"
                             text
                             size="small"
                             class="meeting-admin-artifact-action"
@@ -136,6 +138,7 @@
                             {{ $t('ui.views.regenerate_summary') }}
                           </n-button>
                           <n-button
+                            v-if="adminArtifactMenu?.can_download_audio"
                             text
                             size="small"
                             class="meeting-admin-artifact-action"
@@ -406,6 +409,7 @@
               <div class="meeting-ended-menu-divider" />
 
               <button
+                v-if="adminArtifactMenu?.can_regenerate_transcript"
                 type="button"
                 class="meeting-ended-menu-action"
                 data-testid="meeting-admin-regenerate-transcript"
@@ -416,6 +420,7 @@
                 <n-icon size="20"><document-text-icon /></n-icon>
               </button>
               <button
+                v-if="adminArtifactMenu?.can_regenerate_summary"
                 type="button"
                 class="meeting-ended-menu-action"
                 data-testid="meeting-admin-regenerate-summary"
@@ -426,6 +431,7 @@
                 <n-icon size="20"><sparkles-icon /></n-icon>
               </button>
               <button
+                v-if="adminArtifactMenu?.can_download_audio"
                 type="button"
                 class="meeting-ended-menu-action"
                 data-testid="meeting-admin-download-audio"
