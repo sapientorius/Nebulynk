@@ -103,6 +103,7 @@ test.describe('settings security password change', () => {
     await page.getByTestId('login-submit').click()
     await expect(page).toHaveURL(/\/login$/)
     await expect(page.getByTestId('login-view')).toBeVisible()
+    await expect(page.getByTestId('login-error')).toBeVisible()
 
     await page.getByTestId('login-password').fill(updatedMemberPassword)
     await page.getByTestId('login-submit').click()

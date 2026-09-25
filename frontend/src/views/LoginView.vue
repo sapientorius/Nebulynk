@@ -194,7 +194,7 @@
         </template>
       </n-form>
 
-      <n-alert v-if="error" type="error" style="margin-top: 16px">
+      <n-alert v-if="error" type="error" style="margin-top: 16px" data-testid="login-error">
         {{ error }}
       </n-alert>
         </n-card>
