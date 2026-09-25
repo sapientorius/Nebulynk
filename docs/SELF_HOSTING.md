@@ -300,6 +300,25 @@ storage, Docker, and host monitoring for physical capacity planning.
 
 ## Meeting-recording retention
 
+**Before the first upgrade to v0.7.0:** The migration sets a 60-day retention
+period unless a value already exists. The new backend runs cleanup at startup,
+so eligible recordings older than 60 days can be deleted before an administrator
+can change the setting in the UI. Back up PostgreSQL and Garage first. If you
+need to keep older recordings, set the retention value in PostgreSQL *before*
+starting the v0.7.0 backend:
+
+```sql
+INSERT INTO platform_settings (key, value)
+VALUES ('meeting_recording_retention_days', 'unlimited')
+ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value;
+```
+
+You can replace `unlimited` with the desired number of days. The migration
+preserves an existing value; after startup, administrators can adjust the
+setting in **Admin → Meetings**. Deleted recording audio cannot be recovered
+from Nebulynk or transcribed again, though existing transcripts and summaries
+remain available.
+
 Platform administrators configure recording retention in **Admin → Meetings**.
 The default keeps completed meeting recordings for 60 days; it can be set to at
 least one day or to unlimited. A separate optional limit caps the combined
