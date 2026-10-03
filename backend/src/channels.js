@@ -1,4 +1,29 @@
 import { logger } from './logger.js'
+import { evaluateMeetingContentAccess } from './domains/meetings/content-access.js'
+
+export async function publishMeetingArtifactUpdate(app, data) {
+  const db = app.get('postgresqlClient')
+  const meeting = await db('meetings').where('id', data.meetingId).first()
+  if (!meeting) return null
+  const [source, participants, members, snapshots, admins] = await Promise.all([
+    meeting.source_channel_id ? db('channels').where('id', meeting.source_channel_id).first() : null,
+    db('meeting_participants').where('meeting_id', meeting.id).select('user_id', 'joined_at'),
+    meeting.source_channel_id ? db('channel_members').where('channel_id', meeting.source_channel_id).select('user_id') : [],
+    db('meeting_start_members').where('meeting_id', meeting.id).select('user_id'),
+    db('users').where('is_admin', true).select('id')
+  ])
+  const participantsById = new Map(participants.map(row => [row.user_id, row]))
+  const membersById = new Map(members.map(row => [row.user_id, row]))
+  const snapshotIds = new Set(snapshots.map(row => row.user_id))
+  const adminIds = new Set(admins.map(row => row.id))
+  const viewerIds = new Set([...participantsById.keys(), ...membersById.keys(), ...adminIds])
+  const accessMeeting = { ...meeting, source_channel_type: source?.type,
+    source_channel_meeting_history_access: source?.meeting_history_access }
+  return [...viewerIds].filter(id => evaluateMeetingContentAccess({
+    meeting: accessMeeting, user: { id, is_admin: adminIds.has(id) },
+    participant: participantsById.get(id), sourceMembership: membersById.get(id), hasStartSnapshot: snapshotIds.has(id)
+  }).allowed).map(id => app.channel(`user/${id}`))
+}
 
 export async function publishMeetingEnd(app, data) {
   const db = app.get('postgresqlClient')
@@ -107,7 +132,7 @@ export const channels = (app) => {
   app.service('meetings').publish('joined', (data) => app.channel(`channel/${data.chatChannelId}`))
   app.service('meetings').publish('ended', (data) => publishMeetingEnd(app, data))
   app.service('meetings').publish('artifacts-queued', (data) => app.channel(`channel/${data.chatChannelId}`))
-  app.service('meetings').publish('artifacts-updated', (data) => app.channel(`channel/${data.chatChannelId}`))
+  app.service('meetings').publish('artifacts-updated', (data) => publishMeetingArtifactUpdate(app, data))
   app.service('meetings').publish('recording-state-updated', (data) => app.channel(`channel/${data.chatChannelId}`))
 
   // Voice message AI artifacts are private per user.

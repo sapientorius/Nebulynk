@@ -107,6 +107,28 @@ post-commit external failures have no compensating transaction. These are
 preserved boundaries, not new delivery guarantees. Service lifecycle work stays
 with AP-05.
 
+## Meeting summary revisions
+
+`meeting-summary-revisions` creates private AI proposals, refines an editor's own
+proposal, and applies it only after explicit review. Writes require an ended
+meeting, a ready summary, existing meeting-content access, and either the
+meeting creator or an administrator. Dictation reuses `/voice-drafts/transcribe`
+with `meeting_id` instead of chat-writing authorization.
+
+Migration 075 adds `summary_version` and `meeting_summary_revisions`. Applying
+a proposal locks the meeting and summary, checks the proposal's base version,
+and commits the summary and revision together. Regeneration invalidates earlier
+proposals and restores the previous summary if generation fails. It requires
+explicit replacement confirmation once an edit has been applied.
+
+Only published applied revisions are returned by the paginated history API;
+responses contain author, time and change description. Proposals, instructions,
+snapshots and suppressed revisions remain private. This service disables all
+automatic socket publication; committed changes use metadata-only meeting
+artifact refresh events and update the current summary's search document.
+Revision data is deleted with its meeting. See
+[summary editing](meeting-summary-editing.md) for the user flow and API contract.
+
 ## Backend lifecycle and instance count
 
 Run exactly one backend instance per shared application state. Stop the previous

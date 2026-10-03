@@ -29,6 +29,7 @@ import { voice } from './voice/voice.js'
 import { meetings } from './meetings/meetings.js'
 import { meetingCalls } from './meeting-calls/meeting-calls.js'
 import { meetingQuestions } from './meeting-questions/meeting-questions.js'
+import { meetingSummaryRevisions } from './meeting-summary-revisions/meeting-summary-revisions.js'
 import { voiceMessageArtifacts } from './voice-message-artifacts/voice-message-artifacts.js'
 import { messageSummaries } from './message-summaries/message-summaries.js'
 import { aiProviderInstances } from './ai-provider-instances/ai-provider-instances.js'
@@ -76,6 +77,7 @@ export const services = (app) => {
   app.configure(meetings)
   app.configure(meetingCalls)
   app.configure(meetingQuestions)
+  app.configure(meetingSummaryRevisions)
   app.configure(voiceMessageArtifacts)
   app.configure(messageSummaries)
   app.configure(aiProviderInstances)

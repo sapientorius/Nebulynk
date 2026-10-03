@@ -300,12 +300,12 @@ storage, Docker, and host monitoring for physical capacity planning.
 
 ## Meeting-recording retention
 
-**Before the first upgrade to v0.7.0:** The migration sets a 60-day retention
-period unless a value already exists. The new backend runs cleanup at startup,
-so eligible recordings older than 60 days can be deleted before an administrator
-can change the setting in the UI. Back up PostgreSQL and Garage first. If you
-need to keep older recordings, set the retention value in PostgreSQL *before*
-starting the v0.7.0 backend:
+**Before the first upgrade to v0.7.0 or later:** The migration sets a 60-day
+retention period unless a value already exists. The new backend runs cleanup at
+startup, so eligible recordings older than 60 days can be deleted before an
+administrator can change the setting in the UI. Back up PostgreSQL and Garage
+first. If you need to keep older recordings, set the retention value in
+PostgreSQL *before* starting the new backend:
 
 ```sql
 INSERT INTO platform_settings (key, value)

@@ -1,6 +1,6 @@
 {
   "name": "nebulynk-backend",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "private": true,
   "type": "module",
   "description": "Nebulynk Backend API",
@@ -64,7 +64,7 @@
     "formidable": "^3.5.4",
     "knex": "^3.1.0",
     "livekit-server-sdk": "^2.15.0",
-    "nodemailer": "^9.1.1",
+    "nodemailer": "^10.0.13",
     "pg": "^8.18.0",
     "qrcode": "^1.5.4",
     "redis": "^5.12.1",

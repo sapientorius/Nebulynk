@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { channels } from '../src/channels.js'
+import { createMemoryDb } from './helpers/memory-db.js'
 
 function createAppHarness() {
   const eventHandlers = new Map()
@@ -131,7 +132,7 @@ test('socket contract: meeting end uses member personal channels and preserves i
   assert.equal(payload.sourceChannelId, 'source')
 })
 
-for (const event of ['joined', 'artifacts-queued', 'artifacts-updated']) {
+for (const event of ['joined', 'artifacts-queued']) {
   test(`socket contract: meeting ${event} stays within its chat room and preserves its payload`, () => {
     const harness = createAppHarness()
     channels(harness.app)
@@ -141,6 +142,22 @@ for (const event of ['joined', 'artifacts-queued', 'artifacts-updated']) {
     assert.deepEqual(payload, { meetingId: 'meeting-one', chatChannelId: 'private-meeting-chat', userId: 'member', status: 'ended' })
   })
 }
+
+test('socket contract: meeting artifacts-updated reaches authorized personal channels and preserves identifiers', async () => {
+  const harness = createAppHarness()
+  const db = createMemoryDb({
+    meetings: [{ id: 'meeting-one', status: 'ended', source_channel_id: 'source' }],
+    channels: [{ id: 'source', type: 'private', meeting_history_access: 'all_channel_members' }],
+    channel_members: [{ channel_id: 'source', user_id: 'reader' }],
+    users: [{ id: 'admin', is_admin: true }]
+  })
+  harness.app.get = () => db
+  channels(harness.app)
+  const payload = Object.freeze({ meetingId: 'meeting-one', chatChannelId: 'private-meeting-chat', artifactTypes: ['summary'] })
+  const publish = harness.getPublishHandler('meetings', 'artifacts-updated')
+  assert.deepEqual((await publish(payload)).map(channel => channel.name), ['user/reader', 'user/admin'])
+  assert.deepEqual(payload, { meetingId: 'meeting-one', chatChannelId: 'private-meeting-chat', artifactTypes: ['summary'] })
+})
 
 test('socket contract: raw admin role and invite payloads are not broadcast', () => {
   const harness = createAppHarness()
