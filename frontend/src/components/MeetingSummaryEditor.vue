@@ -1,5 +1,6 @@
 <template>
-  <n-modal :show="show" preset="card" :title="$t('summaryEdit.title')" class="summary-editor-modal"
+  <n-modal :show="show" preset="card" :title="$t('summaryEdit.title')"
+    style="width: calc(100vw - 24px); max-width: 800px"
     :mask-closable="!busy" :close-on-esc="!busy" :closable="!busy" @update:show="close">
     <div data-testid="meeting-summary-editor" class="summary-editor">
       <n-alert v-if="error" type="error" :show-icon="false" data-testid="summary-edit-error">{{ error }}</n-alert>
@@ -85,7 +86,6 @@ export default {
 </script>
 
 <style scoped>
-.summary-editor-modal { width: min(800px, calc(100vw - 24px)); }
 .summary-editor { display: flex; flex-direction: column; gap: 16px; }
 .summary-editor-preview { max-height: 50dvh; overflow: auto; display: flex; flex-direction: column; gap: 12px; }
 </style>
