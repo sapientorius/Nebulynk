@@ -20,7 +20,7 @@ describe('static source contract: MeetingSummaryPanel', () => {
     expect(source).toContain('data-testid="meeting-summary-topic"')
     expect(source).toContain('data-testid="meeting-summary-error"')
     expect(source).toContain('data-testid="meeting-summary-generation-hint"')
-    expect(source).toContain("emits: ['generate-summary', 'copy-summary', 'export-summary', 'share-summary', 'open-evidence']")
+    expect(source).toContain("emits: ['generate-summary', 'copy-summary', 'export-summary', 'share-summary', 'open-evidence', 'edit-summary']")
   })
 
   it('groups share actions into a share menu and lets the parent hide in-app sharing', () => {

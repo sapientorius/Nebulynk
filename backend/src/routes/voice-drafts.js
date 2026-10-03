@@ -6,6 +6,7 @@ import { getActiveMeetingSummaryRuntime, getActiveTranscriptionRuntime } from '.
 import { generateStructuredObject, transcribeAudio } from '../lib/ai-provider-adapters.js'
 import { logger } from '../logger.js'
 import { authenticateRequest } from './authenticate-request.js'
+import { assertCanEditMeetingSummary } from '../domains/meetings/summary-edit-access.js'
 
 const MAX_VOICE_DRAFT_SIZE = Number(process.env.MAX_FILE_SIZE) || 26214400
 
@@ -204,13 +205,20 @@ export function configureVoiceDraftRoutes(app) {
       }
 
       const channelId = String(getFieldValue(fields, 'channel_id') || '').trim()
-      if (!channelId) {
+      const meetingId = String(getFieldValue(fields, 'meeting_id') || '').trim()
+      if (channelId && meetingId) {
+        ctx.status = 400
+        ctx.body = buildErrorBody('api.voice_drafts.ambiguous_context', 'Supply either channel_id or meeting_id')
+        return
+      }
+      if (!channelId && !meetingId) {
         ctx.status = 400
         ctx.body = buildErrorBody('api.voice_drafts.channel_id_required', 'channel_id is required')
         return
       }
 
-      const accessError = await assertDraftAccess(app, { user, channelId })
+      if (meetingId) await assertCanEditMeetingSummary(app.get('postgresqlClient'), meetingId, user)
+      const accessError = channelId ? await assertDraftAccess(app, { user, channelId }) : null
       if (accessError) {
         ctx.status = accessError.status
         ctx.body = accessError.body

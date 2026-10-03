@@ -106,9 +106,10 @@ async function createRouteHarness({
   }
 }
 
-async function postVoiceDraft(baseUrl, { token = 'admin-token', channelId = 'channel-1', fileType = 'audio/webm' } = {}) {
+async function postVoiceDraft(baseUrl, { token = 'admin-token', channelId = 'channel-1', meetingId = null, fileType = 'audio/webm' } = {}) {
   const formData = new FormData()
   if (channelId !== null) formData.append('channel_id', channelId)
+  if (meetingId !== null) formData.append('meeting_id', meetingId)
   formData.append('duration_ms', '1200')
   formData.append('file', new Blob(['voice'], { type: fileType }), fileType.startsWith('audio/') ? 'voice.webm' : 'voice.txt')
 
@@ -305,4 +306,46 @@ test('voice draft route transcribes and polishes an authorized draft', async () 
   } finally {
     await harness.close()
   }
+})
+
+const meetingSeed = {
+  meetings: [{ id: 'meeting-1', status: 'ended', host_user_id: 'user-1', chat_channel_id: 'channel-archived', source_channel_type: 'private', source_channel_meeting_history_access: 'active_participants' }],
+  meeting_participants: [{ id: 'participant-1', meeting_id: 'meeting-1', user_id: 'user-1', joined_at: '2026-10-01T10:00:00Z' }],
+  meeting_artifacts: [{ id: 'summary-1', meeting_id: 'meeting-1', artifact_type: 'summary', status: 'ready', payload: { mini_summary: 'Saved summary.' } }]
+}
+
+test('meeting dictation allows creator without chat write permission and admin without chat membership', async () => {
+  const harness = await createRouteHarness({ seed: meetingSeed })
+  try {
+    for (const token of ['user-token', 'admin-token']) {
+      const response = await postVoiceDraft(harness.baseUrl, { token, channelId: null, meetingId: 'meeting-1' })
+      assert.equal(response.status, 200)
+      assert.equal((await response.json()).text, 'Polished voice draft.')
+    }
+  } finally { await harness.close() }
+})
+
+test('meeting dictation rejects participants, outsiders, and creators with revoked content access', async () => {
+  for (const seed of [
+    { ...meetingSeed, meetings: [{ ...meetingSeed.meetings[0], host_user_id: 'admin-1' }] },
+    { ...meetingSeed, meeting_participants: [] }
+  ]) {
+    const harness = await createRouteHarness({ seed })
+    try {
+      const response = await postVoiceDraft(harness.baseUrl, { token: 'user-token', channelId: null, meetingId: 'meeting-1' })
+      assert.equal(response.status, 403)
+    } finally { await harness.close() }
+  }
+})
+
+test('meeting dictation rejects unfinished summary and ambiguous chat plus meeting context', async () => {
+  const harness = await createRouteHarness({ seed: { ...meetingSeed, meeting_artifacts: [{ ...meetingSeed.meeting_artifacts[0], status: 'processing' }] } })
+  try {
+    const ambiguous = await postVoiceDraft(harness.baseUrl, { meetingId: 'meeting-1' })
+    assert.equal(ambiguous.status, 400)
+    assert.equal((await ambiguous.json()).error_code, 'api.voice_drafts.ambiguous_context')
+    const processing = await postVoiceDraft(harness.baseUrl, { channelId: null, meetingId: 'meeting-1' })
+    assert.equal(processing.status, 400)
+    assert.equal((await processing.json()).error_code, 'api.summary_revisions.not_ready')
+  } finally { await harness.close() }
 })

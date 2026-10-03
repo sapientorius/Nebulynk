@@ -1,7 +1,7 @@
 import { beforeEach, expect, it, vi } from 'vitest'
 import { DOMWrapper, flushPromises } from '@vue/test-utils'
 import { nextTick } from 'vue'
-import { NSelect } from 'naive-ui'
+import { NSelect, useDialog } from 'naive-ui'
 import MeetingView from '../../src/views/MeetingView.vue'
 import { componentContext, deferred } from '../helpers/mount-component.js'
 import MeetingInviteDialog from '../../src/components/meetings/MeetingInviteDialog.vue'
@@ -108,6 +108,38 @@ it('shows the admin regeneration action for a failed transcript', async () => {
   await flushPromises()
 
   expect(generateTranscript).toHaveBeenCalledWith('one', { reason: 'admin_regenerate' })
+})
+
+it('warns before summary regeneration and lets admins suppress its public change entry', async () => {
+  meeting.status = 'ended'
+  meeting.artifacts = [{ artifact_type: 'summary', status: 'ready', payload: { markdown: 'Corrected summary' } }]
+  meeting.admin_artifact_menu = { visible: true, can_regenerate_summary: true }
+  const generateSummary = vi.spyOn(useMeetingsStore(), 'generateSummary').mockResolvedValue(meeting)
+  const previousDialog = window.$dialog
+  try {
+    const wrapper = context.mount(MeetingView, { global: { stubs: { ...stubs,
+      MeetingSummaryPanel: { ...stubs.MeetingSummaryPanel, setup() { window.$dialog = useDialog() } }
+    } } })
+    await flushPromises()
+    await wrapper.get('[data-testid=meeting-admin-artifact-menu-trigger]').trigger('click')
+    await flushPromises()
+    const body = new DOMWrapper(document.body)
+    await body.get('[data-testid=meeting-admin-regenerate-summary]').trigger('click')
+    await flushPromises()
+    expect(generateSummary).not.toHaveBeenCalled()
+    expect(body.text()).toContain('corrections may be lost')
+    expect(body.get('[data-testid=summary-regenerate-publish]').attributes('aria-checked')).toBe('true')
+    await body.get('[data-testid=summary-regenerate-publish]').trigger('click')
+    await body.get('[data-testid=summary-regenerate-confirm]').trigger('click')
+    await flushPromises()
+    expect(generateSummary).toHaveBeenCalledWith('one', { reason: 'admin_regenerate', publishChange: false, confirmReplace: true })
+    await vi.waitFor(() => expect(body.get('[data-testid=summary-regenerate-publish]').isVisible()).toBe(false))
+    await wrapper.get('[data-testid=meeting-admin-artifact-menu-trigger]').trigger('click')
+    await flushPromises()
+    await body.get('[data-testid=meeting-admin-regenerate-summary]').trigger('click')
+    await flushPromises()
+    expect(body.findAll('[data-testid=summary-regenerate-publish]').filter(item => item.isVisible()).at(-1).attributes('aria-checked')).toBe('true')
+  } finally { window.$dialog = previousDialog }
 })
 function button(wrapper, label) {
   const found = wrapper.findAll('button').find(b => b.text() === label)

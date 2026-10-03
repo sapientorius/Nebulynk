@@ -1,10 +1,13 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { once } from 'node:events'
+import { createServer } from 'node:net'
 import {
   appendInviteEmailStatus
 } from '../src/services/invites/invites.js'
 import {
   getEmailDeliveryStatus,
+  invalidateSmtpTransporter,
   parseSmtpBoolean,
   resolveEnvSmtpConfig,
   sendAccountActivatedEmail,
@@ -14,6 +17,70 @@ import {
   sendPlatformSecurityUpdateEmail
 } from '../src/email.js'
 import { createMemoryDb } from './helpers/memory-db.js'
+
+test('invite delivery works with the real Nodemailer SMTP transport', { timeout: 10000 }, async (t) => {
+  const commands = []
+  const message = []
+  const sockets = new Set()
+  const server = createServer((socket) => {
+    sockets.add(socket)
+    socket.on('close', () => sockets.delete(socket))
+    socket.setEncoding('utf8')
+    socket.write('220 localhost ESMTP test\r\n')
+    let buffer = ''
+    let receivingMessage = false
+    socket.on('data', (chunk) => {
+      buffer += chunk
+      let end
+      while ((end = buffer.indexOf('\r\n')) !== -1) {
+        const line = buffer.slice(0, end)
+        buffer = buffer.slice(end + 2)
+        if (receivingMessage) {
+          if (line === '.') {
+            receivingMessage = false
+            socket.write('250 Message accepted\r\n')
+          } else message.push(line)
+          continue
+        }
+        commands.push(line)
+        if (line.startsWith('EHLO ')) socket.write('250-localhost\r\n250 AUTH PLAIN\r\n')
+        else if (line.startsWith('AUTH PLAIN ')) socket.write('235 Authentication successful\r\n')
+        else if (line.startsWith('MAIL FROM:') || line.startsWith('RCPT TO:')) socket.write('250 OK\r\n')
+        else if (line === 'DATA') {
+          receivingMessage = true
+          socket.write('354 End with a dot\r\n')
+        } else if (line === 'QUIT') socket.end('221 Bye\r\n')
+        else socket.end('421 Unexpected command\r\n')
+      }
+    })
+  })
+  invalidateSmtpTransporter()
+  t.after(async () => {
+    invalidateSmtpTransporter()
+    for (const socket of sockets) socket.destroy()
+    await new Promise((resolve) => server.close(resolve))
+  })
+  server.listen(0, '127.0.0.1')
+  await once(server, 'listening')
+  const { app } = createApp()
+  await withEnv({
+    SMTP_HOST: '127.0.0.1', SMTP_PORT: server.address().port,
+    SMTP_USER: 'mailer', SMTP_PASS: 'test-password', SMTP_FROM: 'noreply@example.test',
+    SMTP_SECURE: 'false', SMTP_IGNORE_TLS: 'true', FRONTEND_URL: 'https://chat.example.test'
+  }, async () => {
+    const result = await sendInviteEmail(app, {
+      email: 'invitee@example.test', token: 'test-token', inviterName: 'Admin',
+      platformName: 'Nebulynk', message: 'Welcome', locale: 'en'
+    })
+    assert.equal(result.ok, true)
+    assert.deepEqual(result.accepted, ['invitee@example.test'])
+  })
+  assert.ok(commands.some((line) => line.startsWith('AUTH PLAIN ')))
+  assert.ok(commands.includes('MAIL FROM:<noreply@example.test>'))
+  assert.ok(commands.includes('RCPT TO:<invitee@example.test>'))
+  assert.match(message.join('\n'), /Subject:.*Nebulynk/)
+  assert.match(message.join('\n'), /\/invite\/test-token/)
+})
 
 function withEnv(patch, run) {
   const previous = {}

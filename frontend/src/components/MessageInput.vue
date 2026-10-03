@@ -1,6 +1,7 @@
 <template>
-  <div class="message-input" ref="inputContainer" data-testid="message-input">
+  <div class="message-input" ref="inputContainer" :data-testid="isInstruction ? 'instruction-input' : 'message-input'">
     <MentionAutocomplete
+      v-if="!isInstruction"
       :visible="showMentionPicker"
       :search-term="mentionSearchTerm"
       :position="mentionPosition"
@@ -80,15 +81,15 @@
         type="textarea"
         :bordered="false"
         :autosize="{ minRows: 1, maxRows: MAX_INPUT_ROWS }"
-        :placeholder="placeholder"
+        :placeholder="inputPlaceholder"
         :disabled="!canSend"
-        :input-props="{ 'data-testid': 'message-input-textarea' }"
+        :input-props="{ 'data-testid': isInstruction ? 'instruction-input-textarea' : 'message-input-textarea' }"
         @keydown="onKeydown"
         @input="onInput"
         ref="textInput"
       />
       <div class="composer-action-row">
-        <div class="composer-tools">
+        <div v-if="!isInstruction" class="composer-tools">
           <div class="markdown-toolbar" data-testid="message-markdown-toolbar">
             <n-button
               v-for="action in markdownToolbarActions"
@@ -138,6 +139,7 @@
         </div>
         <div class="composer-primary-actions">
           <n-popover
+            v-if="!isInstruction"
             trigger="click"
             placement="top-start"
             :show-arrow="false"
@@ -167,12 +169,20 @@
             </div>
           </n-popover>
           <n-button
+            v-else quaternary size="small" :disabled="!canSend"
+            :title="$t('ui.components.voice_to_text')" :aria-label="$t('ui.components.voice_to_text')"
+            data-testid="instruction-voice-to-text" @click="openVoiceRecorder('voice-to-text')"
+          >
+            <template #icon><n-icon><mic-icon /></n-icon></template>
+          </n-button>
+          <n-button
             size="small"
             class="message-send-button"
             :disabled="!canSubmit"
-            :title="$t('ui.components.send_message')"
-            :aria-label="$t('ui.components.send_message')"
-            data-testid="message-send-button"
+            :loading="loading || voiceSubmitting"
+            :title="submitLabel || $t('ui.components.send_message')"
+            :aria-label="submitLabel || $t('ui.components.send_message')"
+            :data-testid="isInstruction ? 'instruction-submit' : 'message-send-button'"
             @click="submit"
           >
             <template #icon><n-icon size="20"><send-icon /></n-icon></template>
@@ -252,6 +262,16 @@ const MARKDOWN_TOOLBAR_ACTIONS = [
 
 export default {
   name: 'MessageInput',
+  props: {
+    mode: { type: String, default: 'chat' },
+    modelValue: { type: String, default: '' },
+    meetingId: { type: String, default: null },
+    disabled: { type: Boolean, default: false },
+    loading: { type: Boolean, default: false },
+    placeholder: { type: String, default: '' },
+    submitLabel: { type: String, default: '' }
+  },
+  emits: ['update:modelValue', 'submit'],
   components: {
     EmojiPicker,
     MentionAutocomplete,
@@ -268,6 +288,7 @@ export default {
   data() {
     return {
       MAX_INPUT_ROWS,
+      disposed: false,
       showEmojiPicker: false,
       isMobileLayout: readIsMobileLayout(),
       stopObservingMobileLayout: null,
@@ -286,6 +307,7 @@ export default {
     }
   },
   computed: {
+    isInstruction() { return this.mode === 'instruction' },
     channelsStore() {
       return useChannelsStore()
     },
@@ -302,12 +324,14 @@ export default {
       return this.gifSearchStore.klipyConfigured
     },
     activeChannelId() {
+      if (this.isInstruction) return null
       return this.channelsStore.activeChannelId
     },
     activeChannel() {
       return this.channelsStore.channels.find((entry) => entry.id === this.activeChannelId) || null
     },
     activeDraft() {
+      if (this.isInstruction) return { text: this.modelValue, files: [] }
       return this.messagesStore.getDraft(this.activeChannelId)
     },
     text: {
@@ -315,6 +339,7 @@ export default {
         return this.activeDraft.text
       },
       set(value) {
+        if (this.isInstruction) { this.$emit('update:modelValue', value); return }
         this.messagesStore.setDraftText(this.activeChannelId, value)
       }
     },
@@ -328,6 +353,7 @@ export default {
       return Boolean(this.messagesStore.draftFilesHydratingByChannel[this.activeChannelId])
     },
     canSend() {
+      if (this.isInstruction) return !this.disabled && !this.loading && !this.voiceSubmitting
       return this.channelsStore.can('send_messages') && !this.activeChannel?.is_archived
     },
     canSubmit() {
@@ -340,12 +366,14 @@ export default {
         && (this.text.trim().length > 0 || hasFiles || hasPendingImages)
     },
     replyContext() {
+      if (this.isInstruction) return null
       return this.messagesStore.replyContext
     },
     replySnippet() {
       return toPlainMessageSnippet(this.replyContext?.content || '', { maxLength: 140 })
     },
-    placeholder() {
+    inputPlaceholder() {
+      if (this.isInstruction) return this.placeholder
       if (this.activeChannel?.is_archived) return this.$t('ui.components.channel_is_archived')
       if (!this.canSend) return this.$t('ui.components.you_do_not_have_permission_to_write_here')
       if (this.activeChannel?.purpose === 'meeting') {
@@ -361,6 +389,7 @@ export default {
   },
   watch: {
     activeChannelId(nextChannelId) {
+      if (this.isInstruction) return
       this.showMentionPicker = false
       this.showEmojiPicker = false
       this.showGifPicker = false
@@ -379,11 +408,14 @@ export default {
       this.isMobileLayout = matches
     })
     this.attachPasteHandler()
-    this.messagesStore.hydrateDraftFiles(this.activeChannelId).catch(() => {})
-    this.gifSearchStore.loadConfiguration().catch(() => {})
+    if (!this.isInstruction) {
+      this.messagesStore.hydrateDraftFiles(this.activeChannelId).catch(() => {})
+      this.gifSearchStore.loadConfiguration().catch(() => {})
+    }
     this.focusTextarea()
   },
   beforeUnmount() {
+    this.disposed = true
     this.stopObservingMobileLayout?.()
     this.detachPasteHandler()
     this.revokeAllPendingImageUploads()
@@ -522,6 +554,7 @@ export default {
       this.messagesStore.removeDraftFile(this.activeChannelId, fileId)
     },
     async handleSelectedFiles(files) {
+      if (this.isInstruction) return
       if (!this.canSend) return
       const fileList = Array.from(files || []).filter(Boolean)
       if (fileList.length === 0) return
@@ -636,6 +669,7 @@ export default {
       })
     },
     async onPaste(event) {
+      if (this.isInstruction) return
       const items = Array.from(event.clipboardData?.items || [])
       if (items.length === 0) return
 
@@ -657,6 +691,7 @@ export default {
       await this.handleSelectedFiles(files)
     },
     async onKeydown(event) {
+      if (event.isComposing || event.ctrlKey || event.metaKey || event.altKey) return
       if (this.showMentionPicker && this.$refs.mentionAutocomplete) {
         const handled = this.$refs.mentionAutocomplete.handleKeydown(event)
         if (handled) return
@@ -675,6 +710,7 @@ export default {
     },
     async submit() {
       if (!this.canSubmit) return
+      if (this.isInstruction) { this.$emit('submit', this.text.trim()); return }
 
       const channelId = this.channelsStore.activeChannelId
 
@@ -707,6 +743,7 @@ export default {
       }
     },
     onInput() {
+      if (this.isInstruction) return
       this.checkForMention()
     },
     checkForMention() {
@@ -776,6 +813,7 @@ export default {
     },
     openVoiceRecorder(mode) {
       if (!this.canSend) return
+      if (this.isInstruction && mode !== 'voice-to-text') return
       this.voiceRecorderMode = mode
       this.showVoiceMenu = false
       this.showVoiceRecorder = true
@@ -809,15 +847,19 @@ export default {
       })
     },
     async onVoiceRecorderSubmit({ file, durationMs, mode }) {
-      if (!file || !this.activeChannelId) return
+      const meetingId = this.isInstruction ? this.meetingId : null
+      const channelId = this.isInstruction ? null : this.activeChannelId
+      if (!file || (!meetingId && !channelId) || this.voiceSubmitting || !this.canSend) return
       this.voiceSubmitting = true
 
       try {
         if (mode === 'voice-to-text') {
           const result = await this.uploadsStore.transcribeVoiceDraft(file, {
-            channelId: this.activeChannelId,
+            channelId,
+            meetingId,
             durationMs
           })
+          if (this.disposed || (this.isInstruction ? this.meetingId !== meetingId : this.activeChannelId !== channelId)) return
           this.insertTextAtCursor(result?.text || '')
           window.$message?.success(this.$t('ui.components.voice_text_inserted'))
         } else {

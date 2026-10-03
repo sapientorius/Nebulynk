@@ -1,12 +1,10 @@
-import { upsertMeetingArtifactSearchDocument } from '../../lib/search-index.js'
+import { normalizeSummaryDraft, buildReadySummaryPayload } from '../../lib/meeting-summary-draft.js'
+import { normalizeChangeSummary, notifySummaryUpdated, summaryVersion } from '../../lib/meeting-summary-revisions.js'
 import { generateStructuredObject } from '../../lib/ai-provider-adapters.js'
 import {
-  buildMeetingSummaryMarkdown,
   buildSummaryPromptInput,
   hasMeetingAiInput,
-  loadMeetingAiContext,
-  materializeEvidenceByIds,
-  normalizeText
+  loadMeetingAiContext
 } from '../../lib/meeting-ai.js'
 import {
   getActiveMeetingSummaryRuntime,
@@ -16,88 +14,7 @@ import {
 const SUMMARY_POLL_LIMIT = 10
 const SUMMARY_ARTIFACTS_IN_FLIGHT = new Set()
 
-function asArray(value) {
-  return Array.isArray(value) ? value : []
-}
-
-function normalizeEvidenceIds(value) {
-  if (Array.isArray(value)) {
-    return value.map((entry) => normalizeText(entry)).filter(Boolean)
-  }
-  if (typeof value === 'string') {
-    const normalized = normalizeText(value)
-    return normalized ? [normalized] : []
-  }
-  return []
-}
-
-function normalizeSummaryDraft(payload) {
-  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
-    throw new Error('Meeting summary draft must be an object')
-  }
-
-  const summaryPoints = asArray(payload.summary_points)
-    .map((item) => normalizeText(typeof item === 'string' ? item : item?.text))
-    .filter(Boolean)
-    .slice(0, 8)
-
-  const decisions = asArray(payload.decisions)
-    .map((item, index) => {
-      const text = normalizeText(item?.text || item?.decision)
-      if (!text) return null
-      return {
-        id: `decision-${index + 1}`,
-        text,
-        evidence_ids: normalizeEvidenceIds(item?.evidence_ids || item?.evidence)
-      }
-    })
-    .filter(Boolean)
-    .slice(0, 8)
-
-  const openItems = asArray(payload.open_items)
-    .map((item, index) => {
-      const text = normalizeText(item?.text || item?.question || item?.risk)
-      if (!text) return null
-      return {
-        id: `open-${index + 1}`,
-        kind: item?.kind === 'risk' ? 'risk' : 'question',
-        text,
-        evidence_ids: normalizeEvidenceIds(item?.evidence_ids || item?.evidence)
-      }
-    })
-    .filter(Boolean)
-    .slice(0, 8)
-
-  const topicChapters = asArray(payload.topic_chapters)
-    .map((item, index) => {
-      const title = normalizeText(item?.title)
-      const summary = normalizeText(item?.summary || item?.text)
-      if (!title && !summary) return null
-      const startMs = Number.isFinite(Number(item?.start_ms)) ? Math.max(0, Math.round(Number(item.start_ms))) : null
-      const endMs = Number.isFinite(Number(item?.end_ms)) ? Math.max(startMs || 0, Math.round(Number(item.end_ms))) : null
-      return {
-        id: `topic-${index + 1}`,
-        title: title || `Topic ${index + 1}`,
-        summary: summary || null,
-        start_ms: startMs,
-        end_ms: endMs,
-        evidence_ids: normalizeEvidenceIds(item?.evidence_ids || item?.evidence)
-      }
-    })
-    .filter(Boolean)
-    .slice(0, 8)
-
-  return {
-    language: normalizeText(payload.language) || null,
-    mini_summary: normalizeText(payload.mini_summary || payload.summary) || null,
-    summary_points: summaryPoints,
-    decisions,
-    open_items: openItems,
-    topic_chapters: topicChapters
-  }
-}
-
-function buildPrompt(context) {
+function buildPrompt(context, regeneration) {
   return JSON.stringify({
     instructions: {
       output_rules: [
@@ -106,7 +23,8 @@ function buildPrompt(context) {
         'Use only the evidence ids present in transcript.segments and chat.messages.',
         'Do not invent decisions, risks, or citations.',
         'Keep the mini_summary to one short paragraph.',
-        'Keep summary_points concise and business-focused.'
+        'Keep summary_points concise and business-focused.',
+        ...(regeneration ? ['Also return change_summary: 1-3 short sentences describing actual changes compared with previous_summary. Write it in the summary language.'] : [])
       ],
       shape: {
         language: 'string',
@@ -114,60 +32,13 @@ function buildPrompt(context) {
         summary_points: ['string'],
         decisions: [{ text: 'string', evidence_ids: ['string'] }],
         open_items: [{ kind: 'question|risk', text: 'string', evidence_ids: ['string'] }],
-        topic_chapters: [{ title: 'string', summary: 'string', start_ms: 'number|null', end_ms: 'number|null', evidence_ids: ['string'] }]
+        topic_chapters: [{ title: 'string', summary: 'string', start_ms: 'number|null', end_ms: 'number|null', evidence_ids: ['string'] }],
+        ...(regeneration ? { change_summary: 'string' } : {})
       }
     },
-    context: buildSummaryPromptInput(context)
+    context: buildSummaryPromptInput(context),
+    ...(regeneration ? { previous_summary: regeneration.before_payload } : {})
   }, null, 2)
-}
-
-function buildReadySummaryPayload(context, draft) {
-  const decisions = draft.decisions.map((item) => ({
-    id: item.id,
-    text: item.text,
-    evidence: materializeEvidenceByIds(item.evidence_ids, context.evidenceCatalog)
-  }))
-
-  const openItems = draft.open_items.map((item) => ({
-    id: item.id,
-    kind: item.kind,
-    text: item.text,
-    evidence: materializeEvidenceByIds(item.evidence_ids, context.evidenceCatalog)
-  }))
-
-  const topicChapters = draft.topic_chapters.map((item) => {
-    const evidence = materializeEvidenceByIds(item.evidence_ids, context.evidenceCatalog)
-    const transcriptEvidence = evidence.filter((entry) => entry.type === 'transcript')
-    const inferredStartMs = transcriptEvidence.length > 0
-      ? Math.min(...transcriptEvidence.map((entry) => entry.start_ms))
-      : null
-    const inferredEndMs = transcriptEvidence.length > 0
-      ? Math.max(...transcriptEvidence.map((entry) => entry.end_ms))
-      : null
-
-    return {
-      id: item.id,
-      title: item.title,
-      summary: item.summary,
-      start_ms: item.start_ms ?? inferredStartMs,
-      end_ms: item.end_ms ?? inferredEndMs,
-      evidence
-    }
-  })
-
-  const payload = {
-    language: context.targetLanguage || draft.language || context.transcriptArtifact?.payload?.language || null,
-    mini_summary: draft.mini_summary || draft.summary_points[0] || null,
-    summary_points: draft.summary_points,
-    decisions,
-    open_items: openItems,
-    topic_chapters: topicChapters,
-    coverage: context.coverage,
-    markdown: ''
-  }
-
-  payload.markdown = buildMeetingSummaryMarkdown(payload)
-  return payload
 }
 
 async function loadSummaryCandidates(db) {
@@ -188,25 +59,29 @@ function shouldWaitForTranscript(transcriptArtifact) {
   return transcriptArtifact.status === 'pending' || transcriptArtifact.status === 'processing'
 }
 
-async function updateSummaryArtifact(app, artifact, meeting, patch) {
+async function updateSummaryArtifact(app, artifact, meeting, patch, regeneration = null, changeSummary = null) {
   const db = app.get('postgresqlClient')
   const nowIso = new Date().toISOString()
 
-  await db('meeting_artifacts')
-    .where('id', artifact.id)
-    .update({
-      ...patch,
-      updated_at: nowIso
+  const committed = await db.transaction(async trx => {
+    const current = await trx('meeting_artifacts').where('id', artifact.id).forUpdate().first()
+    if (!current || summaryVersion(current) !== summaryVersion(artifact)
+      || !['pending', 'processing'].includes(current.status)) return false
+    const failed = patch.status === 'failed'
+    const next = failed && regeneration
+      ? { status: 'ready', payload: regeneration.before_payload }
+      : patch
+    await trx('meeting_artifacts').where('id', artifact.id).update({
+      ...next, summary_version: summaryVersion(current) + 1, updated_at: nowIso
     })
-
-  const upsertArtifactSearchDocument = app.get('upsertMeetingArtifactSearchDocument') || upsertMeetingArtifactSearchDocument
-  await upsertArtifactSearchDocument(db, artifact.id)
-
-  app.service('meetings').emit('artifacts-updated', {
-    meetingId: meeting.id,
-    chatChannelId: meeting.chat_channel_id,
-    artifactTypes: ['summary']
+    if (regeneration) await trx('meeting_summary_revisions').where('id', regeneration.id).update({
+      status: failed ? 'failed' : 'applied', payload: failed ? null : patch.payload,
+      change_summary: !failed && regeneration.publish_change ? changeSummary : null,
+      publish_change: !failed && regeneration.publish_change, applied_at: failed ? null : nowIso
+    })
+    return true
   })
+  if (committed) await notifySummaryUpdated(app, meeting, artifact.id)
 }
 
 export async function processPendingMeetingSummaries(app) {
@@ -228,6 +103,7 @@ export async function processPendingMeetingSummaries(app) {
   for (const artifact of candidates) {
     if (SUMMARY_ARTIFACTS_IN_FLIGHT.has(artifact.id)) continue
     SUMMARY_ARTIFACTS_IN_FLIGHT.add(artifact.id)
+    let regeneration = null
 
     try {
       const meeting = await db('meetings').where('id', artifact.meeting_id).first()
@@ -236,6 +112,8 @@ export async function processPendingMeetingSummaries(app) {
       }
 
       const context = await loadMeetingAiContext(db, meeting)
+      regeneration = await db('meeting_summary_revisions').where({ meeting_id: meeting.id, kind: 'regenerate', status: 'generating', base_version: summaryVersion(artifact) - 1 }).first()
+      if (regeneration?.before_payload?.language) context.targetLanguage = regeneration.before_payload.language
       if (shouldWaitForTranscript(context.transcriptArtifact)) {
         continue
       }
@@ -248,7 +126,7 @@ export async function processPendingMeetingSummaries(app) {
             markdown: '',
             failure_message: 'No meeting transcript or chat content was available for summarization'
           }
-        })
+        }, regeneration)
         processed += 1
         continue
       }
@@ -260,9 +138,9 @@ export async function processPendingMeetingSummaries(app) {
         model: runtime.functionConfig.model,
         ...runtime.requestOptions,
         systemPrompt: 'You create grounded business meeting summaries for Nebulynk. Only use provided meeting evidence and always return valid JSON.',
-        userPrompt: buildPrompt(context),
+        userPrompt: buildPrompt(context, regeneration),
         capability: 'meeting_summary',
-        validateObject: normalizeSummaryDraft
+        validateObject: value => ({ ...normalizeSummaryDraft(value), ...(regeneration ? { change_summary: normalizeChangeSummary(value.change_summary) } : {}) })
       })
 
       const payload = buildReadySummaryPayload(context, draft)
@@ -275,7 +153,7 @@ export async function processPendingMeetingSummaries(app) {
             markdown: '',
             failure_message: 'Meeting summary model returned an empty response'
           }
-        })
+        }, regeneration)
         processed += 1
         continue
       }
@@ -283,7 +161,7 @@ export async function processPendingMeetingSummaries(app) {
       await updateSummaryArtifact(app, artifact, meeting, {
         status: 'ready',
         payload
-      })
+      }, regeneration, regeneration ? normalizeChangeSummary(draft.change_summary) : null)
       processed += 1
     } catch (error) {
       const meeting = await db('meetings').where('id', artifact.meeting_id).first()
@@ -296,7 +174,7 @@ export async function processPendingMeetingSummaries(app) {
             markdown: '',
             failure_message: error.message
           }
-        })
+        }, regeneration)
       }
       processed += 1
     } finally {

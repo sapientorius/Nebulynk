@@ -18,7 +18,7 @@ describe('static source contract: Voice messages source contract', () => {
   it('adds the visible composer send button beside the voice menu trigger', () => {
     const source = readFileSync(resolve('src/components/MessageInput.vue'), 'utf8')
 
-    expect(source).toContain('data-testid="message-send-button"')
+    expect(source).toContain(":data-testid=\"isInstruction ? 'instruction-submit' : 'message-send-button'\"")
     expect(source).toContain('PaperPlaneSharp as SendIcon')
     expect(source).toContain(':disabled="!canSubmit"')
     expect(source).toContain('@click="submit"')

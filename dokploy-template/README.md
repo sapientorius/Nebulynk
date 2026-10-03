@@ -18,6 +18,9 @@ Dokploy templates repository. `import.base64` is the directly importable form.
 The template builds Nebulynk directly from the public repository. It defaults
 to the reviewed `stable` branch. Set `NEBULYNK_SOURCE_REF` to an immutable tag
 such as `v0.4.0` before deployment when a pinned release is required.
+Garage, LiveKit, and LiveKit Egress use their upstream images directly. Their
+configuration is embedded in the Compose import, so no additional files need
+to be mounted on the Dokploy host.
 
 ## Domains and TLS
 

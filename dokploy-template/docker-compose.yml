@@ -49,11 +49,8 @@ services:
     restart: "no"
 
   garage:
-    build:
-      context: "https://github.com/sapientorius/Nebulynk.git#${NEBULYNK_SOURCE_REF:-stable}"
-      dockerfile: garage.Dockerfile
-      args:
-        GARAGE_IMAGE: "${NEBULYNK_GARAGE_IMAGE:-dxflrs/garage:v2.3.0}"
+    image: "${NEBULYNK_GARAGE_IMAGE:-dxflrs/garage:v2.3.0}"
+    user: "65532:65532"
     depends_on:
       garage-volume-init:
         condition: service_completed_successfully
@@ -66,21 +63,24 @@ services:
     volumes:
       - nebulynk_garage_meta:/var/lib/garage/meta
       - nebulynk_garage_data:/var/lib/garage/data
+    configs:
+      - source: garage_config
+        target: /etc/garage.toml
     expose:
       - "3900"
     restart: unless-stopped
 
   livekit:
-    build:
-      context: "https://github.com/sapientorius/Nebulynk.git#${NEBULYNK_SOURCE_REF:-stable}"
-      dockerfile: livekit.Dockerfile
-      args:
-        LIVEKIT_SERVER_IMAGE: "${NEBULYNK_LIVEKIT_SERVER_IMAGE:-livekit/livekit-server:v1.13.4}"
+    image: "${NEBULYNK_LIVEKIT_SERVER_IMAGE:-livekit/livekit-server:v1.13.4}"
+    user: "65532:65532"
     command: --config /livekit.yaml
     depends_on:
       - redis
     environment:
       LIVEKIT_KEYS: "${LIVEKIT_API_KEY:?LIVEKIT_API_KEY must be set}: ${LIVEKIT_API_SECRET:?LIVEKIT_API_SECRET must be set}"
+    configs:
+      - source: livekit_config
+        target: /livekit.yaml
     expose:
       - "7880"
     ports:
@@ -89,11 +89,8 @@ services:
     restart: unless-stopped
 
   livekit-egress:
-    build:
-      context: "https://github.com/sapientorius/Nebulynk.git#${NEBULYNK_SOURCE_REF:-stable}"
-      dockerfile: livekit-egress.Dockerfile
-      args:
-        LIVEKIT_EGRESS_IMAGE: "${NEBULYNK_LIVEKIT_EGRESS_IMAGE:-livekit/egress:v1.13.0}"
+    image: "${NEBULYNK_LIVEKIT_EGRESS_IMAGE:-livekit/egress:v1.13.0}"
+    user: egress
     command: --config /livekit-egress.yaml
     environment:
       EGRESS_CONFIG_FILE: /livekit-egress.yaml
@@ -103,6 +100,9 @@ services:
       AWS_ACCESS_KEY_ID: "${STORAGE_S3_ACCESS_KEY:?STORAGE_S3_ACCESS_KEY must be set}"
       AWS_SECRET_ACCESS_KEY: "${STORAGE_S3_SECRET_KEY:?STORAGE_S3_SECRET_KEY must be set}"
       AWS_DEFAULT_REGION: "${STORAGE_S3_REGION:-${MEETING_RECORDINGS_S3_REGION:-us-east-1}}"
+    configs:
+      - source: livekit_egress_config
+        target: /livekit-egress.yaml
     depends_on:
       - livekit
       - redis
@@ -235,3 +235,41 @@ volumes:
   nebulynk_redis_data:
   nebulynk_garage_meta:
   nebulynk_garage_data:
+
+configs:
+  garage_config:
+    content: |
+      metadata_dir = "/var/lib/garage/meta"
+      data_dir = "/var/lib/garage/data"
+      db_engine = "sqlite"
+
+      replication_factor = 1
+      rpc_bind_addr = "[::]:3901"
+      rpc_public_addr = "garage:3901"
+
+      [s3_api]
+      s3_region = "us-east-1"
+      api_bind_addr = "[::]:3900"
+      root_domain = ".s3.garage.localhost"
+  livekit_config:
+    content: |
+      port: 7880
+      rtc:
+        udp_port: 7882
+        tcp_port: 7881
+        use_external_ip: true
+      redis:
+        address: redis:6379
+      keys:
+  livekit_egress_config:
+    content: |
+      insecure: true
+      log_level: debug
+      health_port: 8080
+
+      redis:
+        address: redis:6379
+
+      s3:
+        bucket: nebulynk-files
+        endpoint: http://garage:3900

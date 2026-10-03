@@ -8,7 +8,9 @@ export async function generateSummary({ reads, authorization, artifacts }, id, d
   await artifacts.generateSummary({
     meeting,
     user,
-    reason: data?.reason || 'manual'
+    reason: data?.reason || 'manual',
+    publishChange: data?.publish_change !== false,
+    confirmReplace: data?.confirm_replace === true
   })
 
   return reads.get(id, params)

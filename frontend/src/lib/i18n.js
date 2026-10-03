@@ -1,6 +1,7 @@
 import { computed, ref } from 'vue'
 import { generatedUiMessages } from './generated-ui-messages.js'
 import { apiErrorMessages } from './api-error-messages.js'
+import { summaryEditMessages } from './summary-edit-messages.js'
 
 export const SUPPORTED_LOCALES = ['en', 'de']
 export const DEFAULT_LOCALE = 'en'
@@ -1819,7 +1820,7 @@ function mergeMessages(base, extra) {
 }
 
 const messages = mergeMessages(
-  mergeMessages(baseMessages, generatedUiMessages),
+  mergeMessages(mergeMessages(baseMessages, generatedUiMessages), summaryEditMessages),
   apiErrorMessages
 )
 

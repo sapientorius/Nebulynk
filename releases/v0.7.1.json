@@ -1,0 +1,78 @@
+{
+  "schema_version": 1,
+  "version": "0.7.1",
+  "revision": 1,
+  "channel": "stable",
+  "published_at": "2026-10-03T16:28:44.000Z",
+  "title": { "en": "Nebulynk 0.7.1" },
+  "summary": {
+    "en": "Adds AI-assisted corrections to meeting summaries with private previews and an optional change history, improves the Dokploy deployment template, and updates vulnerable dependencies."
+  },
+  "changes": [
+    {
+      "category": "feature",
+      "title": { "en": "Edit meeting summaries with AI" },
+      "description": { "en": "Meeting creators and administrators can correct a completed summary or add missing context through Edit with AI. Review and refine a private preview before applying it, or discard it without changing the saved summary. Dictation can insert instructions when transcription is configured; corrections retain the original summary language." }
+    },
+    {
+      "category": "feature",
+      "title": { "en": "Optional summary change history" },
+      "description": { "en": "Applied corrections can publish the editor, time, and a short change description to the meeting history. Private instructions and earlier summary versions stay hidden. Stale previews cannot overwrite newer changes, and regenerating an edited summary requires confirmation; a failed regeneration restores the previous summary." }
+    },
+    {
+      "category": "fix",
+      "title": { "en": "Clearer summary editor layout" },
+      "description": { "en": "The meeting-summary editor uses a corrected modal layout for reviewing instructions and the generated preview." }
+    },
+    {
+      "category": "improvement",
+      "title": { "en": "Simpler Dokploy service deployment" },
+      "description": { "en": "The Dokploy template uses upstream Garage, LiveKit, and LiveKit Egress images with inline service configuration instead of building wrapper images. Backend and frontend deployment continues to use the selected Nebulynk source reference." }
+    },
+    {
+      "category": "security",
+      "title": { "en": "Dependency security updates" },
+      "description": { "en": "Updates Axios to 1.20.0, Nodemailer to 10.0.13, Engine.IO to 6.6.11, and brace-expansion to 1.1.21 and 5.0.12 to address High-severity advisories. Additional updates to fast-uri, markdown-it, and DOMPurify address the remaining dependency advisories. A regression test verifies invitation delivery through the real SMTP transport." }
+    }
+  ],
+  "security": [
+    {
+      "severity": "high",
+      "affected_versions": "<0.7.1",
+      "summary": { "en": "Bundled Axios dependencies are updated to address denial-of-service, prototype-pollution, and request-control bypass advisories. Some advisories affect Node adapters rather than the browser transport used by Nebulynk." },
+      "advisory_url": "https://github.com/advisories/GHSA-c29m-xwm3-cm6r"
+    },
+    {
+      "severity": "high",
+      "affected_versions": "<0.7.1",
+      "summary": { "en": "Updates Nodemailer to address address-parser denial-of-service vulnerabilities and related SMTP security advisories." },
+      "advisory_url": "https://github.com/advisories/GHSA-v53p-9fqp-m79j"
+    },
+    {
+      "severity": "high",
+      "affected_versions": "<0.7.1",
+      "summary": { "en": "Updates Engine.IO to prevent a protocol revision mismatch from causing denial of service in the Socket.IO server." },
+      "advisory_url": "https://github.com/advisories/GHSA-2gc4-cqfq-p2gv"
+    },
+    {
+      "severity": "high",
+      "affected_versions": "<0.7.1",
+      "summary": { "en": "Updates development dependencies using brace-expansion to address uncontrolled recursion and CPU exhaustion." },
+      "advisory_url": "https://github.com/advisories/GHSA-qhr7-859c-m2p7"
+    }
+  ],
+  "upgrade": {
+    "backup_required": true,
+    "downtime_expected": true,
+    "breaking": false,
+    "manual_steps": {
+      "en": [
+        "Before updating, create and verify an external backup of PostgreSQL and Garage data. Do not remove persistent volumes. When upgrading from a version before 0.7.0, first review the recording-retention and transcription-worker upgrade notes; the default 60-day retention may delete eligible older recordings at startup.",
+        "Deploy the v0.7.1 backend, frontend, and transcription-worker together from the same reviewed tag. Stop the old backend completely before starting its replacement, allow at least 75 seconds for shutdown, and wait for GET /health/ready and the worker health check to pass.",
+        "Migration 075_meeting_summary_revisions runs during normal backend startup. Existing summaries start at version 0. AI-assisted editing uses the existing manual summary configuration; dictation additionally requires enabled transcription. Provider requests may incur charges.",
+        "After deployment, verify login, messaging, invitation email delivery, transcription, and summary preview, apply, and history actions. For Dokploy deployments, refresh the imported template to include the updated service configuration."
+      ]
+    },
+    "docs_url": "https://github.com/sapientorius/Nebulynk/blob/v0.7.1/docs/SELF_HOSTING.md"
+  }
+}

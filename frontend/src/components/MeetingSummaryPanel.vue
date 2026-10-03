@@ -3,6 +3,7 @@
     <div v-if="!compactHeader" class="summary-header">
       <span class="summary-title">{{ $t('ui.views.meeting_summary') }}</span>
       <n-space align="center" :size="8">
+        <n-button v-if="canEditSummary" size="tiny" :disabled="!editingAvailable" data-testid="summary-edit-open" @click="$emit('edit-summary')">{{ $t('summaryEdit.edit') }}</n-button>
         <n-tag v-if="summaryLanguage" size="small">
           {{ summaryLanguage }}
         </n-tag>
@@ -80,12 +81,13 @@
     </div>
 
     <n-space
-      v-else-if="summaryLanguage || (summaryArtifact?.status === 'ready' && summaryCoverage) || summaryShareText || canShareInApp || showSummaryGenerationButton"
+      v-else-if="canEditSummary || summaryLanguage || (summaryArtifact?.status === 'ready' && summaryCoverage) || summaryShareText || canShareInApp || showSummaryGenerationButton"
       align="center"
       :size="8"
       class="summary-compact-actions"
       data-testid="meeting-summary-compact-actions"
     >
+      <n-button v-if="canEditSummary" size="tiny" :disabled="!editingAvailable" data-testid="summary-edit-open" @click="$emit('edit-summary')">{{ $t('summaryEdit.edit') }}</n-button>
       <n-tag v-if="summaryLanguage" size="small">
         {{ summaryLanguage }}
       </n-tag>
@@ -295,6 +297,7 @@
     >
       {{ summaryGenerationHint }}
     </div>
+    <MeetingSummaryHistory v-if="meetingId" :meeting-id="meetingId" :revision-key="summaryArtifact?.updated_at || ''" />
   </div>
 </template>
 
@@ -305,11 +308,15 @@ import {
   ShareSocialOutline as ShareSocialIcon
 } from '@vicons/ionicons5'
 import { formatEvidenceLabel, formatTranscriptTimestamp } from '../lib/meeting-artifact-format.js'
+import MeetingSummaryHistory from './MeetingSummaryHistory.vue'
 
 export default {
   name: 'MeetingSummaryPanel',
-  components: { CopyIcon, DownloadIcon, ShareSocialIcon },
+  components: { CopyIcon, DownloadIcon, ShareSocialIcon, MeetingSummaryHistory },
   props: {
+    meetingId: { type: String, default: null },
+    canEditSummary: { type: Boolean, default: false },
+    editingAvailable: { type: Boolean, default: true },
     summaryArtifact: {
       type: Object,
       default: null
@@ -348,7 +355,7 @@ export default {
       showShareMenu: false
     }
   },
-  emits: ['generate-summary', 'copy-summary', 'export-summary', 'share-summary', 'open-evidence'],
+  emits: ['generate-summary', 'copy-summary', 'export-summary', 'share-summary', 'open-evidence', 'edit-summary'],
   computed: {
     summaryGenerationAction() {
       return this.summaryGeneration?.action || null

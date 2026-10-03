@@ -7,6 +7,8 @@ import {
 } from '../../lib/meeting-recordings.js'
 import { listQueuedMeetingArtifactTypes } from '../../services/ai-function-configs/ai-function-configs.js'
 import { queueTranscriptRecordingJobs } from '../../services/meetings/transcription-jobs.js'
+import { queueSummaryRegenerationRevision, summaryVersion } from '../../lib/meeting-summary-revisions.js'
+import { assertCanAccessMeetingContent } from './content-access.js'
 import {
   filterVisibleMeetingArtifacts,
   isRegeneratableTranscriptRecording
@@ -125,7 +127,9 @@ export class MeetingArtifactsDomainService {
   async generateSummary({
     meeting,
     user,
-    reason = 'manual'
+    reason = 'manual',
+    publishChange = true,
+    confirmReplace = false
   }) {
     if (meeting.status !== 'ended') {
       throw badRequest(
@@ -182,12 +186,26 @@ export class MeetingArtifactsDomainService {
 
     const nowIso = this.now().toISOString()
     await this.db.transaction(async (trx) => {
+      await trx('meetings').where('id', meeting.id).forUpdate().first()
+      const current = await trx('meeting_artifacts').where({ meeting_id: meeting.id, artifact_type: 'summary' }).forUpdate().first()
+      if (current?.status === 'processing' || current?.status === 'pending') {
+        throw badRequest('api.meetings.summary_generation_already_processing')
+      }
+      if (current?.status === 'ready') {
+        if (!user.is_admin) throw forbidden('api.meetings.summary_regenerate_forbidden')
+        await assertCanAccessMeetingContent(trx, { meetingId: meeting.id, meeting, user })
+        const corrections = await trx('meeting_summary_revisions').where({ meeting_id: meeting.id, status: 'applied', kind: 'edit' }).first()
+        if (corrections && !confirmReplace) throw badRequest('api.summary_revisions.confirm_replace')
+        if (current.payload) await queueSummaryRegenerationRevision(trx, { meeting, artifact: current, user, publishChange, nowIso })
+      }
       await this.queueProcessingArtifact(trx, {
         meetingId: meeting.id,
         artifactType: 'summary',
         nowIso,
         resetPayload: true
       })
+      // Invalidates drafts immediately, including if generation subsequently fails.
+      if (current) await trx('meeting_artifacts').where('id', current.id).update({ summary_version: summaryVersion(current) + 1 })
     })
 
     this.emitArtifactsQueued(meeting, {

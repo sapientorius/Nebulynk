@@ -357,6 +357,7 @@ export async function enrichMeetingsWithDetails({
     .select('id', 'meeting_id', 'expires_at', 'created_at')
   const manualSummaryRuntime = await getManualMeetingSummaryRuntime(db, app)
   const manualSummaryRuntimeAvailable = !!manualSummaryRuntime
+  const editableMeetingIds = rows.filter(row => viewerUser?.is_admin === true || viewerUser?.id === row.host_user_id).map(row => row.id)
   let transcriptionRuntimeAvailable = false
   try {
     transcriptionRuntimeAvailable = !!(await getActiveTranscriptionRuntime(db, app))
@@ -463,6 +464,10 @@ export async function enrichMeetingsWithDetails({
       detail_level: 'full',
       participants: meetingParticipants,
       artifacts: visibleArtifacts,
+      ...(editableMeetingIds.includes(row.id) ? { summary_edit: {
+        allowed: row.status === 'ended' && summaryArtifact?.status === 'ready',
+        available: manualSummaryRuntimeAvailable
+      } } : {}),
       guest_invite_link: viewerUser?.is_admin === true || viewerUser?.id === row.host_user_id
         ? (() => {
             const link = inviteLinkByMeetingId[row.id]
