@@ -164,6 +164,8 @@
                 >
                   <MeetingSummaryPanel
                     v-if="endedMeetingArtifactTab === 'summary' && shouldShowSummaryPanel"
+                    :meeting-id="meeting.id" :can-edit-summary="canEditSummary" :editing-available="meeting.summary_edit?.available !== false"
+                    @edit-summary="showSummaryEditor = true"
                     :summary-artifact="summaryArtifact"
                     :summary-generation="summaryGeneration"
                     :attended-participant-display-names="attendedParticipantDisplayNames"
@@ -276,6 +278,8 @@
         </div>
 
         <MeetingSummaryPanel
+          :meeting-id="meeting.id" :can-edit-summary="canEditSummary" :editing-available="meeting.summary_edit?.available !== false"
+          @edit-summary="showSummaryEditor = true"
           v-if="shouldShowSummaryPanel"
           :summary-artifact="summaryArtifact"
           :summary-generation="summaryGeneration"
@@ -472,10 +476,12 @@
       </n-card>
     </n-modal>
 
+  <MeetingSummaryEditor v-if="showSummaryEditor && meeting?.id" :key="meeting.id" v-model:show="showSummaryEditor" :meeting-id="meeting.id" />
 </template>
 
 <script>
-import { defineAsyncComponent } from 'vue'
+import { defineAsyncComponent, h } from 'vue'
+import { NCheckbox } from 'naive-ui'
 import { ChatbubbleEllipsesOutline as ChatIcon, CloseOutline, DownloadOutline as DownloadIcon, DocumentTextOutline as DocumentTextIcon, EllipsisHorizontalOutline as MoreIcon, HelpCircleOutline as HelpCircleIcon, SparklesOutline as SparklesIcon } from '@vicons/ionicons5'
 import api from '../../lib/api.js'
 import { useSessionStore, useUiStore, useMeetingsStore, useMessagesStore } from '../../stores/index.js'
@@ -509,9 +515,10 @@ const MessageList = defineAsyncComponent(() => import('../MessageList.vue'))
 const MeetingTranscriptPanel = defineAsyncComponent(() => import('../MeetingTranscriptPanel.vue'))
 const MeetingSummaryPanel = defineAsyncComponent(() => import('../MeetingSummaryPanel.vue'))
 const AskMeetingPanel = defineAsyncComponent(() => import('../AskMeetingPanel.vue'))
+const MeetingSummaryEditor = defineAsyncComponent(() => import('../MeetingSummaryEditor.vue'))
 export default {
   name: 'MeetingHistorySurface',
-  components: { AskMeetingPanel,
+  components: { AskMeetingPanel, MeetingSummaryEditor,
 ChatIcon,
 CloseOutline,
 DownloadIcon,
@@ -534,6 +541,9 @@ evidenceGeneration: 0,
 loadingQuestions: false,
 askingQuestion: false,
 generatingSummary: false,
+showSummaryEditor: false,
+summaryRegenerationDialog: null,
+publishRegenerationChange: true,
 generatingTranscript: false,
 downloadingMeetingAudio: false,
 showShareSummaryModal: false,
@@ -549,6 +559,11 @@ endedMeetingArtifactTab: null,
 isEndedMeetingChatOpen: false
   } },
   computed: {
+canEditSummary() {
+  return this.meeting?.status === 'ended' && this.summaryArtifact?.status === 'ready'
+    && this.meeting?.content_access?.allowed !== false
+    && (this.sessionStore.user?.is_admin === true || this.sessionStore.user?.id === this.meeting?.host_user_id)
+},
 meetingsStore() {
       return useMeetingsStore()
     },
@@ -744,6 +759,13 @@ voiceStore() {
     }
   },
   watch: {
+'meeting.id'(nextId, previousId) {
+  if (nextId !== previousId) {
+    this.summaryRegenerationDialog?.destroy()
+    this.summaryRegenerationDialog = null
+    this.showSummaryEditor = false
+  }
+},
 '$route.query.message'() {
       this.syncRouteEvidence()
     },
@@ -761,7 +783,7 @@ shareMaximized() { this.showEndedMeetingCompactMenu = false },
 meeting: { immediate: true, handler() { this.isEndedMeetingChatOpen = false; this.showEndedMeetingCompactMenu = false; this.ensureEndedMeetingArtifactTab(); this.syncRouteEvidence(); this.ensureMeetingQuestionsLoaded() } }
   },
   mounted() { this.stopObservingShortViewport = observeShortViewport(matches => { this.isShortViewport = matches }) },
-  beforeUnmount() { this.viewGeneration++; this.evidenceGeneration++; this.stopObservingShortViewport?.() },
+  beforeUnmount() { this.viewGeneration++; this.evidenceGeneration++; this.stopObservingShortViewport?.(); this.summaryRegenerationDialog?.destroy() },
   methods: {
 async ensureMeetingQuestionsLoaded({ force = false } = {}) {
       if (!this.canAskMeeting || !this.meeting?.id) return
@@ -939,7 +961,9 @@ async triggerSummaryGeneration(options = {}) {
       this.generatingSummary = true
       try {
         await this.meetingsStore.generateSummary(this.meeting.id, {
-          reason: options.reason || undefined
+          reason: options.reason || undefined,
+          publishChange: options.publishChange,
+          confirmReplace: options.confirmReplace
         })
         window.$message?.success(this.$t(options.successMessageKey || (
           this.summaryGeneration?.action === 'retry'
@@ -971,9 +995,42 @@ async triggerTranscriptGeneration(options = {}) {
     },
 async triggerAdminSummaryRegeneration() {
       this.showAdminArtifactMenu = false
+      if (this.summaryArtifact?.status === 'ready') {
+        if (this.summaryRegenerationDialog) return
+        const meetingId = this.meeting.id
+        this.publishRegenerationChange = true
+        const dialog = window.$dialog.warning({
+          title: this.$t('summaryEdit.regenerateTitle'),
+          content: () => h('div', [
+            h('p', this.$t('summaryEdit.regenerateWarning')),
+            h(NCheckbox, {
+              checked: this.publishRegenerationChange,
+              'onUpdate:checked': value => { this.publishRegenerationChange = value },
+              'data-testid': 'summary-regenerate-publish'
+            }, { default: () => this.$t('summaryEdit.publish') })
+          ]),
+          positiveText: this.$t('summaryEdit.regenerateConfirm'),
+          negativeText: this.$t('common.cancel'),
+          positiveButtonProps: { 'data-testid': 'summary-regenerate-confirm' },
+          onPositiveClick: async () => {
+            if (this.meeting?.id === meetingId) await this.confirmSummaryRegeneration()
+            if (this.summaryRegenerationDialog?.key === dialog.key) this.summaryRegenerationDialog = null
+          },
+          onAfterLeave: () => {
+            if (this.summaryRegenerationDialog?.key === dialog.key) this.summaryRegenerationDialog = null
+          }
+        })
+        this.summaryRegenerationDialog = dialog
+        return
+      }
+      await this.confirmSummaryRegeneration()
+    },
+async confirmSummaryRegeneration() {
       await this.triggerSummaryGeneration({
         force: true,
         reason: 'admin_regenerate',
+        publishChange: this.publishRegenerationChange,
+        confirmReplace: true,
         successMessageKey: 'ui.views.summary_regeneration_queued'
       })
     },

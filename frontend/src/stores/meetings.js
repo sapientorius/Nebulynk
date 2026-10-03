@@ -862,6 +862,8 @@ export const useMeetingsStore = defineStore('meetings', () => {
 
   async function generateSummary(meetingId, options = {}) {
     const payload = { action: 'generate_summary' }
+    if (typeof options.publishChange === 'boolean') payload.publish_change = options.publishChange
+    if (options.confirmReplace === true) payload.confirm_replace = true
     if (typeof options.reason === 'string' && options.reason.trim()) {
       payload.reason = options.reason.trim()
     }

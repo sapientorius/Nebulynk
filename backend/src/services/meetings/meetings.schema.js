@@ -51,6 +51,8 @@ export const patchSchema = {
     muted: { type: 'boolean' },
     deafened: { type: 'boolean' },
     reason: { type: ['string', 'null'], maxLength: 250 },
+    publish_change: { type: 'boolean' },
+    confirm_replace: { type: 'boolean' },
     title: { type: ['string', 'null'], minLength: 1, maxLength: 120 },
     description: { type: ['string', 'null'], minLength: 1, maxLength: 2000 },
     language: { type: 'string', enum: SUPPORTED_MEETING_LANGUAGES },

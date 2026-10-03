@@ -1,6 +1,8 @@
+import { summaryEditApi } from './summary-edit-messages.js'
 export const apiErrorMessages = {
   en: {
     api: {
+      ...summaryEditApi.en,
       authentication: {
         account_disabled: 'This account is disabled',
         account_pending: 'This account is not active yet',
@@ -401,6 +403,7 @@ export const apiErrorMessages = {
         upload_failed: 'Background upload failed'
       },
       voice_drafts: {
+        ambiguous_context: 'Supply either a channel or a meeting for dictation.',
         audio_required: 'Voice drafts must be audio files',
         authentication_required: 'Authentication required',
         channel_id_required: 'channel_id is required',
@@ -460,6 +463,7 @@ export const apiErrorMessages = {
   },
   de: {
     api: {
+      ...summaryEditApi.de,
       authentication: {
         account_disabled: 'Dieses Konto ist deaktiviert',
         account_pending: 'Dieses Konto ist noch nicht aktiv',
@@ -860,6 +864,7 @@ export const apiErrorMessages = {
         upload_failed: 'Hintergrund-Upload fehlgeschlagen'
       },
       voice_drafts: {
+        ambiguous_context: 'Gib für das Diktat entweder einen Channel oder ein Meeting an.',
         audio_required: 'Sprachentwuerfe muessen Audiodateien sein',
         authentication_required: 'Authentifizierung erforderlich',
         channel_id_required: 'channel_id ist erforderlich',

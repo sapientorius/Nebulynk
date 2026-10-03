@@ -54,12 +54,13 @@ export const useUploadsStore = defineStore('uploads', () => {
     return data
   }
 
-  async function transcribeVoiceDraft(file, { channelId, durationMs } = {}) {
+  async function transcribeVoiceDraft(file, { channelId, meetingId, durationMs } = {}) {
     const formData = new FormData()
     formData.append('file', file)
     if (channelId) {
       formData.append('channel_id', channelId)
     }
+    if (meetingId) formData.append('meeting_id', meetingId)
     if (durationMs != null) {
       formData.append('duration_ms', String(durationMs))
     }
