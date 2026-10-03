@@ -5,9 +5,9 @@ import { loadReleaseCatalog } from './release-catalog.mjs'
 const { releases } = await loadReleaseCatalog(process.cwd())
 const outputDirectory = path.resolve(process.env.RELEASE_NOTES_OUTPUT_DIR || 'dist-release-notes')
 
-function renderRelease({ document }, includeHeading = true) {
+function renderRelease({ document }, { includeUpgradeSteps = false } = {}) {
   const lines = []
-  if (includeHeading) lines.push(`## v${document.version} — ${document.title.en}`, '')
+  lines.push(`## v${document.version} — ${document.title.en}`, '')
   lines.push(document.summary.en, '')
   for (const change of document.changes) {
     lines.push(`- **${change.category}: ${change.title.en}** — ${change.description.en}`)
@@ -20,19 +20,25 @@ function renderRelease({ document }, includeHeading = true) {
       lines.push(`- **${advisory.severity.toUpperCase()}** (${advisory.affected_versions}) — ${advisory.summary.en}`)
     }
   }
+  if (includeUpgradeSteps && document.upgrade.manual_steps.en.length > 0) {
+    lines.push('', '### Upgrade steps', '')
+    for (const [index, step] of document.upgrade.manual_steps.en.entries()) {
+      lines.push(`${index + 1}. ${step}`)
+    }
+  }
   lines.push('', `[Upgrade guide](${document.upgrade.docs_url})`)
   return lines.join('\n')
 }
 
 const latest = releases.at(-1)
 const releaseNotes = [
-  renderRelease(latest, true),
+  renderRelease(latest, { includeUpgradeSteps: true }),
   ''
 ].join('\n')
 const changelog = [
   '# Nebulynk Changelog',
   '',
-  ...releases.toReversed().flatMap((entry) => [renderRelease(entry, true), ''])
+  ...releases.toReversed().flatMap((entry) => [renderRelease(entry), ''])
 ].join('\n')
 
 await mkdir(outputDirectory, { recursive: true })

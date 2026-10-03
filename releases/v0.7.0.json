@@ -1,0 +1,85 @@
+{
+  "schema_version": 1,
+  "version": "0.7.0",
+  "revision": 1,
+  "channel": "stable",
+  "published_at": "2026-09-25T13:22:09.000Z",
+  "title": {
+    "en": "Nebulynk 0.7.0"
+  },
+  "summary": {
+    "en": "Adds configurable meeting-recording retention, durable transcription in a separate worker, and live AI configuration checks, with clearer artifact recovery, session handling, and notification badges."
+  },
+  "changes": [
+    {
+      "category": "feature",
+      "title": {
+        "en": "Configurable meeting-recording retention"
+      },
+      "description": {
+        "en": "Platform administrators can set a retention period and an optional storage limit for meeting recordings. Cleanup runs at startup, when settings change, and every eight hours; it removes the oldest completed meetings' recordings first while preserving transcripts and summaries. The default is 60 days with no storage limit, so eligible older recordings may be deleted on the first upgrade."
+      }
+    },
+    {
+      "category": "feature",
+      "title": {
+        "en": "Dedicated transcription worker"
+      },
+      "description": {
+        "en": "Meeting transcription runs one recording at a time in a separate private container. PostgreSQL jobs and chunk checkpoints let it resume interrupted work, retry transient failures, and keep the API available if the worker fails. Existing pending transcript artifacts enter the queue during migration."
+      }
+    },
+    {
+      "category": "feature",
+      "title": {
+        "en": "AI configuration verification"
+      },
+      "description": {
+        "en": "Saving an enabled AI function now tests its selected provider and model before applying the change. Administrators can see verification status and errors, then retry after correcting a configuration. Image generation tests create a real image and may incur provider charges."
+      }
+    },
+    {
+      "category": "improvement",
+      "title": {
+        "en": "Independent meeting artifact actions"
+      },
+      "description": {
+        "en": "For ended meetings, administrators can retry a failed transcript or summary independently and download audio when a recording is available. Actions are shown only when their own requirements are met."
+      }
+    },
+    {
+      "category": "improvement",
+      "title": {
+        "en": "Clearer browser session recovery"
+      },
+      "description": {
+        "en": "When the login page finds an existing browser session, it shows the signed-in account and offers Continue or Log out. An expired session returns to the normal login form."
+      }
+    },
+    {
+      "category": "improvement",
+      "title": {
+        "en": "Unread notification app badge"
+      },
+      "description": {
+        "en": "On supported browsers and installed apps, the icon badge follows the unread notification count, including push notifications, and clears when notifications are read or the session ends."
+      }
+    }
+  ],
+  "security": [],
+  "upgrade": {
+    "backup_required": true,
+    "downtime_expected": true,
+    "breaking": false,
+    "manual_steps": {
+      "en": [
+        "Before updating, create and verify an external backup of PostgreSQL and Garage recording data. Do not remove persistent volumes.",
+        "The first v0.7.0 backend startup applies a 60-day recording-retention default and immediately cleans up eligible older recordings. If you need to keep them, set platform_settings.meeting_recording_retention_days to unlimited or a longer period before starting the new backend; see the upgrade guide. Deleted recording audio cannot be transcribed again, although existing transcripts and summaries remain.",
+        "Disable the transcription AI function before the maintenance window. Deploy the v0.7.0 backend, frontend, and private transcription-worker together from the same reviewed tag, stopping the old backend before starting the replacement. Migrations 073_meeting_recording_retention, 074_ai_function_model_verification, and 074_transcription_worker run at startup.",
+        "Wait for GET /health/ready and the transcription-worker health check to pass. The worker defaults to a 1.5 GiB memory limit, one CPU, and a 2 GiB temporary recording limit; ensure the host has capacity before enabling transcription again. Existing pending transcript artifacts resume through the new queue.",
+        "After deployment, verify login, messaging, recordings, transcription, and meeting artifact retry actions. Existing AI configurations appear unverified until saved again; saving an enabled function makes a live provider request, and an image generation check may incur charges."
+      ]
+    },
+    "docs_url": "https://github.com/sapientorius/Nebulynk/blob/v0.7.0/docs/SELF_HOSTING.md"
+  }
+}
