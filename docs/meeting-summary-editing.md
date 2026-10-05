@@ -29,6 +29,29 @@ with the backend's normal startup migrations. Existing summaries start at
 version 0. No additional AI configuration is required beyond the existing
 manual summary configuration and, for dictation, active transcription.
 
+## Summary completion notifications
+
+When the first summary becomes ready, everyone who actually joined the meeting
+receives one `meeting_summary_ready` notification, including the host and people
+who left early. Invitations without attendance do not qualify. Automatic and
+manual generation, including a successful retry, use the same behavior. Later
+regeneration and editing do not send another completion notification.
+
+The notification center retains the entry even for muted channels. Browser push
+and desktop delivery use the existing notification settings, permissions,
+foreground suppression and Do Not Disturb status. Notifications contain the
+meeting title and a completion notice, without summary contents. Opening one
+selects the summary tab. Viewing the ready summary in a visible window also
+marks its completion notification read; other meeting tabs and invitations
+remain separate.
+
+Migration `076_meeting_summary_notifications.js` stores an internal completion
+marker with the summary. Existing completed summaries, including those being
+regenerated, do not send historical notifications. Summary completion and
+notification rows commit atomically; socket and push delivery run after commit
+without a persistent delivery queue. Delivery failures leave the notification
+available in the notification center.
+
 ## API
 
 All requests require authentication and use existing meeting-content access

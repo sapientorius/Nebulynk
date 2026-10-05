@@ -53,6 +53,9 @@ export const backendMessages = {
     push: {
       dmTitle: '{actor}',
       mentionTitle: '{actor} hat dich erwaehnt',
+      summaryReadyTitle: 'Meeting-Zusammenfassung fertig',
+      summaryReadyBody: 'Die Zusammenfassung für „{title}“ ist fertig.',
+      untitledMeeting: 'Meeting',
       callTitle: '{actor} ruft an',
       reminderTitle: 'Erinnerung',
       registrationPendingTitle: 'Registrierung wartet auf Freigabe',
@@ -113,6 +116,9 @@ export const backendMessages = {
     push: {
       dmTitle: '{actor}',
       mentionTitle: '{actor} mentioned you',
+      summaryReadyTitle: 'Meeting summary ready',
+      summaryReadyBody: 'The summary for “{title}” is ready.',
+      untitledMeeting: 'Meeting',
       callTitle: '{actor} is calling',
       reminderTitle: 'Reminder',
       registrationPendingTitle: 'Registration awaiting approval',

@@ -216,7 +216,9 @@ export const useNotificationsStore = defineStore('notifications', () => {
       }
 
       const updated = Number(data?.updated)
-      const decrementBy = Number.isInteger(updated) ? updated : localUpdated
+      // A socket event can carry an unread snapshot after an earlier patch has
+      // already marked the server row read. Clear that local badge as well.
+      const decrementBy = Number.isInteger(updated) ? Math.max(updated, localUpdated) : localUpdated
       setUnreadCount(unreadCount.value - decrementBy)
       return decrementBy
     } catch (error) {
@@ -279,6 +281,15 @@ export const useNotificationsStore = defineStore('notifications', () => {
       `meeting:${meetingId}`,
       { meeting_id: meetingId, type: 'meeting_invite' },
       (notification) => notification.type === 'meeting_invite' && notification.meeting_id === meetingId
+    )
+  }
+
+  function markMeetingSummaryReadyRead(meetingId) {
+    if (!meetingId) return Promise.resolve(0)
+    return markMatchingNotificationsRead(
+      `meeting-summary:${meetingId}`,
+      { meeting_id: meetingId, type: 'meeting_summary_ready' },
+      (notification) => notification.type === 'meeting_summary_ready' && notification.meeting_id === meetingId
     )
   }
 
@@ -468,6 +479,7 @@ export const useNotificationsStore = defineStore('notifications', () => {
     markMessageNotificationsRead,
     markMessageNotificationsReadBatch,
     markMeetingInviteRead,
+    markMeetingSummaryReadyRead,
     updatePreference,
     enableNotifications,
     disableNotifications,

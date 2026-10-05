@@ -69,3 +69,8 @@ describe('desktop notification routing', () => {
   })
 })
 
+it('routes ready summaries directly to their summary tab without a meeting index', () => {
+  expect(buildDesktopNotificationRoute({ notification: {
+    type: 'meeting_summary_ready', meeting_id: 'meeting/encoded', channel_id: 'chat'
+  }, meetingByChatChannelId: { chat: 'wrong-meeting' } })).toBe('/meetings/meeting%2Fencoded?tab=summary')
+})

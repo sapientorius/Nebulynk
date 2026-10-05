@@ -324,6 +324,33 @@ describe('notifications store', () => {
     expect(store.unreadCount).toBe(2)
   })
 
+  it('marks summary notifications read independently of invitations and other meetings', async () => {
+    const store = useNotificationsStore()
+    store.notifications = [
+      { id: 'summary', meeting_id: 'meeting', type: 'meeting_summary_ready', is_read: false },
+      { id: 'invite', meeting_id: 'meeting', type: 'meeting_invite', is_read: false },
+      { id: 'other', meeting_id: 'other', type: 'meeting_summary_ready', is_read: false }
+    ]
+    store.unreadCount = 5
+    apiMock.patch.mockResolvedValue({ data: { updated: 2 } })
+    await store.markMeetingSummaryReadyRead('meeting')
+    expect(apiMock.patch).toHaveBeenCalledWith('/notifications', { is_read: true }, {
+      params: { is_read: false, meeting_id: 'meeting', type: 'meeting_summary_ready' }
+    })
+    expect(store.notifications.map(row => row.is_read)).toEqual([true, false, false])
+    expect(store.unreadCount).toBe(3)
+  })
+
+  it('clears the badge for a late unread socket snapshot whose server row is already read', async () => {
+    const store = useNotificationsStore()
+    store.ingestIncomingNotification({ id: 'late-summary', type: 'meeting_summary_ready', meeting_id: 'meeting', is_read: false })
+    apiMock.patch.mockResolvedValue({ data: { updated: 0 } })
+    expect(store.unreadCount).toBe(1)
+    await store.markMeetingSummaryReadyRead('meeting')
+    expect(store.notifications[0].is_read).toBe(true)
+    expect(store.unreadCount).toBe(0)
+  })
+
   it('syncs browser notification state from local storage and permission', async () => {
     const store = useNotificationsStore()
     vi.stubGlobal('localStorage', {

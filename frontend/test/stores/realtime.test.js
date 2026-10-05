@@ -504,6 +504,25 @@ describe('realtime socket contract', () => {
     })
   })
 
+  it.each(['online', 'dnd'])('delivers summary entries while native delivery respects %s status', async status => {
+    const { socket, emit } = createSocketHarness()
+    const stores = createStoreMocks()
+    stores.sessionStore.user.status = status
+    isElectronDesktopRuntimeMock.mockReturnValue(true)
+    setupRealtimeListeners(socket, stores)
+    emit('notifications created', {
+      id: 'ready-summary', type: 'meeting_summary_ready', meeting_id: 'meeting-direct',
+      actor_id: null, actor_display_name: 'Nebulynk', channel_id: 'chat', message_snippet: 'Summary ready'
+    })
+    await flushAsyncWork()
+    expect(stores.notificationsStore.ingestIncomingNotification).toHaveBeenCalledTimes(1)
+    if (status === 'dnd') expect(showDesktopNotificationMock).not.toHaveBeenCalled()
+    else expect(showDesktopNotificationMock).toHaveBeenCalledWith({
+      title: 'Nebulynk', body: 'Summary ready', serverId: 'profile-electron-1',
+      route: '/meetings/meeting-direct?tab=summary'
+    })
+  })
+
   it('does not dispatch native desktop notifications for a visible-but-unfocused Electron workspace', async () => {
     const { socket, emit } = createSocketHarness()
     const stores = createStoreMocks()

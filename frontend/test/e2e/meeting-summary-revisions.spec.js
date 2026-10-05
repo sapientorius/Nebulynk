@@ -131,6 +131,40 @@ test.describe('AI meeting summary revisions with real backend', () => {
     } finally { await readerContext.close().catch(() => {}) }
   })
 
+  test('first completion notifies attendees once, opens the summary and marks visible summaries read', async ({ page, browser }) => {
+    await db('meeting_artifacts').where({ meeting_id: meetingId, artifact_type: 'summary' }).update({
+      status: 'failed', payload: null, summary_ready_notified_at: null
+    })
+    await db('meeting_artifacts').insert({ id: createId(), meeting_id: meetingId, artifact_type: 'transcript', status: 'ready', payload: { segments: [] } })
+    await db('meeting_participants').insert({ id: createId(), meeting_id: meetingId, user_id: adminId, joined_at: null, invite_status: 'invited' })
+    await db('channel_members').whereIn('user_id', [hostId, readerId]).update({ notifications: 'none' })
+    await page.reload()
+    await expect(page.getByTestId('meeting-summary-generate')).toBeVisible()
+    const readerContext = await browser.newContext(), reader = await readerContext.newPage()
+    try {
+      await login(reader, readerEmail)
+      await reader.goto(`/meetings/${meetingId}?tab=transcript`)
+      await expect(reader.getByTestId('meeting-transcript-panel')).toBeVisible()
+      await page.getByTestId('meeting-summary-generate').click()
+      await expect(page.getByTestId('meeting-summary-panel')).toContainText('Richtiger Begriff.', { timeout: 30_000 })
+      await expect.poll(async () => (await db('notifications').where({ meeting_id: meetingId, type: 'meeting_summary_ready' })).length).toBe(2)
+      await expect.poll(async () => (await db('notifications').where({ meeting_id: meetingId, type: 'meeting_summary_ready', user_id: hostId }).first())?.is_read).toBe(true)
+      const readerNotification = await db('notifications').where({ meeting_id: meetingId, type: 'meeting_summary_ready', user_id: readerId }).first()
+      expect(readerNotification.is_read).toBe(false)
+      await reader.getByTestId('open-notifications-panel').click()
+      const item = reader.locator(`[data-notification-id="${readerNotification.id}"]`)
+      await expect(item).toContainText('Summary corrections')
+      await expect(item.getByTestId('notification-meeting-card')).toHaveCount(0)
+      await item.click()
+      await expect(reader).toHaveURL(new RegExp(`/meetings/${meetingId}\\?tab=summary$`))
+      await expect(reader.getByTestId('meeting-summary-panel')).toContainText('Richtiger Begriff.')
+      await expect.poll(async () => (await db('notifications').where('id', readerNotification.id).first()).is_read).toBe(true)
+      await reader.reload()
+      await expect(reader.getByTestId('meeting-summary-panel')).toContainText('Richtiger Begriff.')
+      expect((await db('notifications').where({ meeting_id: meetingId, type: 'meeting_summary_ready' })).length).toBe(2)
+    } finally { await readerContext.close().catch(() => {}) }
+  })
+
   test('admin regeneration warns before replacing corrections and supports suppressing its history entry', async ({ page, browser }) => {
     await page.getByTestId('summary-edit-open').click()
     await page.getByTestId('instruction-input-textarea').fill('Begriff korrigieren')

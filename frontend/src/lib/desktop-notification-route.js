@@ -13,6 +13,10 @@ export function buildDesktopNotificationRoute({
     return '/admin?tab=registration'
   }
 
+  if (notification?.type === 'meeting_summary_ready' && notification.meeting_id) {
+    return `/meetings/${encodeURIComponent(notification.meeting_id)}?tab=summary`
+  }
+
   if (notification?.type === 'meeting_call' && notification.channel_id) {
     return `/channels/${notification.channel_id}${notification.message_id ? `?message=${notification.message_id}` : ''}`
   }

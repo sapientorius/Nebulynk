@@ -628,6 +628,30 @@ test('processPendingMeetingSummaries fails when neither transcript nor chat is a
   assert.match(db.tables.meeting_artifacts[0].payload.failure_message, /No meeting transcript or chat content/)
 })
 
+for (const scenario of [
+  { name: 'automatic generation', enabled: true, draft: { mini_summary: 'Ready' }, status: 'ready', count: 1 },
+  { name: 'manual generation', enabled: false, draft: { mini_summary: 'Ready' }, status: 'ready', count: 1 },
+  { name: 'empty model response', enabled: true, draft: {}, status: 'failed', count: 0 },
+  { name: 'waiting for transcript', enabled: true, draft: { mini_summary: 'Ready' }, transcriptStatus: 'processing', status: 'processing', count: 0 }
+]) test(`summary completion notifications: ${scenario.name}`, async () => {
+  const { app, db } = createApp({ draft: scenario.draft, seed: {
+    ai_function_configs: [{ function_key: 'meeting_summary', enabled: scenario.enabled, provider_instance_id: 'instance-1', model: 'gpt-4.1-mini' }],
+    meetings: [{ id: 'notification-meeting', title: 'Weekly', status: 'ended', source_channel_id: 'source', chat_channel_id: 'chat' }],
+    channels: [{ id: 'source', name: 'General' }],
+    users: [{ id: 'host', display_name: 'Host' }],
+    meeting_participants: [{ meeting_id: 'notification-meeting', user_id: 'host', joined_at: '2026-10-01' }],
+    messages: [{ id: 'message', channel_id: 'chat', user_id: 'host', type: 'text', content: 'Discussed the weekly status.', deleted_at: null, created_at: '2026-10-01T10:00:00Z' }],
+    meeting_artifacts: [
+      { id: 'summary', meeting_id: 'notification-meeting', artifact_type: 'summary', status: 'processing', payload: null },
+      ...(scenario.transcriptStatus ? [{ id: 'transcript', meeting_id: 'notification-meeting', artifact_type: 'transcript', status: scenario.transcriptStatus, payload: null }] : [])
+    ]
+  } })
+  await processPendingMeetingSummaries(app)
+  assert.equal(db.tables.meeting_artifacts[0].status, scenario.status)
+  assert.equal(db.tables.notifications.length, scenario.count)
+  if (scenario.count) assert.equal(db.tables.notifications[0].type, 'meeting_summary_ready')
+})
+
 test('processPendingMeetingSummaries uses the manual summary runtime when auto-summary is disabled', async () => {
   const { app, db } = createApp({
     draft: {

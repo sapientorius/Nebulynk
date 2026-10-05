@@ -4,6 +4,9 @@ import { bt } from './i18n.js'
 import { hasVisibleChannelSession } from '../presence.js'
 
 function buildNotificationUrl(notification) {
+  if (notification?.type === 'meeting_summary_ready' && notification.meeting_id) {
+    return `/meetings/${encodeURIComponent(notification.meeting_id)}?tab=summary`
+  }
   if (notification?.type === 'registration_pending') return '/admin?tab=registration'
   if (!notification?.channel_id) return '/channels'
   const channelId = encodeURIComponent(notification.channel_id)
@@ -14,6 +17,7 @@ function buildNotificationUrl(notification) {
 }
 
 function buildPushTitle(notification, user) {
+  if (notification.type === 'meeting_summary_ready') return bt(user?.preferred_locale, 'push.summaryReadyTitle')
   if (notification.type === 'meeting_call') return bt(user?.preferred_locale, 'push.callTitle', { actor: notification.actor_display_name })
   if (notification.type === 'message_reminder') {
     return bt(user?.preferred_locale, 'push.reminderTitle')

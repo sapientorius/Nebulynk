@@ -1,6 +1,8 @@
 import { normalizeSummaryDraft, buildReadySummaryPayload } from '../../lib/meeting-summary-draft.js'
 import { normalizeChangeSummary, notifySummaryUpdated, summaryVersion } from '../../lib/meeting-summary-revisions.js'
 import { generateStructuredObject } from '../../lib/ai-provider-adapters.js'
+import { buildMeetingSummaryNotifications } from '../../lib/meeting-summary-notifications.js'
+import { logger } from '../../logger.js'
 import {
   buildSummaryPromptInput,
   hasMeetingAiInput,
@@ -59,7 +61,7 @@ function shouldWaitForTranscript(transcriptArtifact) {
   return transcriptArtifact.status === 'pending' || transcriptArtifact.status === 'processing'
 }
 
-async function updateSummaryArtifact(app, artifact, meeting, patch, regeneration = null, changeSummary = null) {
+export async function updateSummaryArtifact(app, artifact, meeting, patch, regeneration = null, changeSummary = null) {
   const db = app.get('postgresqlClient')
   const nowIso = new Date().toISOString()
 
@@ -71,17 +73,31 @@ async function updateSummaryArtifact(app, artifact, meeting, patch, regeneration
     const next = failed && regeneration
       ? { status: 'ready', payload: regeneration.before_payload }
       : patch
+    const firstReady = next.status === 'ready' && !current.summary_ready_notified_at
+    const notifications = firstReady && !failed && !regeneration
+      ? await buildMeetingSummaryNotifications(trx, meeting, nowIso)
+      : []
     await trx('meeting_artifacts').where('id', artifact.id).update({
-      ...next, summary_version: summaryVersion(current) + 1, updated_at: nowIso
+      ...next, summary_version: summaryVersion(current) + 1, updated_at: nowIso,
+      ...(firstReady ? { summary_ready_notified_at: nowIso } : {})
     })
+    if (notifications.length) await trx('notifications').insert(notifications)
     if (regeneration) await trx('meeting_summary_revisions').where('id', regeneration.id).update({
       status: failed ? 'failed' : 'applied', payload: failed ? null : patch.payload,
       change_summary: !failed && regeneration.publish_change ? changeSummary : null,
       publish_change: !failed && regeneration.publish_change, applied_at: failed ? null : nowIso
     })
-    return true
+    return { notifications }
   })
-  if (committed) await notifySummaryUpdated(app, meeting, artifact.id)
+  if (!committed) return
+  await notifySummaryUpdated(app, meeting, artifact.id)
+  try {
+    if (committed.notifications.length) app.get('notificationSideEffectsDispatcher')?.enqueue(committed.notifications)
+  } catch (error) {
+    logger.error('Could not dispatch committed meeting summary notifications', {
+      artifactId: artifact.id, error: error.message
+    })
+  }
 }
 
 export async function processPendingMeetingSummaries(app) {

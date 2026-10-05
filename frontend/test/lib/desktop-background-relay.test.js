@@ -19,6 +19,7 @@ const updateDesktopProfileSessionMock = vi.hoisted(() => vi.fn(async () => {}))
 const showDesktopNotificationMock = vi.hoisted(() => vi.fn(async () => true))
 const playSfxMock = vi.hoisted(() => vi.fn())
 const createSocketClientCalls = vi.hoisted(() => [])
+const relayUserStatus = vi.hoisted(() => ({ status: 'online' }))
 
 vi.mock('vue', async (importOriginal) => {
   const actual = await importOriginal()
@@ -42,6 +43,7 @@ vi.mock('../../src/lib/api-client.js', () => ({
   createApiClient: vi.fn((options = {}) => ({
     http: {
       get: vi.fn(async (url) => {
+        if (url.startsWith('/users/')) return { data: { id: 'self', status: relayUserStatus.status } }
         if (url === '/notifications') {
           return {
             data: {
@@ -135,6 +137,7 @@ async function flushRelayStart() {
 describe('desktop background relay', () => {
   beforeEach(() => {
     desktopStateMock.activeProfileId = null
+    relayUserStatus.status = 'online'
     desktopStateMock.profiles = []
     createSocketClientCalls.length = 0
     updateDesktopProfileNotificationStateMock.mockReset()
@@ -145,6 +148,33 @@ describe('desktop background relay', () => {
 
   afterEach(() => {
     stopDesktopBackgroundRelay()
+  })
+
+  it.each(['online', 'dnd'])('uses current server status for background summary delivery (%s)', async status => {
+    const profile = createProfile('profile-background')
+    profile.authState.user = { id: 'self', status: status === 'online' ? 'dnd' : 'online' }
+    desktopStateMock.activeProfileId = 'profile-active'
+    desktopStateMock.profiles = [profile]
+    relayUserStatus.status = status
+    vi.stubGlobal('document', { visibilityState: 'visible' })
+    startDesktopBackgroundRelay()
+    await flushRelayStart()
+    const handlers = new Map()
+    const socket = { on: (event, handler) => handlers.set(event, handler), off: vi.fn() }
+    createSocketClientCalls[0].subscribeToSocketAuthenticated.mock.calls[0][0](socket)
+    const notification = { id: 'summary', type: 'meeting_summary_ready', meeting_id: 'meeting', actor_display_name: 'Nebulynk', message_snippet: 'Summary ready' }
+    handlers.get('notifications created')(notification)
+    handlers.get('notifications created')(notification)
+    await flushRelayStart()
+    await flushRelayStart()
+    if (status === 'dnd') {
+      expect(showDesktopNotificationMock).not.toHaveBeenCalled()
+      expect(playSfxMock).not.toHaveBeenCalled()
+    } else expect(showDesktopNotificationMock).toHaveBeenCalledExactlyOnceWith({
+      title: 'Nebulynk', body: 'Summary ready', serverId: 'profile-background', route: '/meetings/meeting?tab=summary'
+    })
+    expect(updateDesktopProfileNotificationStateMock).toHaveBeenCalledWith('profile-background', { unreadCount: 1, lastNotificationId: 'summary' })
+    vi.unstubAllGlobals()
   })
 
   it('starts relay connections only for enabled background profiles', async () => {

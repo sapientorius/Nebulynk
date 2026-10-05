@@ -400,6 +400,30 @@ test('notification side effects dispatcher deep-links message notifications and 
   assert.equal(pushed[0].payload.url, '/channels/channel-visible?message=message-1')
 })
 
+test('summary notifications use localized push titles and summary deep links, respecting DND and visible channels', async () => {
+  const emitted = [], pushed = []
+  const dispatcher = createNotificationSideEffectsDispatcher({
+    get: () => createUsersDb([
+      { id: 'de', status: 'online', preferred_locale: 'de' },
+      { id: 'en', status: 'online', preferred_locale: 'en' },
+      { id: 'dnd', status: 'dnd' }, { id: 'visible', status: 'online' }
+    ]),
+    service: () => ({ emit: (event, row) => emitted.push(row) })
+  }, {
+    sendPush: async (app, id, payload) => pushed.push({ id, payload }),
+    hasVisibleSession: id => id === 'visible'
+  })
+  dispatcher.enqueue(['de', 'en', 'dnd', 'visible'].map(id => ({
+    id, user_id: id, type: 'meeting_summary_ready', meeting_id: 'meeting',
+    channel_id: 'chat', actor_display_name: 'Nebulynk', message_snippet: 'Summary ready'
+  })))
+  await dispatcher.flush()
+  assert.equal(emitted.length, 4)
+  assert.deepEqual(pushed.map(row => row.id), ['de', 'en'])
+  assert.deepEqual(pushed.map(row => row.payload.title), ['Meeting-Zusammenfassung fertig', 'Meeting summary ready'])
+  assert.ok(pushed.every(row => row.payload.url === '/meetings/meeting?tab=summary'))
+})
+
 test('notification side effects dispatcher routes registration alerts to registration settings', async () => {
   const pushed = []
   const app = {

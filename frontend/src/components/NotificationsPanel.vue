@@ -30,16 +30,20 @@
           }"
           :data-testid="hasMeetingInviteCard(notif) ? 'notification-meeting-item' : 'notification-item'"
           :data-call-id="notif.call_id || undefined"
+          :data-notification-id="notif.id"
+          :data-notification-type="notif.type"
           @click="handleNotificationClick(notif)"
         >
           <div class="notif-header">
             <UserAvatar
+              v-if="notif.type !== 'meeting_summary_ready'"
               :size="24"
               class="notif-avatar"
               :name="notif.actor_display_name"
               :avatar-url="actorAvatarUrl(notif)"
             />
-            <span class="notif-actor">{{ notif.actor_display_name }}</span>
+            <n-icon v-else size="24"><summary-icon /></n-icon>
+            <span class="notif-actor">{{ notif.type === 'meeting_summary_ready' ? $t('meetingSummaryReady.title') : notif.actor_display_name }}</span>
             <span class="notif-time">{{ formatTime(notif.created_at) }}</span>
           </div>
           <div class="notif-body">
@@ -83,6 +87,7 @@
 
 <script>
 import { h } from 'vue'
+import { SparklesOutline as SummaryIcon } from '@vicons/ionicons5'
 import {
   useSessionStore,
   useNotificationsStore,
@@ -103,6 +108,7 @@ import UserAvatar from './UserAvatar.vue'
 export default {
   name: 'NotificationsPanel',
   components: {
+    SummaryIcon,
     MeetingActionCard,
     UserAvatar
   },
@@ -162,6 +168,7 @@ export default {
       const cards = {}
 
       for (const notif of this.notifications) {
+        if (notif.type !== 'meeting_invite') continue
         const meetingId = this.getNotificationMeetingId(notif)
         if (!meetingId) continue
 
@@ -232,6 +239,7 @@ export default {
       return this.$t('ui.components.unknown_channel')
     },
     notificationContextLabel(notif) {
+      if (notif?.type === 'meeting_summary_ready') return 'Nebulynk'
       if (notif?.type === 'registration_pending') {
         return this.$t('selfRegistrationAdmin.title')
       }
@@ -254,6 +262,7 @@ export default {
       const meetingIds = new Set()
 
       for (const notif of this.notifications) {
+        if (notif.type !== 'meeting_invite') continue
         const meetingId = this.getNotificationMeetingId(notif)
         if (!meetingId) continue
         meetingIds.add(meetingId)
@@ -309,6 +318,14 @@ export default {
     async openNotification(notif) {
       await this.markNotificationRead(notif)
       this.notificationsStore.showPanel = false
+
+      if (notif?.type === 'meeting_summary_ready' && notif.meeting_id) {
+        await this.$router.push({
+          path: `/meetings/${encodeURIComponent(notif.meeting_id)}`,
+          query: { tab: 'summary' }
+        }).catch(() => {})
+        return
+      }
 
       if (notif?.type === 'meeting_call' && notif.channel_id) {
         if (notif.call_id) await useMeetingCallsStore().load(notif.call_id).catch(() => {})

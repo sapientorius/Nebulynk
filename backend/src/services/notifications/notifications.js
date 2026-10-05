@@ -9,6 +9,7 @@ const ALLOWED_NOTIFICATION_TYPES = new Set([
   'mention_all',
   'dm_message',
   'meeting_invite',
+  'meeting_summary_ready',
   'meeting_call',
   'message_reminder',
   'registration_pending'
