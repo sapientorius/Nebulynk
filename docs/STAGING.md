@@ -47,6 +47,13 @@ Wait for all jobs to complete successfully. The complete checks and native build
 take time; there is no fixed completion time. If a job fails, open its failed step
 and inspect the log. Do not use unverified candidate tags for deployments.
 
+If a test or security audit needs a code/dependency fix, commit and push the fix,
+then start a new **Run workflow** on the updated branch. **Re-run failed jobs**
+uses the original commit and cannot pick up a newer lockfile or code change. Use
+reruns for recovered registry access or corrected package visibility when the
+commit itself is unchanged. See GitHub's
+[rerun behavior](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/re-run-workflows-and-jobs).
+
 ## 3. Make the packages public once
 
 The first push can create private GHCR packages. If only
