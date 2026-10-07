@@ -411,10 +411,11 @@ test('Coolify compose passes generated production configuration to every consume
   assert.equal(services.backend.environment.PASSKEY_RP_ID, 'app.example.com')
   assert.equal(services.backend.environment.STORAGE_S3_PUBLIC_ENDPOINT, 'https://files.example.com')
   assert.equal(services.backend.environment.LIVEKIT_PUBLIC_URL, 'https://livekit.example.com')
-  assert.equal(services.backend.environment.NEBULYNK_BUILD_SHA, '0123456789abcdef')
-  assert.equal(services.frontend.build.args.VITE_API_URL, 'https://api.example.com')
-  assert.equal(services.frontend.build.args.VITE_LIVEKIT_URL, 'https://livekit.example.com')
-  assert.equal(services.frontend.build.args.VITE_VAPID_PUBLIC_KEY, 'generated-vapid-public-key')
+  assert.equal(services.backend.environment.NEBULYNK_BUILD_SHA, undefined)
+  assert.equal(services.frontend.environment.API_URL, 'https://api.example.com')
+  assert.equal(services.frontend.environment.LIVEKIT_URL, 'https://livekit.example.com')
+  assert.equal(services.frontend.environment.VAPID_PUBLIC_KEY, 'generated-vapid-public-key')
+  assert.equal(services.frontend.build, undefined)
 })
 
 test('Coolify compose preserves explicit secrets for existing installations', {
@@ -485,9 +486,10 @@ test('Dokploy compose passes explicit production configuration to every consumer
   assert.equal(services.backend.environment.STORAGE_S3_PUBLIC_ENDPOINT, 'https://files.example.com')
   assert.equal(services.backend.environment.LIVEKIT_HOST, 'http://livekit:7880')
   assert.equal(services.backend.environment.LIVEKIT_PUBLIC_URL, 'https://livekit.example.com')
-  assert.equal(services.frontend.build.args.VITE_API_URL, 'https://api.example.com')
-  assert.equal(services.frontend.build.args.VITE_LIVEKIT_URL, 'https://livekit.example.com')
-  assert.equal(services.frontend.build.args.VITE_VAPID_PUBLIC_KEY, 'generated-vapid-public-key')
+  assert.equal(services.frontend.environment.API_URL, 'https://api.example.com')
+  assert.equal(services.frontend.environment.LIVEKIT_URL, 'https://livekit.example.com')
+  assert.equal(services.frontend.environment.VAPID_PUBLIC_KEY, 'generated-vapid-public-key')
+  assert.equal(services.frontend.build, undefined)
 
   for (const service of Object.values(services)) {
     assert.equal(service.container_name, undefined)
@@ -552,8 +554,11 @@ test('Dokploy template packages a reproducible native-domain import', async () =
   assert.ok(metadata.tags.includes('self-hosted'))
   assert.deepEqual([...icon.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10])
 
-  const remoteBuildContext = 'context: "https://github.com/sapientorius/Nebulynk.git#${NEBULYNK_SOURCE_REF:-stable}"'
-  assert.equal(compose.split(remoteBuildContext).length - 1, 3)
+  assert.doesNotMatch(compose, /^\s+build:/m)
+  assert.doesNotMatch(compose, /NEBULYNK_SOURCE_REF/)
+  for (const component of ['backend', 'frontend', 'transcription-worker']) {
+    assert.ok(compose.includes(`ghcr.io/sapientorius/nebulynk-${component}:`))
+  }
   assert.match(compose, /image: "\$\{NEBULYNK_GARAGE_IMAGE:-dxflrs\/garage:v2\.3\.0\}"/)
   assert.match(compose, /image: "\$\{NEBULYNK_LIVEKIT_SERVER_IMAGE:-livekit\/livekit-server:v1\.13\.4\}"/)
   assert.match(compose, /image: "\$\{NEBULYNK_LIVEKIT_EGRESS_IMAGE:-livekit\/egress:v1\.13\.0\}"/)
@@ -590,10 +595,10 @@ test('Dokploy template packages a reproducible native-domain import', async () =
   assert.match(config, /^backend_url = "http:\/\/\$\{backend_domain\}"$/m)
   assert.match(config, /^livekit_public_url = "http:\/\/\$\{livekit_domain\}"$/m)
   assert.match(config, /^garage_public_url = "http:\/\/\$\{garage_domain\}"$/m)
-  assert.match(config, /^NEBULYNK_SOURCE_REF = "\$\{source_ref\}"$/m)
+  assert.match(config, /^NEBULYNK_VERSION = "\$\{image_version\}"$/m)
   assert.match(config, /^FRONTEND_URL = "\$\{frontend_url\}"$/m)
   assert.match(config, /^PASSKEY_RP_ID = "\$\{frontend_domain\}"$/m)
-  assert.match(config, /^VITE_API_URL = "\$\{backend_url\}"$/m)
+  assert.match(config, /^API_URL = "\$\{backend_url\}"$/m)
   assert.match(config, /^LIVEKIT_PUBLIC_URL = "\$\{livekit_public_url\}"$/m)
   assert.match(config, /^STORAGE_S3_PUBLIC_ENDPOINT = "\$\{garage_public_url\}"$/m)
 
@@ -622,8 +627,7 @@ test('Dokploy template packages a reproducible native-domain import', async () =
     LOG_LEVEL: 'info',
     MAX_FILE_SIZE: '26214400',
     MEETING_TRANSCRIPT_WAIT_TIMEOUT_MS: '1800000',
-    TRUST_PROXY: 'true',
-    NEBULYNK_BUILD_SHA: ''
+    TRUST_PROXY: 'true'
   }
 
   for (const [variable, value] of Object.entries(optionalTemplateEnvironment)) {
@@ -648,16 +652,14 @@ test('Dokploy template renders its generated development contract when Docker Co
     'redis',
     'transcription-worker'
   ])
-  assert.equal(
-    services.frontend.build.context,
-    'https://github.com/sapientorius/Nebulynk.git#stable'
-  )
+  assert.equal(services.frontend.build, undefined)
+  assert.match(services.frontend.image, /^ghcr\.io\/sapientorius\/nebulynk-frontend:\d+\.\d+\.\d+$/)
   assert.equal(services.backend.environment.NODE_ENV, 'development')
   assert.equal(services.backend.environment.FRONTEND_URL, 'http://app.example.com')
   assert.equal(services.backend.environment.PASSKEY_RP_ID, 'app.example.com')
   assert.equal(services.backend.environment.STORAGE_S3_PUBLIC_ENDPOINT, 'http://files.example.com')
   assert.equal(services.backend.environment.LIVEKIT_PUBLIC_URL, 'http://livekit.example.com')
-  assert.equal(services.frontend.build.args.VITE_API_URL, 'http://api.example.com')
+  assert.equal(services.frontend.environment.API_URL, 'http://api.example.com')
   assert.equal(services.garage.build, undefined)
   assert.equal(services.livekit.build, undefined)
   assert.equal(services['livekit-egress'].build, undefined)
@@ -687,7 +689,7 @@ test('self-hosted production configuration uses one CSRF cookie setting for back
 
   assert.match(environmentTemplate, /^AUTH_CSRF_COOKIE_NAME=nebulynk_csrf_token$/m)
   assert.doesNotMatch(environmentTemplate, /^VITE_AUTH_CSRF_COOKIE_NAME=/m)
-  assert.match(compose, /VITE_AUTH_CSRF_COOKIE_NAME:\s*\$\{AUTH_CSRF_COOKIE_NAME:-nebulynk_csrf_token\}/)
+  assert.ok(compose.includes('AUTH_CSRF_COOKIE_NAME: "${AUTH_CSRF_COOKIE_NAME-${VITE_AUTH_CSRF_COOKIE_NAME:-nebulynk_csrf_token}}"'))
   assert.match(environmentTemplate, /^AUTH_2FA_SECRET_KEY=CHANGE_ME_STRONG_UNIQUE_2FA_ENCRYPTION_KEY$/m)
   assert.match(environmentTemplate, /^KLIPY_API_KEY=$/m)
 })
@@ -706,8 +708,7 @@ test('Dokploy compose exposes only the supported deployment variable and network
     'PASSKEY_RP_ID',
     'FRONTEND_URL',
     'LIVEKIT_PUBLIC_URL',
-    'STORAGE_S3_PUBLIC_ENDPOINT',
-    'VITE_API_URL'
+    'STORAGE_S3_PUBLIC_ENDPOINT'
   ]
 
   for (const variable of requiredVariables) {
@@ -718,9 +719,10 @@ test('Dokploy compose exposes only the supported deployment variable and network
 
   assert.match(contents, /AUTH_2FA_SECRET_KEY:\s*"\$\{AUTH_2FA_SECRET_KEY:-\}"/)
 
-  assert.match(contents, /dockerfile:\s*garage\.Dockerfile/)
-  assert.match(contents, /dockerfile:\s*livekit\.Dockerfile/)
-  assert.match(contents, /dockerfile:\s*livekit-egress\.Dockerfile/)
+  assert.doesNotMatch(contents, /^\s+build:/m)
+  assert.match(contents, /configs:/)
+  assert.match(contents, /content: \|/)
+  assert.ok(contents.includes('API_URL: "${API_URL-${VITE_API_URL:?API_URL or VITE_API_URL must be set}}"'))
   assert.match(contents, /STORAGE_S3_ENDPOINT:\s*http:\/\/garage:3900/)
   assert.match(contents, /LIVEKIT_HOST:\s*http:\/\/livekit:7880/)
   assert.match(contents, /LIVEKIT_WS_URL:\s*ws:\/\/livekit:7880/)
@@ -762,25 +764,26 @@ test('Coolify compose exposes only the supported deployment variable contract', 
   assert.doesNotMatch(selfHostedContents, /MINIO_/)
   assert.doesNotMatch(contents, /S3_ROOT_/)
   assert.doesNotMatch(contents, /COOLIFY_URL_/)
-  assert.match(contents, /dockerfile:\s*garage\.Dockerfile/)
-  assert.match(contents, /dockerfile:\s*livekit-egress\.Dockerfile/)
+  assert.doesNotMatch(contents, /^\s+build:/m)
+  assert.match(contents, /configs:/)
+  assert.match(contents, /content: \|/)
   assert.doesNotMatch(contents, /\.\/garage\.toml:\/etc\/garage\.toml/)
   assert.doesNotMatch(contents, /\.\/livekit-egress\.yaml:\/livekit-egress\.yaml/)
   assert.match(contents, /STORAGE_S3_ENDPOINT:\s*"http:\/\/garage:3900"/)
   assert.match(contents, /STORAGE_S3_PUBLIC_ENDPOINT:\s*\$\{STORAGE_S3_PUBLIC_ENDPOINT:-\$\{SERVICE_URL_GARAGE\}\}/)
   assert.match(contents, /LIVEKIT_PUBLIC_URL:\s*\$\{LIVEKIT_PUBLIC_URL:-\$\{SERVICE_URL_LIVEKIT\}\}/)
-  assert.match(contents, /VITE_API_URL:\s*\$\{SERVICE_URL_BACKEND\}/)
-  assert.match(contents, /VITE_LIVEKIT_URL:\s*\$\{SERVICE_URL_LIVEKIT\}/)
-  assert.match(contents, /VITE_VAPID_PUBLIC_KEY:\s*\$\{VAPID_PUBLIC_KEY:-\}/)
+  assert.ok(contents.includes('API_URL: "${API_URL-${VITE_API_URL:-${SERVICE_URL_BACKEND}}}"'))
+  assert.ok(contents.includes('LIVEKIT_URL: "${LIVEKIT_URL-${VITE_LIVEKIT_URL:-${LIVEKIT_PUBLIC_URL:-${SERVICE_URL_LIVEKIT}}}}"'))
+  assert.ok(contents.includes('VAPID_PUBLIC_KEY: "${VAPID_PUBLIC_KEY-${VITE_VAPID_PUBLIC_KEY:-}}"'))
   assert.doesNotMatch(contents, /NEBULYNK_UPDATE_PUBLIC_KEYS_JSON/)
   assert.doesNotMatch(contents, /NEBULYNK_BUILD_TIME/)
-  assert.match(contents, /NEBULYNK_BUILD_SHA:\s*\$\{SOURCE_COMMIT:-\}/)
+  assert.doesNotMatch(contents, /SOURCE_COMMIT|NEBULYNK_BUILD_SHA/)
   assert.doesNotMatch(contents, /"3900:3900"/)
   assert.doesNotMatch(contents, /"7880:7880"/)
   assert.match(contents, /- "7881:7881"/)
   assert.match(contents, /- "7882:7882\/udp"/)
-  assert.match(selfHostedContents, /VITE_LIVEKIT_URL:\s*\$\{LIVEKIT_PUBLIC_URL:\?LIVEKIT_PUBLIC_URL must be set\}/)
-  assert.match(selfHostedContents, /VITE_VAPID_PUBLIC_KEY:\s*\$\{VAPID_PUBLIC_KEY:-\}/)
-  assert.match(contents, /AUTH_CSRF_COOKIE_NAME:\s*\$\{AUTH_CSRF_COOKIE_NAME:-nebulynk_csrf_token\}/)
-  assert.match(contents, /VITE_AUTH_CSRF_COOKIE_NAME:\s*\$\{AUTH_CSRF_COOKIE_NAME:-nebulynk_csrf_token\}/)
+  assert.ok(selfHostedContents.includes('LIVEKIT_URL: "${LIVEKIT_URL-${VITE_LIVEKIT_URL:-${LIVEKIT_PUBLIC_URL:?LIVEKIT_PUBLIC_URL must be set}}}"'))
+  assert.ok(selfHostedContents.includes('VAPID_PUBLIC_KEY: "${VAPID_PUBLIC_KEY-${VITE_VAPID_PUBLIC_KEY:-}}"'))
+  assert.ok(contents.includes('AUTH_CSRF_COOKIE_NAME: "${AUTH_CSRF_COOKIE_NAME-${VITE_AUTH_CSRF_COOKIE_NAME:-nebulynk_csrf_token}}"'))
+  assert.doesNotMatch(contents, /^\s*VITE_AUTH_CSRF_COOKIE_NAME:/m)
 })

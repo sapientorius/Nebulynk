@@ -1,0 +1,62 @@
+name: Publish staging images
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: container-staging-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    uses: ./.github/workflows/ci.yml
+
+  container-candidates:
+    needs: checks
+    uses: ./.github/workflows/container-candidates.yml
+    with:
+      channel: staging
+    permissions:
+      contents: read
+      packages: write
+
+  publish-staging:
+    needs: container-candidates
+    runs-on: ubuntu-24.04
+    environment: container-staging
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    env:
+      NEBULYNK_CONTAINER_CHANNEL: staging
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: container-candidate-*
+          path: output/container-candidates
+      - name: Publish the verified multiarch staging images
+        run: node scripts/container-release.mjs promote
+      # Upload before the public-access check so the first private-package
+      # publication remains inspectable while operators enable public access.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: container-staging-manifest
+          path: dist/containers/staging-images.json
+          if-no-files-found: error
+      - name: Require downloads without registry credentials
+        run: node scripts/container-release.mjs verify-public

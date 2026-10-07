@@ -1,5 +1,6 @@
 import { Room, RoomEvent, ScreenSharePresets, Track, VideoQuality, createLocalScreenTracks, createLocalVideoTrack } from 'livekit-client'
 import { BackgroundBlur, VirtualBackground, supportsBackgroundProcessors, supportsModernBackgroundProcessors } from '@livekit/track-processors'
+import { readFrontendConfig } from './frontend-config.js'
 import {
   DEFAULT_SCREEN_SHARE_PUBLISH_QUALITY,
   DEFAULT_SCREEN_SHARE_VIEW_QUALITY,
@@ -11,7 +12,7 @@ import {
 let room = null
 let callbacks = {}
 const roomDisconnections = new WeakMap()
-const configuredLivekitUrl = import.meta.env.VITE_LIVEKIT_URL?.trim() || ''
+const configuredLivekitUrl = readFrontendConfig('livekitUrl')
 const useFakeLivekit = import.meta.env.VITE_FAKE_LIVEKIT === 'true'
 const BACKGROUND_BLUR_ASSET_PATHS = Object.freeze({
   tasksVisionFileSet: '/vendor/mediapipe/tasks-vision/0.10.14/wasm',

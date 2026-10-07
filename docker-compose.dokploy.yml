@@ -3,22 +3,19 @@
 # labels or dokploy-network entries here.
 services:
   frontend:
-    build:
-      context: .
-      dockerfile: frontend/Dockerfile
-      args:
-        NODE_IMAGE: "${NEBULYNK_NODE_IMAGE:-node:22.23.1-alpine3.24}"
-        NGINX_IMAGE: "${NEBULYNK_NGINX_IMAGE:-nginxinc/nginx-unprivileged:1.31-alpine3.23@sha256:6320020c7da8714feab524e02c08c5a1958675c4e68700e93a2fd8970b065786}"
-        # These URLs are baked into the browser bundle.
-        VITE_API_URL: "${VITE_API_URL:?VITE_API_URL must be set}"
-        VITE_LIVEKIT_URL: "${LIVEKIT_PUBLIC_URL:?LIVEKIT_PUBLIC_URL must be set}"
-        VITE_VAPID_PUBLIC_KEY: "${VAPID_PUBLIC_KEY:-}"
-        VITE_AUTH_CSRF_COOKIE_NAME: "${AUTH_CSRF_COOKIE_NAME:-nebulynk_csrf_token}"
+    image: ghcr.io/sapientorius/nebulynk-frontend:${NEBULYNK_VERSION:-0.7.1}
     depends_on:
       - backend
     expose:
       - "8080"
     restart: unless-stopped
+
+    environment:
+      API_URL: "${API_URL-${VITE_API_URL:?API_URL or VITE_API_URL must be set}}"
+      BACKEND_URL: "${BACKEND_URL-${VITE_BACKEND_URL:-}}"
+      LIVEKIT_URL: "${LIVEKIT_URL-${VITE_LIVEKIT_URL:-${LIVEKIT_PUBLIC_URL:?LIVEKIT_PUBLIC_URL must be set}}}"
+      VAPID_PUBLIC_KEY: "${VAPID_PUBLIC_KEY-${VITE_VAPID_PUBLIC_KEY:-}}"
+      AUTH_CSRF_COOKIE_NAME: "${AUTH_CSRF_COOKIE_NAME-${VITE_AUTH_CSRF_COOKIE_NAME:-nebulynk_csrf_token}}"
 
   postgres:
     image: "${NEBULYNK_POSTGRES_IMAGE:-postgres:17-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193}"
@@ -47,11 +44,11 @@ services:
     restart: "no"
 
   garage:
-    build:
-      context: .
-      dockerfile: garage.Dockerfile
-      args:
-        GARAGE_IMAGE: "${NEBULYNK_GARAGE_IMAGE:-dxflrs/garage:v2.3.0}"
+    image: ${NEBULYNK_GARAGE_IMAGE:-dxflrs/garage:v2.3.0}
+    user: "65532:65532"
+    configs:
+      - source: garage_config
+        target: /etc/garage.toml
     depends_on:
       garage-volume-init:
         condition: service_completed_successfully
@@ -69,11 +66,11 @@ services:
     restart: unless-stopped
 
   livekit:
-    build:
-      context: .
-      dockerfile: livekit.Dockerfile
-      args:
-        LIVEKIT_SERVER_IMAGE: "${NEBULYNK_LIVEKIT_SERVER_IMAGE:-livekit/livekit-server:v1.13.4}"
+    image: ${NEBULYNK_LIVEKIT_SERVER_IMAGE:-livekit/livekit-server:v1.13.4}
+    user: "65532:65532"
+    configs:
+      - source: livekit_config
+        target: /livekit.yaml
     command: --config /livekit.yaml
     depends_on:
       - redis
@@ -87,11 +84,11 @@ services:
     restart: unless-stopped
 
   livekit-egress:
-    build:
-      context: .
-      dockerfile: livekit-egress.Dockerfile
-      args:
-        LIVEKIT_EGRESS_IMAGE: "${NEBULYNK_LIVEKIT_EGRESS_IMAGE:-livekit/egress:v1.13.0}"
+    image: ${NEBULYNK_LIVEKIT_EGRESS_IMAGE:-livekit/egress:v1.13.0}
+    user: "egress"
+    configs:
+      - source: egress_config
+        target: /livekit-egress.yaml
     command: --config /livekit-egress.yaml
     environment:
       EGRESS_CONFIG_FILE: /livekit-egress.yaml
@@ -115,11 +112,7 @@ services:
       timeout: 3s
       retries: 3
       start_period: 60s
-    build:
-      context: .
-      dockerfile: backend/Dockerfile
-      args:
-        NODE_IMAGE: "${NEBULYNK_NODE_IMAGE:-node:22.23.1-alpine3.24}"
+    image: ghcr.io/sapientorius/nebulynk-backend:${NEBULYNK_VERSION:-0.7.1}
     environment:
       NODE_ENV: production
       JWT_SECRET: "${JWT_SECRET:?JWT_SECRET must be set}"
@@ -133,7 +126,7 @@ services:
       AUTH_REFRESH_TOKEN_TTL: "${AUTH_REFRESH_TOKEN_TTL:-1d}"
       AUTH_REMEMBER_REFRESH_TOKEN_TTL: "${AUTH_REMEMBER_REFRESH_TOKEN_TTL:-30d}"
       AUTH_REFRESH_COOKIE_NAME: "${AUTH_REFRESH_COOKIE_NAME:-nebulynk_refresh_session}"
-      AUTH_CSRF_COOKIE_NAME: "${AUTH_CSRF_COOKIE_NAME:-nebulynk_csrf_token}"
+      AUTH_CSRF_COOKIE_NAME: "${AUTH_CSRF_COOKIE_NAME-${VITE_AUTH_CSRF_COOKIE_NAME:-nebulynk_csrf_token}}"
       AUTH_COOKIE_DOMAIN: "${AUTH_COOKIE_DOMAIN:-}"
       RATE_LIMIT_DRIVER: "${RATE_LIMIT_DRIVER:-redis}"
       PASSKEY_RP_ID: "${PASSKEY_RP_ID:?PASSKEY_RP_ID must be set}"
@@ -175,7 +168,6 @@ services:
       SMTP_FROM_NAME: "${SMTP_FROM_NAME:-Nebulynk}"
       FRONTEND_URL: "${FRONTEND_URL:?FRONTEND_URL must be set}"
       TRUST_PROXY: "${TRUST_PROXY:-true}"
-      NEBULYNK_BUILD_SHA: "${NEBULYNK_BUILD_SHA:-}"
     depends_on:
       - postgres
       - redis
@@ -187,12 +179,7 @@ services:
     restart: unless-stopped
 
   transcription-worker:
-    build:
-      context: .
-      dockerfile: backend/Dockerfile
-      args:
-        NODE_IMAGE: "${NEBULYNK_NODE_IMAGE:-node:22.23.1-alpine3.24}"
-    command: ["node", "src/transcription-worker.js"]
+    image: ghcr.io/sapientorius/nebulynk-transcription-worker:${NEBULYNK_VERSION:-0.7.1}
     stop_grace_period: 75s
     mem_limit: ${TRANSCRIPTION_WORKER_MEMORY_LIMIT:-1536m}
     cpus: ${TRANSCRIPTION_WORKER_CPUS:-1.0}
@@ -233,3 +220,45 @@ volumes:
   nebulynk_redis_data:
   nebulynk_garage_meta:
   nebulynk_garage_data:
+
+configs:
+  garage_config:
+    content: |
+      metadata_dir = "/var/lib/garage/meta"
+      data_dir = "/var/lib/garage/data"
+      db_engine = "sqlite"
+
+      replication_factor = 1
+      rpc_bind_addr = "[::]:3901"
+      rpc_public_addr = "garage:3901"
+
+      [s3_api]
+      s3_region = "us-east-1"
+      api_bind_addr = "[::]:3900"
+      root_domain = ".s3.garage.localhost"
+  livekit_config:
+    content: |
+      port: 7880
+      rtc:
+        udp_port: 7882
+        tcp_port: 7881
+        use_external_ip: true
+      redis:
+        address: redis:6379 # Nutzt den Redis Service aus dem Docker Compose Stack
+      keys:
+        # Keys werden über ENV Variablen überschrieben, aber Sektion muss existieren
+  egress_config:
+    content: |
+      # LiveKit connection settings are provided via env (`LIVEKIT_API_KEY`,
+      # `LIVEKIT_API_SECRET`, `LIVEKIT_WS_URL`) so this file cannot drift from the
+      # deployment's active credentials.
+      insecure: true
+      log_level: debug
+      health_port: 8080
+
+      redis:
+        address: redis:6379
+
+      s3:
+        bucket: nebulynk-files
+        endpoint: http://garage:3900

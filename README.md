@@ -75,9 +75,10 @@ will be published on [GitHub Releases](https://github.com/sapientorius/Nebulynk/
 > **Update notice for existing installations:** `v0.2.0` is the first release
 > with signed in-app update and security notices for platform administrators.
 > Installations on `v0.1.0` must update once manually. The standard production
-> source is [`sapientorius/Nebulynk`](https://github.com/sapientorius/Nebulynk)
-> on the protected `stable` branch. Use an immutable `vX.Y.Z` tag when a
-> deployment must remain pinned to one exact release. `main` is not a
+> deployment uses the three public GHCR images at one fixed `NEBULYNK_VERSION`.
+> Obtain matching configuration from an immutable `vX.Y.Z` release tag of
+> [`sapientorius/Nebulynk`](https://github.com/sapientorius/Nebulynk).
+> Updates require deliberately changing that version. `main` is not a
 > supported production channel. The update center is informational and never
 > installs or deploys an update.
 
@@ -89,6 +90,10 @@ will be published on [GitHub Releases](https://github.com/sapientorius/Nebulynk/
 - [Deploying with Dokploy](docs/DOKPLOY.md)
 - [Deploying with Plesk](docs/PLESK.md)
 - [Self-Hosting with Docker](docs/SELF_HOSTING.md)
+- [Container Images and Runtime Configuration](docs/CONTAINERS.md)
+- [Testing Staging Images Before a Release](docs/STAGING.md)
+- [Testing Staging Images Before a Release](docs/STAGING.md)
+- [elest.io Integration Reference](docs/ELEST.md)
 - [Secure Self-Hosting](docs/security-hardening.md)
 - [Platform Update Architecture](docs/PLATFORM_UPDATES.md)
 - [Release Process](docs/RELEASING.md)

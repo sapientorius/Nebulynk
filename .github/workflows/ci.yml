@@ -110,10 +110,39 @@ jobs:
             output/ci/
           if-no-files-found: ignore
 
+  containers:
+    name: Containers (${{ matrix.arch }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm exec --workspace=frontend playwright install --with-deps chromium
+      - run: npm run test:deployments
+      - run: npm run test:containers
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: container-diagnostics-${{ matrix.arch }}
+          path: output/ci/
+          if-no-files-found: ignore
+
   required:
     name: CI required
     if: always()
-    needs: [validate, postgres-integration, plesk, security, e2e]
+    needs: [validate, postgres-integration, plesk, security, e2e, containers]
     runs-on: ubuntu-latest
     steps:
       - name: Require every mandatory group to succeed

@@ -1,7 +1,7 @@
 # Self-Hosting with Docker
 
 The production Compose overlay includes a `transcription-worker` service. It
-uses the backend image without publishing a port, waits for the backend's
+uses its own prebuilt image without publishing a port, waits for the backend's
 database migrations, and processes one recording at a time. On the first update,
 keep transcription disabled until both containers are healthy, then enable it
 to resume existing pending transcript artifacts. See the
@@ -42,7 +42,7 @@ otherwise audio and video connections can fail.
 
 You need:
 
-- Docker Engine with Docker Compose v2;
+- Docker Engine with Docker Compose 2.23.1 or newer;
 - a reverse proxy or platform that terminates TLS and routes the public domains
   to the appropriate containers;
 - DNS records for the domains above; and
@@ -53,22 +53,21 @@ Do not expose the database, Redis, or the internal S3 and LiveKit control
 endpoints publicly. Only the deliberately routed HTTP(S) endpoints and the
 required LiveKit media ports should be open in the firewall.
 
-## Choose the production channel
+## Choose a fixed release
 
-The supported standard source is the official repository
-[`sapientorius/Nebulynk`](https://github.com/sapientorius/Nebulynk) on the
-protected `stable` branch. Never deploy `main` in production. Choose one of
-these two intentional update policies before the first deployment:
+Production deployments pull the three public images documented in
+[Container images](CONTAINERS.md). One `NEBULYNK_VERSION=X.Y.Z` selects the
+backend, frontend and transcription worker together. The default in the supplied
+Compose files matches their release; no moving `latest` or `stable` image tag is
+used. Set the version explicitly in `.env.production` so a configuration-file
+update cannot silently change the installed application version.
 
-| Channel | Use it when | Update behavior |
-| --- | --- | --- |
-| `stable` | You want the supported release-ready stream and timely security fixes. | Fetch and fast-forward `stable`, then rebuild and redeploy after reviewing the Update Center and release notes. |
-| `vX.Y.Z` tag | You need an exactly reproducible, change-controlled deployment. | Remain on the immutable tag until you deliberately move to a newer tag. |
-
-`stable` is the recommended default. It contains only release-ready commits;
-an immutable tag is the audit-friendly snapshot of a particular release.
-Forks and source copies are not a supported substitute for the official update
-feed or release process.
+Obtain deployment files from the matching immutable `vX.Y.Z` release tag in the
+official [`sapientorius/Nebulynk`](https://github.com/sapientorius/Nebulynk)
+repository. The protected `stable` branch remains the source of reviewed release
+configuration. A redeploy installs the selected version again. Updating requires
+deliberately selecting a newer release after reviewing its notes and backups.
+Never deploy `main` in production.
 
 ## Configuration
 
@@ -116,11 +115,12 @@ without it, stored two-factor secrets use `JWT_SECRET` as a fallback. Placeholde
 | `LIVEKIT_API_SECRET` | Strong, unique secret | Shared LiveKit secret. |
 | `LIVEKIT_PUBLIC_URL` | `wss://livekit.example.com` | Client-facing LiveKit URL emitted by the backend. |
 | `STORAGE_S3_PUBLIC_ENDPOINT` | `https://files.example.com` | Public S3 API used for signed file URLs; never use an admin or console port. |
-| `VITE_API_URL` | `https://api.example.com` | API URL embedded during the frontend build. |
+| `API_URL` | `https://api.example.com` | Public API URL passed to the frontend at container startup. `VITE_API_URL` is a compatible alias. |
 
-`VITE_*` values are build arguments, not runtime secrets. Rebuild and deploy
-the frontend after changing one. Never expose secrets to the browser with a
-`VITE_` prefix.
+Frontend public values are configured at runtime. Recreate the container after
+changing them; no image rebuild is needed. New variable names take precedence
+over compatible `VITE_*` aliases. Never put secrets in browser configuration.
+See [runtime configuration](CONTAINERS.md#frontend-runtime-configuration).
 
 ### Internal endpoints and recording configuration
 
@@ -149,7 +149,7 @@ included `livekit-egress.yaml` uses `nebulynk-files`.
 
 | Group | Variables | When to set them |
 | --- | --- | --- |
-| Sessions and operation | `AUTH_BROWSER_ACCESS_TOKEN_TTL`, `AUTH_REFRESH_TOKEN_TTL`, `AUTH_REMEMBER_REFRESH_TOKEN_TTL`, `AUTH_COOKIE_DOMAIN`, `AUTH_REFRESH_COOKIE_NAME`, `AUTH_CSRF_COOKIE_NAME`, `LOG_LEVEL`, `BACKEND_PORT` | Use for a non-default session policy, cookie domain, logging level, or port. The self-hosted Compose file passes `AUTH_CSRF_COOKIE_NAME` to both the backend and frontend build. Defaults are in `.env.example`. |
+| Sessions and operation | `AUTH_BROWSER_ACCESS_TOKEN_TTL`, `AUTH_REFRESH_TOKEN_TTL`, `AUTH_REMEMBER_REFRESH_TOKEN_TTL`, `AUTH_COOKIE_DOMAIN`, `AUTH_CSRF_COOKIE_NAME`, `LOG_LEVEL`, `BACKEND_PORT` | Use for a non-default session policy, cookie domain, logging level, or port. The self-hosted Compose file passes `AUTH_CSRF_COOKIE_NAME` to both application containers at runtime. Defaults are in `.env.example`. |
 | Two-factor encryption | `AUTH_2FA_SECRET_KEY` | Recommended stable, dedicated secret for stored two-factor secrets. Existing installations may leave it unset and use `JWT_SECRET` as a fallback. |
 | Abuse protection | `RATE_LIMIT_DRIVER=redis`, `AUTHENTICATION_RATE_LIMIT_IP_LIMIT`, `AI_PROVIDER_BASE_URL_ALLOWLIST` | Redis is the recommended rate-limit store in production. Set an AI allowlist only for intentionally trusted HTTPS endpoints. |
 | Docker host ports | `POSTGRES_PORT`, `REDIS_PORT`, `STORAGE_S3_PORT`, `LIVEKIT_PORT`, `BACKEND_PORT`, `FRONTEND_PORT` | In the supplied self-hosted stack these bind to `127.0.0.1` for the host reverse proxy. LiveKit TCP `7881` and UDP `7882` remain public media ports. Change host ports only when the proxy configuration changes too. |
@@ -157,9 +157,9 @@ included `livekit-egress.yaml` uses `nebulynk-files`.
 | Uploads and recordings | `MAX_FILE_SIZE`, `UPLOAD_MAX_FILE_SIZE_MB`, `UPLOAD_IMAGE_MAX_DIMENSION_PX`, `UPLOAD_IMAGE_COMPRESSION_QUALITY`, `VIDEO_BACKGROUND_MAX_PER_USER`, `MEETING_TRANSCRIPT_WAIT_TIMEOUT_MS` | Use when default size or timeout limits do not fit your deployment. |
 | AI and transcript limits | `MEETING_AI_PROMPT_TRANSCRIPT_SEGMENTS`, `MEETING_AI_PROMPT_CHAT_MESSAGES`, `MEETING_AI_PROMPT_TRANSCRIPT_EXCERPT_CHARS`, `MESSAGE_SUMMARY_MIN_CHARS`, `MESSAGE_SUMMARY_MAX_CONTEXT_CHARS`, `SILENCE_DETECT_THRESHOLD_DB`, `SILENCE_DETECT_MIN_DURATION_SEC`, `SILENCE_DETECT_MIN_SPEECH_SEC` | Use only for deliberate capacity or quality tuning. Provider credentials are stored through the administration interface and protected by `AI_SECRET_KEY`. |
 | Email | `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_IGNORE_TLS`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`, `SMTP_FROM_NAME` | Required for invitations and security-update digests. Sending remains disabled without a complete SMTP configuration. After an administrator saves SMTP settings, that configuration controls delivery globally: disabled or incomplete settings do not fall back to `.env`. An untouched default configuration may still use complete `.env` values. Self-registrations created while SMTP is unavailable require manual approval and are highlighted to users who can manage users. |
-| Build provenance | `NEBULYNK_BUILD_SHA`, `NEBULYNK_BUILD_TIME` | Optional immutable commit and build timestamp shown to administrators. Only the package SemVer determines update availability. |
+| Build provenance | `NEBULYNK_BUILD_SHA`, `NEBULYNK_BUILD_TIME` | Official images carry their own commit and timestamp and ignore obsolete environment overrides. The source Compose override passes these values as Docker build arguments for custom images. Only the package SemVer determines update availability. |
 | Update trust override | `NEBULYNK_UPDATE_PUBLIC_KEYS_JSON` | Official release tags embed their public verification keys. Use this additive public keyring only for controlled development or an overlapping emergency rotation; never place private key material here. |
-| Web Push | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | Both server-side VAPID keys are required for push; the supplied Compose files reuse the public key for the frontend build. |
+| Web Push | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | Both server-side VAPID keys are required for push; the supplied Compose files pass only the public key to the frontend at runtime. |
 | GIF search | `KLIPY_API_KEY` | Optional environment fallback. The key can also be added later under Admin → Platform Settings; the encrypted platform value takes precedence. |
 
 The backend can still read legacy `MINIO_*` names during migration, but the
@@ -175,25 +175,22 @@ rename.
 Use the two supplied Compose files together. The base
 [`docker-compose.yml`](../docker-compose.yml) declares the persistent
 dependencies; [`docker-compose.self-hosted.yml`](../docker-compose.self-hosted.yml)
-adds the backend and frontend, production-only loopback bindings, and root
-build contexts. Do not start the base file alone for a production instance.
+adds the three application images and production-only loopback bindings. Do not
+start the base file alone for a production instance.
 
-1. Clone the official `stable` branch and create the ignored production
-   environment file:
+1. Replace `vX.Y.Z` with the selected published release tag, clone its deployment
+   files, and create the ignored production environment file:
 
    ```bash
-   git clone --branch stable --single-branch https://github.com/sapientorius/Nebulynk.git
+   git clone --branch vX.Y.Z --single-branch https://github.com/sapientorius/Nebulynk.git
    cd Nebulynk
    cp .env.production.example .env.production
    chmod 600 .env.production
    ```
 
-   For a pinned deployment, replace `stable` above with a released tag such as
-   `v0.2.1`. Do not substitute `main`.
-
 2. Edit `.env.production`. Replace every `CHANGE_ME` value, set the four public
    domains, and leave `NODE_ENV=production`, `TRUST_PROXY=true`, and
-   `FRONTEND_PORT=8080`. `VITE_API_URL` is a required build value, while the
+   `FRONTEND_PORT=8080`. Set `NEBULYNK_VERSION=X.Y.Z` and `API_URL`. The
    supplied Compose file reuses `LIVEKIT_PUBLIC_URL`, `VAPID_PUBLIC_KEY`, and
    `AUTH_CSRF_COOKIE_NAME` for their corresponding frontend values.
 
@@ -205,14 +202,17 @@ build contexts. Do not start the base file alone for a production instance.
      -f docker-compose.yml -f docker-compose.self-hosted.yml config --quiet
    ```
 
-4. Build and start all services. Docker only publishes the frontend, backend,
+4. Download all images before starting services. Docker only publishes the frontend, backend,
    Garage API, and LiveKit signalling to loopback. A reverse proxy on the host
    should route the four public domains to those ports.
 
    ```bash
    docker compose -p nebulynk --env-file .env.production \
      -f docker-compose.yml -f docker-compose.self-hosted.yml \
-     up -d --build --remove-orphans
+     pull
+   docker compose -p nebulynk --env-file .env.production \
+     -f docker-compose.yml -f docker-compose.self-hosted.yml \
+     up -d --no-build --pull never --remove-orphans --wait
    ```
 
 5. Configure the reverse proxy and firewall: route the frontend, backend,
@@ -227,27 +227,29 @@ Before every update, back up PostgreSQL and both Garage volumes, test a
 restore, then review the in-app Update Center and the release-specific upgrade
 notes. The Update Center informs; it never changes containers for you.
 
-For the recommended `stable` channel, use only a fast-forward update from the
-official remote and rebuild the same Compose stack:
-
-```bash
-git fetch origin stable
-git switch stable
-git pull --ff-only origin stable
-docker compose -p nebulynk --env-file .env.production \
-  -f docker-compose.yml -f docker-compose.self-hosted.yml \
-  up -d --build --remove-orphans
-```
-
-For a tag-pinned deployment, replace `v0.2.1` with the reviewed target release:
+Select the reviewed target tag and set `NEBULYNK_VERSION=X.Y.Z` in the existing
+`.env.production`. Keep the same project name, credentials and data volumes.
+Download and validate before changing the running containers:
 
 ```bash
 git fetch --tags origin
-git switch --detach v0.2.1
+git switch --detach vX.Y.Z
+docker compose -p nebulynk --env-file .env.production \
+  -f docker-compose.yml -f docker-compose.self-hosted.yml config --quiet
 docker compose -p nebulynk --env-file .env.production \
   -f docker-compose.yml -f docker-compose.self-hosted.yml \
-  up -d --build --remove-orphans
+  pull
+docker compose -p nebulynk --env-file .env.production \
+  -f docker-compose.yml -f docker-compose.self-hosted.yml \
+  up -d --no-build --pull never --remove-orphans --wait
 ```
+
+On the first move from source builds, use this same procedure. Do not remove
+the existing stack or volumes first. The change introduces no database migration
+of its own. A failed image download leaves the running containers untouched.
+An older image does not undo database changes; rollback can require restoring
+the matching backup. See [custom source builds](CONTAINERS.md#custom-source-builds)
+if you maintain application changes.
 
 Do not use `docker compose down -v` during an update: it removes the database
 and Garage volumes.
@@ -365,9 +367,9 @@ The administration area contains an informational **Updates** center. It
 checks the signed stable feed, lists every release between the installed and
 latest versions, and sends security digests to active platform administrators
 when SMTP is configured. It never installs, pulls, or deploys an update. Apply
-an update only with the `stable` fast-forward procedure or by deliberately
-moving to a newer immutable tag after reviewing the release's backup, downtime,
-and migration notes.
+an update by deliberately selecting a newer `NEBULYNK_VERSION` and matching
+deployment files after reviewing the release's backup, downtime and migration
+notes. A redeploy alone does not select a newer version.
 
 Only the platform owner can disable checks, and doing so also stops new
 security email notices. The last verified catalog remains visible but becomes

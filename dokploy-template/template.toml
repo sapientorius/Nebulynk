@@ -21,7 +21,7 @@ frontend_url = "http://${frontend_domain}"
 backend_url = "http://${backend_domain}"
 livekit_public_url = "http://${livekit_domain}"
 garage_public_url = "http://${garage_domain}"
-source_ref = "stable"
+image_version = "0.7.1"
 
 [config]
 isolated = true
@@ -52,7 +52,7 @@ path = "/"
 
 [config.env]
 NODE_ENV = "development"
-NEBULYNK_SOURCE_REF = "${source_ref}"
+NEBULYNK_VERSION = "${image_version}"
 POSTGRES_DB = "nebulynk"
 POSTGRES_USER = "nebulynk"
 POSTGRES_PASSWORD = "${postgres_password}"
@@ -68,7 +68,7 @@ LIVEKIT_API_KEY = "${livekit_api_key}"
 LIVEKIT_API_SECRET = "${livekit_api_secret}"
 FRONTEND_URL = "${frontend_url}"
 PASSKEY_RP_ID = "${frontend_domain}"
-VITE_API_URL = "${backend_url}"
+API_URL = "${backend_url}"
 LIVEKIT_PUBLIC_URL = "${livekit_public_url}"
 STORAGE_S3_PUBLIC_ENDPOINT = "${garage_public_url}"
 
@@ -101,4 +101,3 @@ LOG_LEVEL = "info"
 MAX_FILE_SIZE = "26214400"
 MEETING_TRANSCRIPT_WAIT_TIMEOUT_MS = "1800000"
 TRUST_PROXY = "true"
-NEBULYNK_BUILD_SHA = ""

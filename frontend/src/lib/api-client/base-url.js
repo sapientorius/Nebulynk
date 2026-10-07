@@ -1,7 +1,4 @@
-function readViteEnv(key) {
-  if (typeof import.meta === 'undefined') return ''
-  return import.meta.env?.[key]?.trim?.() || ''
-}
+import { readViteEnv } from '../frontend-config.js'
 
 const configuredApiUrl = readViteEnv('VITE_API_URL')
 

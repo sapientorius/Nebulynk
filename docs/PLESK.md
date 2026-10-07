@@ -1,7 +1,7 @@
 # Nebulynk on Plesk
 
 The Plesk Compose stack includes a private `transcription-worker` container.
-It starts after the backend is healthy, uses the same image, and has no public
+It starts after the backend is healthy, uses its own release image, and has no public
 route. Keep transcription disabled during the first update; enable it after both
 containers are healthy to resume existing pending transcript artifacts. Its
 default limit is 1.5 GiB memory and one CPU. See the
@@ -39,8 +39,8 @@ certificate are shared, but these ports cannot be replaced by URL paths.
 3. Nginx enabled in Plesk.
 4. A dedicated domain or subdomain pointing to the Plesk server.
 5. A valid certificate assigned to that domain.
-6. Outbound access to Docker Hub and the npm registry during the first build.
-7. Enough disk space for the source build, Docker layers, PostgreSQL and Garage data.
+6. Outbound access to Docker Hub and GHCR for image downloads.
+7. Enough disk space for Docker layers, PostgreSQL and Garage data.
 
 If the Plesk GUI does not show “Upload Extension”, enable it in
 `/usr/local/psa/admin/conf/panel.ini`:
@@ -87,16 +87,18 @@ service is running. Then follow this order:
    host architecture, Docker, Docker Compose, Nginx, OpenSSL and the extension
    payload.
 7. Start the installation. The first run can take several minutes because the
-   extension downloads container images, installs npm dependencies and builds
-   the backend and frontend images. The task continues in the background; do
+   extension validates the deployment and downloads its fixed container images.
+   The task continues in the background; do
    not start the same installation more than once.
 8. Wait until the Plesk task is complete and open the prepared domain. The
-   extension copies the bundled source, generates production secrets, starts
+   extension copies the bundled deployment configuration, generates production secrets, starts
    the Compose project, and activates the domain proxy.
 
-The build is intentionally source-based. The Plesk server must therefore be
-able to pull the pinned base images and install npm dependencies inside the
-Docker build.
+The package contains deployment files, the license and the verified image
+references. It supplies one application version for all three containers; an
+old `NEBULYNK_VERSION` in `.env` cannot override that packaged version. Released
+packages pin the verified image digests from `container-images.json`. No application
+source or npm dependencies are installed on the Plesk server.
 
 ## Build an unreleased package from source
 
@@ -110,6 +112,11 @@ npm run plesk:package:check
 
 The output is `dist/plesk/nebulynk-plesk-<version>-<release>.zip` and its
 `.sha256` sidecar file.
+
+A local package uses the repository version's image tags unless
+`NEBULYNK_CONTAINER_MANIFEST` points to its verified `container-images.json`.
+It does not publish images or include unreleased application code. Test custom
+application code with the [source Compose override](CONTAINERS.md#custom-source-builds).
 
 ## Release gate for `/files/`
 
@@ -136,9 +143,21 @@ Persistent data and the generated environment file are stored below:
 /opt/nebulynk-plesk/data/garage-data
 ```
 
-Re-uploading a newer extension ZIP preserves these paths and rebuilds the
-application images. Normal stop, restart, update and extension removal do not
-delete application data.
+Re-upload a newer extension ZIP and run **Update deployment** to select the
+package's fixed application version. The helper stages configuration and
+environment changes, validates Compose, and downloads all target images before
+replacing the active deployment. A configuration or download failure preserves
+the existing `.env`, deployment files and running containers. The previous
+configuration is retained in `source.previous` and `.env.previous` after a
+successful preparation. Normal stop, restart, update and extension removal
+preserve application data. **Restart** recreates containers so changed environment
+values take effect; it does not select a newer image version.
+
+The first upgrade from source builds follows this same procedure. Preserve the
+`nebulynk-plesk` project name, data paths, secrets and domain. No database migration
+is introduced by this deployment change. A failed container startup after a
+successful download requires operator recovery; the helper does not automatically
+roll back database changes. An older image alone does not replace a backup restore.
 
 Plesk does not include Docker volume data in its normal backup. Back up the
 directories above with an external backup system, and test restoring PostgreSQL
@@ -151,7 +170,7 @@ external backup first. In the extension, open the **Danger zone** section and
 enter `DELETE NEBULYNK DATA` in the confirmation field. The cleanup task disables
 the Plesk proxy, stops the `nebulynk-plesk` Compose project, removes local
 Nebulynk build images where possible, verifies that no project containers remain,
-and then deletes `/opt/nebulynk-plesk` including the generated `.env`, source,
+and then deletes `/opt/nebulynk-plesk` including the generated `.env`, deployment configuration,
 PostgreSQL, Redis and Garage data.
 
 If Docker cannot be reached, the stack cannot be stopped, an image cleanup fails,
@@ -170,12 +189,12 @@ also be deleted. After the extension has been removed, only manual cleanup of
 - `502` on the domain: check the extension task log and `docker compose ps` in
   `/opt/nebulynk-plesk`.
 - Manifest, favicon, service worker or PWA icons return `403` while bundled
-  `/assets/...` files work: upload the updated extension and run `Update and
-  rebuild` so the frontend image is rebuilt with readable public document-root
+  `/assets/...` files work: upload the updated extension and run **Update deployment**
+  to install the reviewed frontend image with readable public document-root
   permissions. Inspect `docker compose logs frontend` and verify the mode with
   `docker compose exec frontend stat -c '%a %U:%G %n' /usr/share/nginx/html/manifest.webmanifest`.
 - Login succeeds but `POST /api/auth/session/bootstrap` returns `500`: update
-  the extension and run “Update and rebuild” so the edge configuration is
+  the extension and run **Update deployment** so the edge configuration is
   synchronized and the edge container is recreated. Inspect the backend logs
   for `Cannot send secure cookie over unencrypted connection`; the public HTTPS
   forwarding header must reach the backend. Production cookies remain `Secure`

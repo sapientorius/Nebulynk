@@ -1,7 +1,18 @@
+# Generated from docker-compose.coolify.yml by npm run coolify:source.
+# Standalone source-build deployment for Coolify branch tests/custom changes.
+# Select this file and the desired Git branch; NEBULYNK_VERSION is unused.
+# Edit the shared configuration or generator, then regenerate this file.
 services:
   # 1. Frontend (declared first for Coolify's Compose parser)
   frontend:
-    image: ghcr.io/sapientorius/nebulynk-frontend:${NEBULYNK_VERSION:-0.7.1}
+    pull_policy: build
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      target: production-stage
+      args:
+        BUILD_SHA: ${NEBULYNK_BUILD_SHA:-${SOURCE_COMMIT:-}}
+        BUILD_TIME: ${NEBULYNK_BUILD_TIME:-}
     depends_on:
       - backend
     restart: always
@@ -115,7 +126,14 @@ services:
       timeout: 3s
       retries: 3
       start_period: 60s
-    image: ghcr.io/sapientorius/nebulynk-backend:${NEBULYNK_VERSION:-0.7.1}
+    pull_policy: build
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+      target: backend
+      args:
+        BUILD_SHA: ${NEBULYNK_BUILD_SHA:-${SOURCE_COMMIT:-}}
+        BUILD_TIME: ${NEBULYNK_BUILD_TIME:-}
     environment:
       NODE_ENV: production
       # Required production secrets. Backend startup rejects missing or placeholder
@@ -192,7 +210,14 @@ services:
     restart: always
 
   transcription-worker:
-    image: ghcr.io/sapientorius/nebulynk-transcription-worker:${NEBULYNK_VERSION:-0.7.1}
+    pull_policy: build
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+      target: transcription-worker
+      args:
+        BUILD_SHA: ${NEBULYNK_BUILD_SHA:-${SOURCE_COMMIT:-}}
+        BUILD_TIME: ${NEBULYNK_BUILD_TIME:-}
     stop_grace_period: 75s
     mem_limit: ${TRANSCRIPTION_WORKER_MEMORY_LIMIT:-1536m}
     cpus: ${TRANSCRIPTION_WORKER_CPUS:-1.0}

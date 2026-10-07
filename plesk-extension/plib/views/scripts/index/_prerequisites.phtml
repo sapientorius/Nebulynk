@@ -49,8 +49,8 @@ $isOperational = in_array($statusKey, ['ready', 'running', 'stopped', 'error'], 
                     <strong>Check the firewall and network</strong>
                     <p>
                         Allow HTTPS (TCP 443) and, for audio/video, LiveKit
-                        on TCP 7881 and UDP 7882. Docker Hub and the npm
-                        registry must be reachable during installation and
+                        on TCP 7881 and UDP 7882. Docker Hub and the GitHub
+                        Container Registry must be reachable during installation and
                         updates.
                     </p>
                 </div>
@@ -60,7 +60,7 @@ $isOperational = in_array($statusKey, ['ready', 'running', 'stopped', 'error'], 
                 <div>
                     <strong>Plan for storage and backups</strong>
                     <p>
-                        The first run builds the application images on the
+                        The first run downloads the prebuilt application images to the
                         server. Make sure sufficient storage is available
                         and back up PostgreSQL and Garage outside normal
                         Plesk backups.

@@ -87,20 +87,44 @@ test('builds and validates an uploadable Plesk package', async () => {
   assert.equal(manifest.extension_release, built.release)
   assert.ok(manifest.files.some((file) => file.path === 'deploy/plesk/edge.conf'))
 
-  for (const publicAsset of [
-    'frontend/public/manifest.webmanifest',
-    'frontend/public/sw.js',
-    'frontend/public/share-target-storage.js',
-    'frontend/public/favicon.ico',
-    'frontend/public/apple-touch-icon.png',
-    'frontend/public/pwa-icon-192.png',
-    'frontend/public/pwa-icon-512.png',
-    'frontend/public/pwa-icon-maskable-512.png'
-  ]) {
-    assert.ok(
-      manifest.files.some((file) => file.path === publicAsset),
-      `Plesk payload is missing ${publicAsset}`
-    )
+  assert.ok(manifest.files.some((file) => file.path === 'release.env'))
+  assert.ok(manifest.files.some((file) => file.path === 'LICENSE'))
+  assert.ok(!manifest.files.some((file) => /^(backend|frontend)\//.test(file.path)))
+  assert.ok(!manifest.files.some((file) => /^package(?:-lock)?\.json$/.test(file.path)))
+  const compose = await readFile(repositoryPath('dist', 'plesk', 'staging', 'package', 'var', 'payload', 'deploy', 'plesk', 'docker-compose.yml'), 'utf8')
+  assert.doesNotMatch(compose, /^\s+build:/m)
+})
+
+test('release packages pin the verified image digests and reject mismatched application versions', async () => {
+  const { version } = JSON.parse(await readFile(repositoryPath('package.json'), 'utf8'))
+  const directory = await mkdtemp(path.join(os.tmpdir(), 'nebulynk-plesk-images-'))
+  const manifestPath = path.join(directory, 'container-images.json')
+  const previous = process.env.NEBULYNK_CONTAINER_MANIFEST
+  const manifest = { schema_version: 1, version, revision: 'a'.repeat(40), platforms: ['linux/amd64', 'linux/arm64'],
+    images: Object.fromEntries(['backend', 'frontend', 'transcription-worker'].map((component, index) => [component, {
+      repository: `ghcr.io/sapientorius/nebulynk-${component}`, digest: `sha256:${String(index + 1).repeat(64)}`,
+      platforms: { 'linux/amd64': `sha256:${'4'.repeat(64)}`, 'linux/arm64': `sha256:${'5'.repeat(64)}` }
+    }])) }
+  try {
+    await writeFile(manifestPath, JSON.stringify(manifest))
+    process.env.NEBULYNK_CONTAINER_MANIFEST = manifestPath
+    const built = await buildPleskExtension()
+    await validatePleskExtension()
+    const payload = repositoryPath('dist', 'plesk', 'staging', 'package', 'var', 'payload')
+    const compose = await readFile(path.join(payload, 'deploy/plesk/docker-compose.yml'), 'utf8')
+    for (const image of Object.values(manifest.images)) assert.ok(compose.includes(`${image.repository}@${image.digest}`))
+    assert.doesNotMatch(compose, /NEBULYNK_VERSION:-/)
+    assert.deepEqual(JSON.parse(await readFile(path.join(payload, 'container-images.json'), 'utf8')), manifest)
+    assert.equal(await readFile(path.join(payload, 'release.env'), 'utf8'), `NEBULYNK_VERSION=${version}\n`)
+    assert.equal((await buildPleskExtension()).checksum, built.checksum, 'Reruns must reproduce the immutable archive bytes')
+    await writeFile(manifestPath, JSON.stringify({ ...manifest, version: '999.0.0' }))
+    await assert.rejects(buildPleskExtension(), /release manifest|release identity/)
+  } finally {
+    if (previous === undefined) delete process.env.NEBULYNK_CONTAINER_MANIFEST
+    else process.env.NEBULYNK_CONTAINER_MANIFEST = previous
+    assert.equal(path.dirname(directory), os.tmpdir())
+    await rm(directory, { recursive: true, force: true })
+    await buildPleskExtension()
   }
 })
 
@@ -140,14 +164,15 @@ test('uses fixed safe helper paths and restricts destructive cleanup to the proj
     .replace(/\r\n/g, '\n')
   assert.match(helper, /DEPLOYMENT_ROOT="\/opt\/nebulynk-plesk"/)
   assert.match(helper, /PAYLOAD_ROOT="\$PSA_ROOT\/var\/modules\/\$MODULE_ID\/payload"/)
-  assert.match(helper, /rm -rf -- "\$SOURCE_ROOT"/)
+  assert.match(helper, /mv "\$SOURCE_ROOT" "\$PREVIOUS_ROOT"/)
+  assert.doesNotMatch(helper, /rm -rf -- "\$SOURCE_ROOT"/)
   assert.match(helper, /check_edge_port\(\)/)
   assert.match(helper, /label=com\.docker\.compose\.project=\$COMPOSE_PROJECT/)
   assert.match(helper, /chown 70:70 "\$DATA_ROOT\/postgres"/)
   assert.match(helper, /chown 999:1000 "\$DATA_ROOT\/redis"/)
-  assert.match(helper, /chmod -R u\+rwX,go-rwx "\$SOURCE_ROOT"/)
+  assert.match(helper, /chmod -R u\+rwX,go-rwx "\$CANDIDATE_ROOT"/)
   assert.match(helper, /chmod 0600 "\$ENV_FILE"/)
-  assert.match(helper, /chmod 0644 \\\n\s+"\$SOURCE_ROOT\/deploy\/plesk\/edge\.conf"/)
+  assert.match(helper, /chmod 0644 \\\n\s+"\$CANDIDATE_ROOT\/deploy\/plesk\/edge\.conf"/)
   assert.match(helper, /cleanup_stack\(\)/)
   assert.match(helper, /\[ "\$DEPLOYMENT_ROOT" = "\/opt\/nebulynk-plesk" \]/)
   assert.match(helper, /docker info/)
@@ -189,7 +214,7 @@ test('normalizes frontend document-root permissions before using the unprivilege
   )
   assert.match(
     dockerfile,
-    /USER root\s+RUN chmod -R a\+rX \/usr\/share\/nginx\/html\s+USER 101/
+    /USER root\s+RUN chmod -R a\+rX \/usr\/share\/nginx\/html/
   )
 })
 
@@ -284,7 +309,7 @@ test('registers both Plesk Nginx hook variants and keeps domain routing scoped',
   assert.doesNotMatch(controller, /sendButton/)
   assert.match(controller, /Delete all data/)
   assert.match(viewFragments, /Install the Plesk Docker Extension/)
-  assert.match(viewFragments, /Preflight check &rarr; Install and build/)
+  assert.match(viewFragments, /Preflight check &rarr; Download and deploy/)
   assert.match(viewFragments, /may take several minutes/)
   assert.doesNotMatch(view, /runtimeStatus/)
   assert.doesNotMatch(view, /runtimeLogs/)
@@ -393,4 +418,98 @@ test('fails closed before deleting the deployment when cleanup cannot be verifie
   await runCleanupFixture({ composeExit: 23 })
   await runCleanupFixture({ remaining: true })
   await runCleanupFixture({ symlink: true })
+})
+
+async function runDeploymentFixture({ existing = true, configExit = 0, pullExit = 0 } = {}) {
+  const fixtureRoot = await mkdtemp(path.join(os.tmpdir(), 'nebulynk-plesk-deployment-'))
+  const helperPath = path.join(fixtureRoot, 'nebulynk-plesk')
+  await writeFile(helperPath, (await readFile(repositoryPath('plesk-extension', 'sbin', 'nebulynk-plesk'), 'utf8')).replace(/\r\n/g, '\n'))
+  await writeFile(path.join(fixtureRoot, 'ss'), '#!/bin/sh\nexit 0\n')
+  await writeFile(path.join(fixtureRoot, 'openssl'), '#!/bin/sh\nprintf "%064d\\n" 1\n')
+  await writeFile(path.join(fixtureRoot, 'docker'), `#!/bin/sh
+set -eu
+printf '%s version=%s\\n' "$*" "\${NEBULYNK_VERSION:-unset}" >> /tmp/docker.log
+case "$*" in
+    *' config') exit ${configExit} ;;
+    *' pull')
+        # The legacy source deployment must still exist during every download.
+        if [ '${existing ? '1' : '0'}' = 1 ]; then [ -f /opt/nebulynk-plesk/source/legacy-source ]; fi
+        exit ${pullExit}
+        ;;
+esac
+`)
+  for (const file of ['nebulynk-plesk', 'ss', 'openssl', 'docker']) await chmod(path.join(fixtureRoot, file), 0o755)
+  const fail = configExit !== 0 || pullExit !== 0
+  const script = `set -eu
+export PATH=/fake-bin:$PATH
+payload=/usr/local/psa/var/modules/nebulynk-plesk/payload
+deployment=/opt/nebulynk-plesk
+mkdir -p "$payload/deploy/plesk" "$deployment/data/postgres"
+for file in garage.toml livekit.yaml deploy/plesk/edge.conf deploy/plesk/livekit-egress.yaml deploy/plesk/docker-compose.yml; do : > "$payload/$file"; done
+printf 'NEBULYNK_VERSION=9.8.7\\n' > "$payload/release.env"
+printf 'retained-data\\n' > "$deployment/data/postgres/fixture"
+cat > "$deployment/.env" <<'ENV'
+NEBULYNK_DOMAIN=app.example.com
+EDGE_PORT=49152
+JWT_SECRET=existing-jwt-secret
+AI_SECRET_KEY=existing-ai-secret
+POSTGRES_PASSWORD=existing-database-secret
+STORAGE_S3_SECRET_KEY=existing-storage-secret
+NEBULYNK_VERSION=0.1.0
+ENV
+cp "$deployment/.env" /tmp/previous.env
+if [ '${existing ? '1' : '0'}' = 1 ]; then
+    mkdir -p "$deployment/source/deploy/plesk"
+    : > "$deployment/source/deploy/plesk/docker-compose.yml"
+    printf 'legacy-code\\n' > "$deployment/source/legacy-source"
+fi
+set +e
+/usr/local/bin/nebulynk-plesk --action update --domain changed.example.com
+status=$?
+set -e
+[ "$(cat "$deployment/data/postgres/fixture")" = retained-data ]
+grep -qx 'JWT_SECRET=existing-jwt-secret' "$deployment/.env"
+grep -qx 'AI_SECRET_KEY=existing-ai-secret' "$deployment/.env"
+grep -qx 'POSTGRES_PASSWORD=existing-database-secret' "$deployment/.env"
+grep -qx 'STORAGE_S3_SECRET_KEY=existing-storage-secret' "$deployment/.env"
+if [ '${fail ? '1' : '0'}' = 1 ]; then
+    [ "$status" -ne 0 ]
+    [ -f "$deployment/source/legacy-source" ]
+    [ ! -e "$deployment/source/release.env" ]
+    cmp /tmp/previous.env "$deployment/.env"
+    ! grep -q ' up ' /tmp/docker.log
+else
+    [ "$status" -eq 0 ]
+    [ -f "$deployment/source/release.env" ]
+    grep -qx 'NEBULYNK_DOMAIN=changed.example.com' "$deployment/.env"
+    [ ! -e "$deployment/source/legacy-source" ]
+    if [ '${existing ? '1' : '0'}' = 1 ]; then [ -f "$deployment/source.previous/legacy-source" ]; fi
+    grep -q 'up -d --no-build --pull never.*--wait' /tmp/docker.log
+    ! grep 'compose ' /tmp/docker.log | grep -vq 'version=9.8.7'
+    /usr/local/bin/nebulynk-plesk --action restart
+    grep -q 'up -d --no-build --pull never --force-recreate' /tmp/docker.log
+fi
+cat /tmp/docker.log
+`
+  try {
+    const { stdout } = await execFileAsync('docker', ['run', '--rm', '--network=none',
+      ...(process.env.PLESK_FIXTURE_OWNER ? ['--label', `nebulynk.ci=${process.env.PLESK_FIXTURE_OWNER}`] : []),
+      '--mount', `type=bind,source=${helperPath},target=/usr/local/bin/nebulynk-plesk,readonly`,
+      '--mount', `type=bind,source=${fixtureRoot},target=/fake-bin,readonly`,
+      'alpine:3.20', 'sh', '-c', script
+    ], { timeout: 120000, maxBuffer: 1024 * 1024 })
+    if (!fail) assert.ok(stdout.indexOf(' config') < stdout.indexOf(' pull') && stdout.indexOf(' pull') < stdout.indexOf(' up '))
+  } finally { await rm(fixtureRoot, { recursive: true, force: true }) }
+}
+
+test('Plesk installs images and upgrades legacy source deployments only after successful downloads', async (t) => {
+  if (!await canRunDocker()) {
+    assert.notEqual(process.env.NEBULYNK_CI_STRICT, 'true', 'Full CI requires Linux Docker; Plesk deployment fixtures must not skip')
+    t.skip('requires a Linux Docker daemon')
+    return
+  }
+  await runDeploymentFixture({ existing: false })
+  await runDeploymentFixture()
+  await runDeploymentFixture({ configExit: 12 })
+  await runDeploymentFixture({ pullExit: 23 })
 })

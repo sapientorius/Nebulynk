@@ -34,9 +34,9 @@ and UDP `7882` in both Coolify and the server or provider firewall.
    `/docker-compose.coolify.yml`.
 4. Coolify initially selects `main`. Change the branch to `stable` before the
    first deployment. Never deploy `main` in production. Use an immutable
-   `vX.Y.Z` tag instead only when the installation must remain pinned to one
-   reviewed release.
-5. Enable automatic deployments only when following the `stable` channel.
+   `vX.Y.Z` tag for the matching release's deployment configuration.
+5. Set `NEBULYNK_VERSION=X.Y.Z` explicitly to the selected release and keep
+   automatic application updates disabled. Redeployment preserves this version.
 
 Do not start the first deployment until the branch, domains, and optional
 configuration below have been reviewed.
@@ -72,12 +72,12 @@ Coolify deployment:
 
 Coolify supplies `SERVICE_URL_FRONTEND`, `SERVICE_FQDN_FRONTEND`,
 `SERVICE_URL_BACKEND`, `SERVICE_URL_LIVEKIT`, and `SERVICE_URL_GARAGE` from the
-domain fields. Nebulynk uses `SOURCE_COMMIT` for the build SHA. The build time
-is optional and remains unset, while official update-verification keys are
-already embedded in release builds.
+domain fields. The public GHCR images include their release version, commit and
+build timestamp, independently of Coolify's checked-out configuration commit.
+Official update-verification keys are embedded in the images.
 
-Changing a public domain requires saving the resource and performing a full
-rebuild so the frontend receives the new build-time URLs.
+Changing a public domain requires saving the resource and redeploying so the
+frontend container receives the new runtime URLs. No rebuild is required.
 
 ## 3. Review the generated secrets
 
@@ -118,7 +118,7 @@ Configure only the features you intend to use:
 
 - Web Push: set `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, and optionally
   `VAPID_SUBJECT`. The Compose stack reuses `VAPID_PUBLIC_KEY` for the frontend
-  build automatically. Changing it requires a full frontend rebuild.
+  runtime configuration automatically. Changing it requires a redeploy.
 - Email: set `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_IGNORE_TLS`,
   `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`, and optionally `SMTP_FROM_NAME`.
 - GIF search: optionally set `KLIPY_API_KEY` as an environment fallback. You can also add the key later under Admin → Platform Settings; the encrypted platform value takes precedence.
@@ -131,7 +131,7 @@ Configure only the features you intend to use:
   otherwise.
 
 Do not put secrets in variables prefixed with `VITE_`; Vite values are embedded
-in the browser image.
+in browser configuration.
 
 ## 5. Deploy and verify
 
@@ -154,10 +154,12 @@ part of the recovery material. Redis data may be rebuilt.
 
 ## Updating an existing installation
 
-Review release notes and verify backups before every update. A `stable`
-resource can redeploy the latest reviewed commit; a tag-pinned resource must
-be moved deliberately to the next tag. Never delete persistent volumes during
-an update.
+Review release notes and verify backups before every update. Select the matching
+deployment files, change `NEBULYNK_VERSION` to the reviewed fixed version, then
+redeploy. All three application containers use that version from GHCR. A redeploy
+with the previous value keeps the previous version. Never delete persistent
+volumes during an update. Source-build installations follow the same first
+upgrade procedure; keep the resource identity and all existing secrets.
 
 Existing explicit standard secrets continue to override Coolify-generated
 defaults. Older installations that still use MinIO-named variables must copy
@@ -176,6 +178,51 @@ The bundled stack sets `STORAGE_S3_ENDPOINT` internally to
 external S3-compatible service. Changing storage credentials without rotating
 them in Garage can make existing objects inaccessible.
 
+## Testing branches with source builds
+
+To test the registry publication and image deployment path before a release, use
+[the staging guide](STAGING.md) with `/docker-compose.coolify.yml` and the build's
+fixed staging tag. The source variant below instead builds directly on Coolify.
+
+For a Git-based Coolify test resource, use the standalone
+`/docker-compose.coolify.source.yml` instead of `/docker-compose.coolify.yml`.
+Only one Compose file is needed:
+
+1. Select the branch you want to test. The branch must contain the source Compose
+   file and the current Dockerfiles.
+2. Set **Base Directory** to `/` and **Docker Compose Location** to
+   `/docker-compose.coolify.source.yml`, save, and reload the Compose configuration.
+3. Configure the same four public service domains and generated secrets described
+   above, using separate test domains and data.
+4. Enable **Configuration > Advanced > Include Source Commit in Build** so the
+   built images contain the selected Git revision. Alternatively, supply
+   `NEBULYNK_BUILD_SHA` explicitly. `NEBULYNK_BUILD_TIME` is optional.
+5. Deploy. After changing the branch or pushing test changes, redeploy to build
+   and run that checkout.
+
+Backend, frontend and transcription worker are built locally from the selected
+branch, using the same Docker targets as official images. Their `pull_policy: build`
+requests a build even when a previous local image exists; normal Docker layer
+caching remains available. `NEBULYNK_VERSION` does not select application code in
+this file. PostgreSQL, Redis, Garage and LiveKit still use pinned upstream images.
+Frontend URLs continue to be configured at runtime.
+
+Coolify's Git-based Compose flow and the source-commit setting are documented in
+its [Docker Compose guide](https://coolify.io/docs/applications/builds/docker-compose).
+Docker documents the build policy in the
+[Compose service reference](https://docs.docker.com/reference/compose-file/services/#pull_policy).
+
+Use a separate test resource with its own database and volumes. On the same
+server, LiveKit's host ports `7881` and `7882` also need distinct mappings; a separate
+resource alone does not remove that port conflict. Select the release Compose file
+and a published `NEBULYNK_VERSION` when returning to an official image deployment.
+
+The source file is generated from the production Coolify configuration so routing,
+secrets, volumes, worker limits and health checks stay synchronized. Contributors
+must run `npm run coolify:source` after editing the shared Compose configuration or
+its generator. `npm run coolify:source:check` and CI reject a stale generated file;
+`npm run test:deployments` also validates the standalone source configuration.
+
 ## Backend lifecycle and instance count
 
 Run exactly one backend instance per shared application state. Stop the previous
@@ -190,8 +237,8 @@ existing LiveKit media does not imply seamless API-session recovery.
 
 ## Transcription worker and first upgrade
 
-The Compose deployment adds one `transcription-worker` container using the backend
-image. It has no public domain or port and starts after the backend becomes
+The Compose deployment adds one `transcription-worker` container using its own
+release image. It has no public domain or port and starts after the backend becomes
 healthy. It processes one recording at a time with a default limit of 1.5 GiB
 memory and one CPU. Temporary audio stays inside the worker container and is
 removed after processing or a restart. The default temporary recording limit is

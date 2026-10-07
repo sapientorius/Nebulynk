@@ -5,22 +5,19 @@
 version: "3.8"
 services:
   frontend:
-    build:
-      context: "https://github.com/sapientorius/Nebulynk.git#${NEBULYNK_SOURCE_REF:-stable}"
-      dockerfile: frontend/Dockerfile
-      args:
-        NODE_IMAGE: "${NEBULYNK_NODE_IMAGE:-node:22.23.1-alpine3.24}"
-        NGINX_IMAGE: "${NEBULYNK_NGINX_IMAGE:-nginxinc/nginx-unprivileged:1.31-alpine3.23@sha256:6320020c7da8714feab524e02c08c5a1958675c4e68700e93a2fd8970b065786}"
-        # These URLs are baked into the browser bundle.
-        VITE_API_URL: "${VITE_API_URL:?VITE_API_URL must be set}"
-        VITE_LIVEKIT_URL: "${LIVEKIT_PUBLIC_URL:?LIVEKIT_PUBLIC_URL must be set}"
-        VITE_VAPID_PUBLIC_KEY: "${VAPID_PUBLIC_KEY:-}"
-        VITE_AUTH_CSRF_COOKIE_NAME: "${AUTH_CSRF_COOKIE_NAME:-nebulynk_csrf_token}"
+    image: ghcr.io/sapientorius/nebulynk-frontend:${NEBULYNK_VERSION:-0.7.1}
     depends_on:
       - backend
     expose:
       - "8080"
     restart: unless-stopped
+
+    environment:
+      API_URL: "${API_URL-${VITE_API_URL:?API_URL or VITE_API_URL must be set}}"
+      BACKEND_URL: "${BACKEND_URL-${VITE_BACKEND_URL:-}}"
+      LIVEKIT_URL: "${LIVEKIT_URL-${VITE_LIVEKIT_URL:-${LIVEKIT_PUBLIC_URL:?LIVEKIT_PUBLIC_URL must be set}}}"
+      VAPID_PUBLIC_KEY: "${VAPID_PUBLIC_KEY-${VITE_VAPID_PUBLIC_KEY:-}}"
+      AUTH_CSRF_COOKIE_NAME: "${AUTH_CSRF_COOKIE_NAME-${VITE_AUTH_CSRF_COOKIE_NAME:-nebulynk_csrf_token}}"
 
   postgres:
     image: "${NEBULYNK_POSTGRES_IMAGE:-postgres:17-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193}"
@@ -117,11 +114,7 @@ services:
       timeout: 3s
       retries: 3
       start_period: 60s
-    build:
-      context: "https://github.com/sapientorius/Nebulynk.git#${NEBULYNK_SOURCE_REF:-stable}"
-      dockerfile: backend/Dockerfile
-      args:
-        NODE_IMAGE: "${NEBULYNK_NODE_IMAGE:-node:22.23.1-alpine3.24}"
+    image: ghcr.io/sapientorius/nebulynk-backend:${NEBULYNK_VERSION:-0.7.1}
     environment:
       NODE_ENV: "${NODE_ENV:-development}"
       JWT_SECRET: "${JWT_SECRET:?JWT_SECRET must be set}"
@@ -135,7 +128,7 @@ services:
       AUTH_REFRESH_TOKEN_TTL: "${AUTH_REFRESH_TOKEN_TTL:-1d}"
       AUTH_REMEMBER_REFRESH_TOKEN_TTL: "${AUTH_REMEMBER_REFRESH_TOKEN_TTL:-30d}"
       AUTH_REFRESH_COOKIE_NAME: "${AUTH_REFRESH_COOKIE_NAME:-nebulynk_refresh_session}"
-      AUTH_CSRF_COOKIE_NAME: "${AUTH_CSRF_COOKIE_NAME:-nebulynk_csrf_token}"
+      AUTH_CSRF_COOKIE_NAME: "${AUTH_CSRF_COOKIE_NAME-${VITE_AUTH_CSRF_COOKIE_NAME:-nebulynk_csrf_token}}"
       AUTH_COOKIE_DOMAIN: "${AUTH_COOKIE_DOMAIN:-}"
       RATE_LIMIT_DRIVER: "${RATE_LIMIT_DRIVER:-redis}"
       PASSKEY_RP_ID: "${PASSKEY_RP_ID:?PASSKEY_RP_ID must be set}"
@@ -177,7 +170,6 @@ services:
       SMTP_FROM_NAME: "${SMTP_FROM_NAME:-Nebulynk}"
       FRONTEND_URL: "${FRONTEND_URL:?FRONTEND_URL must be set}"
       TRUST_PROXY: "${TRUST_PROXY:-true}"
-      NEBULYNK_BUILD_SHA: "${NEBULYNK_BUILD_SHA:-}"
     depends_on:
       - postgres
       - redis
@@ -189,12 +181,7 @@ services:
     restart: unless-stopped
 
   transcription-worker:
-    build:
-      context: "https://github.com/sapientorius/Nebulynk.git#${NEBULYNK_SOURCE_REF:-stable}"
-      dockerfile: backend/Dockerfile
-      args:
-        NODE_IMAGE: "${NEBULYNK_NODE_IMAGE:-node:22.23.1-alpine3.24}"
-    command: ["node", "src/transcription-worker.js"]
+    image: ghcr.io/sapientorius/nebulynk-transcription-worker:${NEBULYNK_VERSION:-0.7.1}
     stop_grace_period: 75s
     mem_limit: ${TRANSCRIPTION_WORKER_MEMORY_LIMIT:-1536m}
     cpus: ${TRANSCRIPTION_WORKER_CPUS:-1.0}

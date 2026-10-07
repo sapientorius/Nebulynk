@@ -30,8 +30,46 @@ jobs:
     needs: validate
     uses: ./.github/workflows/ci.yml
 
-  sign-and-publish:
+  container-candidates:
     needs: [validate, checks]
+    uses: ./.github/workflows/container-candidates.yml
+    permissions:
+      contents: read
+      packages: write
+
+  publish-images:
+    needs: container-candidates
+    runs-on: ubuntu-24.04
+    environment: release-production
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: container-candidate-*
+          path: output/container-candidates
+      - name: Promote verified digests and require anonymous registry access
+        run: node scripts/container-release.mjs promote
+      - uses: actions/upload-artifact@v4
+        with:
+          name: container-release-manifest
+          path: dist/containers/container-images.json
+          if-no-files-found: error
+
+  sign-and-publish:
+    needs: [validate, checks, publish-images]
     runs-on: ubuntu-latest
     environment: release-production
     permissions:
@@ -49,7 +87,15 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Download verified image references
+        uses: actions/download-artifact@v4
+        with:
+          name: container-release-manifest
+          path: dist/containers
+
       - name: Build and validate Plesk extension package
+        env:
+          NEBULYNK_CONTAINER_MANIFEST: dist/containers/container-images.json
         run: npm run plesk:package && npm run plesk:package:check
 
       - name: Require the active signing key to be embedded in the release
@@ -102,7 +148,12 @@ jobs:
             fi
 
             # Published immutable releases and their assets must never be changed.
-            # A rerun may still safely rebuild and publish the signed Pages feed.
+            # Missing or conflicting assets must block the signed feed on reruns.
+            mkdir -p output/published-release
+            gh release download "${{ github.ref_name }}" --dir output/published-release \
+              --pattern container-images.json --pattern "$(basename "$plesk_archive")" \
+              --pattern "$(basename "$plesk_checksum")"
+            node scripts/verify-release-container-assets.mjs output/published-release "$plesk_archive"
             echo "GitHub release ${{ github.ref_name }} already exists; leaving immutable release unchanged."
           else
             gh release create "${{ github.ref_name }}" \
@@ -110,6 +161,7 @@ jobs:
               --title "Nebulynk ${{ github.ref_name }}" \
               --notes-file dist-release-notes/release-notes.md \
               dist-release-notes/CHANGELOG.md \
+              dist/containers/container-images.json \
               "$plesk_archive" \
               "$plesk_checksum"
           fi
