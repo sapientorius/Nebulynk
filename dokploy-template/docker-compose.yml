@@ -13,9 +13,10 @@ services:
     restart: unless-stopped
 
     environment:
-      API_URL: "${API_URL-${VITE_API_URL:?API_URL or VITE_API_URL must be set}}"
+      # Validate the required API URL at frontend startup, not in a nested fallback.
+      API_URL: "${API_URL-${VITE_API_URL:-}}"
       BACKEND_URL: "${BACKEND_URL-${VITE_BACKEND_URL:-}}"
-      LIVEKIT_URL: "${LIVEKIT_URL-${VITE_LIVEKIT_URL:-${LIVEKIT_PUBLIC_URL:?LIVEKIT_PUBLIC_URL must be set}}}"
+      LIVEKIT_URL: "${LIVEKIT_URL-${VITE_LIVEKIT_URL:-${LIVEKIT_PUBLIC_URL:-}}}"
       VAPID_PUBLIC_KEY: "${VAPID_PUBLIC_KEY-${VITE_VAPID_PUBLIC_KEY:-}}"
       AUTH_CSRF_COOKIE_NAME: "${AUTH_CSRF_COOKIE_NAME-${VITE_AUTH_CSRF_COOKIE_NAME:-nebulynk_csrf_token}}"
 

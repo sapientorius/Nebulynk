@@ -47,7 +47,10 @@ client API/socket settings, including desktop connections, take precedence over
 global browser configuration.
 
 Missing `API_URL`, invalid URLs, credentials in URLs or an invalid cookie name
-fail container startup with a configuration error. Values are serialized as data;
+fail container startup with a configuration error. Required API URL validation
+runs in the frontend startup renderer. Compose alias fallbacks do not require
+`VITE_API_URL` when `API_URL` is supplied, including on older Compose versions.
+Values are serialized as data;
 server secrets are never copied into runtime configuration. Nginx derives CSP
 connection origins from the same API, socket and LiveKit values. Existing security
 headers are preserved. HTML and runtime configuration use `Cache-Control: no-store`;

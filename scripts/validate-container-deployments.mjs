@@ -4,6 +4,7 @@ import { resolve } from 'node:path'
 import { createContext, root, testEnvironment } from './ci-support.mjs'
 import { deploymentFiles, syncContainerVersion } from './sync-container-version.mjs'
 import { buildCoolifySourceCompose } from './build-coolify-source-compose.mjs'
+import { resolveRuntimeConfig } from '../frontend/scripts/frontend-runtime-config.mjs'
 
 const context = await createContext('deployments')
 const parseCompose = (output) => JSON.parse(output.slice(output.indexOf('{'), output.lastIndexOf('}') + 1))
@@ -62,6 +63,27 @@ try {
     assert.equal(legacy.BACKEND_URL, aliases.VITE_BACKEND_URL)
     assert.equal(legacy.AUTH_CSRF_COOKIE_NAME, aliases.VITE_AUTH_CSRF_COOKIE_NAME)
     assert.equal(parseCompose(aliasOutput).services.backend.environment.AUTH_CSRF_COOKIE_NAME, aliases.VITE_AUTH_CSRF_COOKIE_NAME)
+
+    // An empty canonical API URL must retain precedence and fail runtime startup,
+    // even when a legacy alias or platform default could otherwise supply one.
+    const emptyApi = { ...fixture, API_URL: '', VITE_API_URL: 'https://legacy-api.example.com' }
+    const emptyOutput = await context.execute('docker', args, { env: emptyApi, quiet: true })
+    const emptyRuntime = parseCompose(emptyOutput).services.frontend.environment
+    assert.equal(emptyRuntime.API_URL, '')
+    assert.throws(() => resolveRuntimeConfig(emptyRuntime), /API_URL .* must be set/)
+
+    // With no API URL variables, only platform-generated defaults may provide one.
+    // Other Compose variants pass an empty value to the same startup validator.
+    const missingApi = { ...fixture }
+    delete missingApi.API_URL
+    delete missingApi.VITE_API_URL
+    const missingOutput = await context.execute('docker', args, { env: missingApi, quiet: true })
+    const missingRuntime = parseCompose(missingOutput).services.frontend.environment
+    const defaultApi = file === 'docker-compose.coolify.yml' ? fixture.SERVICE_URL_BACKEND
+      : file === 'deploy/plesk/docker-compose.yml' ? `https://${fixture.NEBULYNK_DOMAIN}/api` : ''
+    assert.equal(missingRuntime.API_URL, defaultApi)
+    if (defaultApi) assert.equal(resolveRuntimeConfig(missingRuntime).apiUrl, defaultApi)
+    else assert.throws(() => resolveRuntimeConfig(missingRuntime), /API_URL .* must be set/)
     console.log(`${file}: valid, build-free, matching fixed application versions`)
   }
   const encoded = (await readFile(resolve(root, 'dokploy-template/import.base64'), 'utf8')).trim()

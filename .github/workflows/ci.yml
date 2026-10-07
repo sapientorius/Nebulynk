@@ -5,15 +5,64 @@ on:
     branches: ['**']
   pull_request:
   workflow_call:
+    inputs:
+      profile:
+        description: CI profile (quick or full); publication callers must use full
+        type: string
+        default: full
+      local-container-tests:
+        description: Build local test images; disable only when native candidate verification follows
+        type: boolean
+        default: true
   workflow_dispatch:
+    inputs:
+      profile:
+        description: CI scope
+        type: choice
+        options: [full, quick]
+        default: full
+
+# Called publication workflows use a unique group and retain their own queue.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ inputs.profile == '' && (github.event.pull_request.number || github.ref) || github.run_id }}
+  cancel-in-progress: ${{ inputs.profile == '' && (github.event_name == 'push' || github.event_name == 'pull_request') }}
 
 permissions:
   contents: read
 
 jobs:
+  scope:
+    name: Select checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      profile: ${{ steps.plan.outputs.profile }}
+      core: ${{ steps.plan.outputs.core }}
+      full: ${{ steps.plan.outputs.full }}
+      containers: ${{ steps.plan.outputs.containers }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify CI selection and required-status policy
+        run: node --test scripts/ci-policy.test.mjs
+      - name: Select checks for this event and changed paths
+        id: plan
+        env:
+          CI_PROFILE: ${{ inputs.profile }}
+          CI_LOCAL_CONTAINERS: ${{ inputs.local-container-tests }}
+        run: node scripts/ci-policy.mjs plan
+
   validate:
     name: Core
+    needs: scope
+    if: ${{ needs.scope.outputs.core == 'true' }}
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -21,10 +70,17 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci
-      - run: npm run ci:core
+      - name: Run quick checks and dependency audit
+        if: ${{ needs.scope.outputs.profile == 'quick' }}
+        run: npm run ci:quick
+      - name: Run core checks and production build
+        if: ${{ needs.scope.outputs.full == 'true' }}
+        run: npm run ci:core
 
   postgres-integration:
     name: PostgreSQL integration
+    needs: scope
+    if: ${{ needs.scope.outputs.full == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -44,6 +100,8 @@ jobs:
 
   plesk:
     name: Plesk and Garage
+    needs: scope
+    if: ${{ needs.scope.outputs.full == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -63,6 +121,8 @@ jobs:
 
   security:
     name: Security
+    needs: scope
+    if: ${{ needs.scope.outputs.full == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -88,7 +148,8 @@ jobs:
 
   e2e:
     name: Browser E2E
-    needs: validate
+    needs: [scope, validate]
+    if: ${{ needs.scope.outputs.full == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -112,6 +173,8 @@ jobs:
 
   containers:
     name: Containers (${{ matrix.arch }})
+    needs: scope
+    if: ${{ needs.scope.outputs.containers == 'true' }}
     strategy:
       fail-fast: false
       matrix:
@@ -142,11 +205,14 @@ jobs:
   required:
     name: CI required
     if: always()
-    needs: [validate, postgres-integration, plesk, security, e2e, containers]
+    needs: [scope, validate, postgres-integration, plesk, security, e2e, containers]
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
-      - name: Require every mandatory group to succeed
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Require every group selected by this profile to succeed
         env:
-          RESULTS: ${{ toJSON(needs) }}
-        run: |
-          node -e 'const results = JSON.parse(process.env.RESULTS); for (const [name, job] of Object.entries(results)) { console.log(name + ": " + job.result); if (job.result !== "success") process.exitCode = 1; }'
+          CI_RESULTS: ${{ toJSON(needs) }}
+        run: node scripts/ci-policy.mjs verify

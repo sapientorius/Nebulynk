@@ -47,6 +47,12 @@ Wait for all jobs to complete successfully. The complete checks and native build
 take time; there is no fixed completion time. If a job fails, open its failed step
 and inspect the log. Do not use unverified candidate tags for deployments.
 
+Complete checks run for every staging publication, even for documentation-only
+commits. Ordinary branch pushes use the lighter automatic CI scope. Staging
+explicitly selects full CI and verifies the actual candidates on both
+architectures instead of first building separate local test images; see the
+[CI scope table](engineering-playbook.md#full-ci-contract).
+
 If a test or security audit needs a code/dependency fix, commit and push the fix,
 then start a new **Run workflow** on the updated branch. **Re-run failed jobs**
 uses the original commit and cannot pick up a newer lockfile or code change. Use

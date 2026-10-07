@@ -29,6 +29,9 @@ jobs:
   checks:
     needs: validate
     uses: ./.github/workflows/ci.yml
+    with:
+      profile: full
+      local-container-tests: false
 
   container-candidates:
     needs: [validate, checks]

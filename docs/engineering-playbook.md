@@ -36,10 +36,15 @@ It runs the following groups sequentially and stops at the first failure:
 | `ci:integration` | Disposable PostgreSQL 17 and the complete backend integration suite |
 | `ci:plesk` | Build/check the Plesk archive, all Plesk tests including the Linux cleanup fixture, Garage signed upload/download integration |
 | `ci:e2e` | Disposable PostgreSQL/Redis/Garage and the complete Chromium suite, including onboarding dependencies, against the preview build |
+| `test:deployments` | Production/source Compose configurations, fixed versions, URL aliases and the Dokploy import |
+| `test:containers` | Actual backend/frontend/worker images, runtime configuration, native dependencies and browser flows |
 | `ci:security` | Workspace/root dependency audit, full-history and working-source Gitleaks, Trivy vulnerabilities and misconfigurations |
 
-`npm run ci:core` is the quick check without external test services. Its success
-does **not** constitute full acceptance. Every group has a `:rtk` alias which
+`npm run ci:quick` runs shared `ci:checks` (lint, CI/publication unit tests,
+generated-artifact, i18n and release checks, backend/frontend units) plus the
+dependency audit. It needs no Docker or Chromium and omits the production build.
+`npm run ci:core` runs the same shared checks and the production frontend build.
+Neither constitutes full acceptance. Every group has a `:rtk` alias which
 calls the same normal entry; GitHub, Docker and normal npm scripts need no RTK.
 The existing `test:*` commands remain available for focused development.
 `test:backend:lifecycle` and `benchmark:runtime` are optional AP-05 checks, not
@@ -96,12 +101,39 @@ findings remain visible but do not fail this established threshold. Download,
 tool and scanner failures are errors, not clean results.
 
 GitHub calls these same groups through a reusable `workflow_call` workflow.
-The final **CI required** status accepts only successful results from all five
-groups; failure, cancellation and skipped dependencies cannot turn it green.
-Maintainers should require this status in branch protection and retire obsolete
-individual check names as appropriate; AP-06 does not edit repository settings.
+The automatic scope is selected from the event and actual changed Git paths:
+
+| Trigger | Checks |
+| --- | --- |
+| Normal branch push with code/configuration changes | `ci:quick`; no service tests or image builds |
+| Documentation-only push or PR | CI-policy regression tests and the required status; no npm installation or image builds |
+| PR with code/configuration changes | Full CI, including both native container architectures |
+| Manual CI | Full by default; select `quick` explicitly for a focused run |
+| Staging or stable release | Explicit full core/integration/Plesk/browser/security gates, then the native candidate workflow on both architectures |
+
+Documentation means root Markdown, workspace README files and recognized
+documentation/image files under `docs/`. Dependency, workflow, deployment and
+application asset changes always count as code/configuration. Removed paths are
+included, so moving source into `docs/` cannot suppress checks. If a comparison
+base is unavailable, the workflow conservatively runs the code-change scope.
+
+Staging and release callers set `profile: full` and `local-container-tests: false`:
+the following mandatory candidate workflow runs deployment validation, actual
+image tests, worker isolation and image scans on AMD64 and ARM64. This avoids
+building additional local test images before building the publication candidates.
+Every publication job still depends on successful candidate verification.
+
+The final **CI required** status requires success from every group selected by
+the scope. Only deliberately unselected groups may be skipped; missing scope
+outputs, failed/cancelled tests or unexpectedly skipped required groups fail it.
+Documentation-only runs still report this status, so path filters cannot leave
+the required check pending. Require **CI required** in branch protection; no
+repository settings change is needed if it is already the required status.
+Newer automatic pushes/PR updates cancel older runs of the same workflow/ref.
+Manual and publication runs use separate groups and retain their publication queue.
+
 Stable release publication requires both tag ancestry on `stable` and the full
-reusable workflow. No release is needed to test the CI configuration. Report
+publication pipeline. No release is needed to test the CI configuration. Report
 local results, static workflow validation and actual GitHub runs separately.
 
 Run the checks that cover the changed scope before submitting a contribution:
