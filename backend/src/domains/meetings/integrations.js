@@ -1,6 +1,20 @@
 import { logger } from '../../logger.js'
 import { deleteRoom } from '../../lib/livekit.js'
 import { stopMeetingParticipantRecordings } from '../../services/meetings/recordings-runtime.js'
+import { processPendingMeetingSourceMessages } from './source-messages.js'
+
+export function _queueSourceMessage({ effects }, meetingId) {
+  try {
+    const work = () => processPendingMeetingSourceMessages(effects.app, { meetingId })
+    const runtime = effects.app.get?.('runtime')
+    const pending = runtime
+      ? runtime.track('meeting-source-message', work)
+      : Promise.resolve().then(work)
+    void pending.catch(error => logger.warn('Meeting source message task failed', { meetingId, error: error.message }))
+  } catch (error) {
+    logger.warn('Could not schedule meeting source message', { meetingId, error: error.message })
+  }
+}
 
 export async function _createSourceMessage({ effects }, { meetingId, sourceChannel, user }) {
   try {

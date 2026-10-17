@@ -624,9 +624,19 @@ test('meetings realtime: join emits additive incremental payload', async () => {
 
   db.transaction = async (callback) => {
     const trx = (table) => {
+      if (table === 'meetings') {
+        return {
+          where() { return this },
+          forUpdate() { return this },
+          async first() {
+            return { id: 'meeting-join-1', status: 'active', source_channel_id: 'source-1', chat_channel_id: 'chat-1', host_user_id: 'host-1' }
+          }
+        }
+      }
       if (table === 'meeting_participants') {
         return {
           where() { return this },
+          async first() { return { id: 'participant-1', invite_status: 'invited' } },
           update: async () => undefined
         }
       }
@@ -721,6 +731,15 @@ test('meetings behavior: join allows active source-channel members who were adde
 
   db.transaction = async (callback) => {
     const trx = (table) => {
+      if (table === 'meetings') {
+        return {
+          where() { return this },
+          forUpdate() { return this },
+          async first() {
+            return { id: 'meeting-source-join-1', status: 'active', source_channel_id: 'source-1', chat_channel_id: 'chat-1', host_user_id: 'host-1' }
+          }
+        }
+      }
       if (table === 'meeting_participants') {
         return {
           insert(payload) {
@@ -730,6 +749,7 @@ test('meetings behavior: join allows active source-channel members who were adde
           where() {
             return this
           },
+          async first() { return null },
           update: async () => undefined
         }
       }

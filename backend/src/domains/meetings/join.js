@@ -1,38 +1,40 @@
-import { badRequest, forbidden } from '../../lib/errors.js'
+import { badRequest, forbidden, notFound } from '../../lib/errors.js'
 import { snapshotMeetingStartMembers } from './content-access.js'
 
 export async function join({ repository, reads, authorization, effects, getNow, createId }, id, data, params) {
   const user = params.user
-  const nowIso = getNow().toISOString()
-
-  const meeting = await reads._getNormalizedMeetingOrThrow(id)
-  if (meeting.status === 'ended' || meeting.status === 'cancelled') {
+  const normalized = await reads._getNormalizedMeetingOrThrow(id)
+  if (normalized.status === 'ended' || normalized.status === 'cancelled') {
     throw badRequest('api.meetings.meeting_already_ended', {}, 'Meeting ist bereits beendet')
   }
-
-  let participant = await reads._getMeetingParticipant(id, user.id)
-  if (!participant && !user.is_admin) {
-    const canJoinFromSourceChannel = meeting.status === 'active' && meeting.source_channel_id
-    if (!canJoinFromSourceChannel) {
-      throw forbidden('api.meetings.meeting_access_denied', {}, 'Kein Zugriff auf dieses Meeting')
-    }
-
-    await authorization._assertCanUseSourceChannel(meeting.source_channel_id, user)
-  }
-
-  const isHostOrAdmin = user.is_admin || meeting.host_user_id === user.id
-  if (meeting.status === 'scheduled' && !isHostOrAdmin) {
-    const joinNotBefore = meeting.join_not_before ? new Date(meeting.join_not_before) : null
-    if (joinNotBefore && !Number.isNaN(joinNotBefore.getTime()) && joinNotBefore.toISOString() > nowIso) {
-      throw badRequest(
-        'api.meetings.join_not_open_yet',
-        { join_not_before: meeting.join_not_before },
-        'Dieses Meeting ist noch nicht zum Beitritt freigegeben'
-      )
-    }
-  }
+  let meeting
+  let activated = false
 
   await repository.transaction(async (trx) => {
+    meeting = await repository.joinLockMeeting({ trx, id })
+    if (!meeting) throw notFound('api.meetings.meeting_not_found', {}, 'Meeting nicht gefunden')
+    if (meeting.status === 'ended' || meeting.status === 'cancelled') {
+      throw badRequest('api.meetings.meeting_already_ended', {}, 'Meeting ist bereits beendet')
+    }
+    const nowIso = getNow().toISOString()
+    let participant = await repository.joinFindMeetingParticipant({ trx, id, userId: user.id })
+    if (!participant && !user.is_admin) {
+      if (meeting.status !== 'active' || !meeting.source_channel_id) {
+        throw forbidden('api.meetings.meeting_access_denied', {}, 'Kein Zugriff auf dieses Meeting')
+      }
+      await authorization._assertCanUseSourceChannel(meeting.source_channel_id, user, trx)
+    }
+    const isHostOrAdmin = user.is_admin || meeting.host_user_id === user.id
+    if (meeting.status === 'scheduled' && !isHostOrAdmin) {
+      const joinNotBefore = meeting.join_not_before ? new Date(meeting.join_not_before) : null
+      if (joinNotBefore && !Number.isNaN(joinNotBefore.getTime()) && joinNotBefore.toISOString() > nowIso) {
+        throw badRequest(
+          'api.meetings.join_not_open_yet',
+          { join_not_before: meeting.join_not_before },
+          'Dieses Meeting ist noch nicht zum Beitritt freigegeben'
+        )
+      }
+    }
     if (!participant) {
       participant = {
         id: createId(),
@@ -51,18 +53,20 @@ export async function join({ repository, reads, authorization, effects, getNow, 
     }
 
     if (meeting.status === 'scheduled') {
-      await repository.joinUpdateMeetings({ trx, id, meeting, nowIso })
+      await repository.joinUpdateMeetings({ trx, id, nowIso })
 
       await snapshotMeetingStartMembers(trx, {
         meetingId: id,
         sourceChannelId: meeting.source_channel_id,
-        sourceChannelType: meeting.source_channel_type,
         nowIso
       })
+      activated = true
     }
 
     await repository.joinInsertChannelMembers({ trx, createId, meeting, user, nowIso })
-  }, { isolationLevel: 'repeatable read' })
+  }, { isolationLevel: 'read committed' })
+
+  if (activated) effects._queueSourceMessage(id)
 
   effects._joinConnectionsToChannel(meeting.chat_channel_id, [user.id])
 

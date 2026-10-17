@@ -111,6 +111,22 @@ export function createMeetingRepository(db) {
     return trx('meeting_participants').insert(participant)
   },
 
+  joinLockMeeting({ trx, id }) {
+    return trx('meetings').where('id', id).forUpdate().first()
+  },
+
+  joinFindMeetingParticipant({ trx, id, userId }) {
+    return trx('meeting_participants').where({ meeting_id: id, user_id: userId }).first()
+  },
+
+  joinFindChannel({ trx, channelId }) {
+    return trx('channels').where('id', channelId).first()
+  },
+
+  joinFindChannelMembership({ trx, channelId, userId }) {
+    return trx('channel_members').where({ channel_id: channelId, user_id: userId }).first()
+  },
+
   joinUpdateMeetingParticipants({ trx, participant, nowIso }) {
     return trx('meeting_participants')
           .where('id', participant.id)
@@ -122,12 +138,13 @@ export function createMeetingRepository(db) {
           })
   },
 
-  joinUpdateMeetings({ trx, id, meeting, nowIso }) {
+  joinUpdateMeetings({ trx, id, nowIso }) {
     return trx('meetings')
           .where('id', id)
           .update({
             status: 'active',
-            started_at: meeting.started_at || nowIso,
+            started_at: nowIso,
+            source_message_pending_at: nowIso,
             updated_at: nowIso
           })
   },
@@ -144,6 +161,37 @@ export function createMeetingRepository(db) {
         })
         .onConflict(['channel_id', 'user_id'])
         .ignore()
+  },
+
+  findDueSourceMessages({ nowIso, limit }) {
+    return db('meetings').where('source_message_pending_at', '<=', nowIso)
+      .orderBy('source_message_pending_at', 'asc').orderBy('id', 'asc').limit(limit).select('id')
+  },
+
+  lockPendingSourceMessage({ trx, id }) {
+    return trx('meetings').where('id', id).forUpdate().skipLocked().first()
+  },
+
+  findSourceMessageHost({ trx, userId }) {
+    return trx('users').where('id', userId).first()
+  },
+
+  findSourceMessage({ trx, channelId, content }) {
+    // Include soft-deleted references: an intentional deletion must stay deleted.
+    return trx('messages').where({ channel_id: channelId, content }).first()
+  },
+
+  insertSourceMessage({ trx, message }) {
+    return trx('messages').insert(message).returning('*')
+  },
+
+  clearSourceMessagePending({ trx, id }) {
+    return trx('meetings').where('id', id).update({ source_message_pending_at: null })
+  },
+
+  delaySourceMessage({ id, pendingAt, nextAt }) {
+    return db('meetings').where({ id, source_message_pending_at: pendingAt })
+      .update({ source_message_pending_at: nextAt })
   },
 
   declineUpdateMeetingParticipants({ participant, nowIso }) {
