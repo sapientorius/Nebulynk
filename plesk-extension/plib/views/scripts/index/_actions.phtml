@@ -60,8 +60,8 @@ $escape = static function ($value) {
     <?php else: ?>
         <p class="nebulynk-form-note">
             <strong>Recommended order:</strong>
-            Preflight check &rarr; Install and build &rarr; Open domain.
-            For an existing installation, use “Update and rebuild.”
+            Preflight check &rarr; Download and deploy &rarr; Open domain.
+            For an existing installation, use “Update deployment.”
         </p>
     <?php endif; ?>
 
@@ -71,7 +71,7 @@ $escape = static function ($value) {
             <strong>Tasks may take several minutes</strong>
             <p>
                 Nebulynk downloads container images, installs dependencies,
-                and builds the backend and frontend. The task continues in
+                and starts the prebuilt backend, frontend and transcription worker. The task continues in
                 the background; do not start it more than once. View progress
                 in Plesk Tasks.
             </p>

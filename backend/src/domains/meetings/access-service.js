@@ -10,12 +10,16 @@ export async function _assertCanAccessMeeting({ reads }, meetingId, user, preloa
   })
 }
 
-export async function _assertCanUseSourceChannel({ reads }, sourceChannelId, user) {
+export async function _assertCanUseSourceChannel({ reads, repository }, sourceChannelId, user, trx = null) {
   return assertCanUseSourceChannel({
     sourceChannelId,
     user,
-    findChannelById: (channelId) => reads._findChannelById(channelId),
-    findChannelMembership: (channelId, userId) => reads._findChannelMembership(channelId, userId)
+    findChannelById: (channelId) => trx
+      ? repository.joinFindChannel({ trx, channelId })
+      : reads._findChannelById(channelId),
+    findChannelMembership: (channelId, userId) => trx
+      ? repository.joinFindChannelMembership({ trx, channelId, userId })
+      : reads._findChannelMembership(channelId, userId)
   })
 }
 

@@ -48,6 +48,17 @@ function appendUnique(target, values) {
   }
 }
 
+function toHttpOrigin(origin) {
+  try {
+    const parsed = new URL(origin)
+    if (parsed.protocol === 'wss:') parsed.protocol = 'https:'
+    if (parsed.protocol === 'ws:') parsed.protocol = 'http:'
+    return ['http:', 'https:'].includes(parsed.protocol) ? parsed.origin : ''
+  } catch {
+    return ''
+  }
+}
+
 export function resolveFrontendConnectSourceOrigins({
   apiOrigin = '',
   apiOrigins = [],
@@ -63,7 +74,9 @@ export function resolveFrontendConnectSourceOrigins({
   }
 
   for (const value of [...asList(livekitOrigin), ...asList(livekitOrigins)]) {
-    appendUnique(connectSrc, [toWebSocketOrigin(normalizeOrigin(value))])
+    const origin = normalizeOrigin(value)
+    // LiveKit also makes HTTP requests for connection preparation/validation.
+    appendUnique(connectSrc, [toWebSocketOrigin(origin), toHttpOrigin(origin)])
   }
 
   if (includeLocalBrowserHelper) {

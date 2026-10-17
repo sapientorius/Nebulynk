@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { loadReleaseCatalog } from './release-catalog.mjs'
+import { syncContainerVersion } from './sync-container-version.mjs'
 
 const rootDir = process.cwd()
 const { releases } = await loadReleaseCatalog(rootDir)
@@ -10,6 +11,7 @@ const packageVersions = await Promise.all(packagePaths.map(async (packagePath) =
   return { packagePath, version: value.version }
 }))
 const latestVersion = releases.at(-1).document.version
+await syncContainerVersion({ check: true })
 
 for (const entry of packageVersions) {
   if (entry.version !== latestVersion) {

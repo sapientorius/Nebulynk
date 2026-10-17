@@ -6,6 +6,7 @@ import { createPostgresTestDb } from '../test/helpers/postgres-test-db.js'
 import { authentication } from '../src/authentication.js'
 import { meetings } from '../src/services/meetings/meetings.js'
 import { RoomServiceClient } from 'livekit-server-sdk'
+import { createRuntime } from '../src/lib/runtime.js'
 
 let fixture, db
 before(async () => { fixture = await createPostgresTestDb(); db = fixture.db })
@@ -25,6 +26,8 @@ beforeEach(async () => {
 async function harness(t) {
   const app = feathers()
   app.set('postgresqlClient', db)
+  const runtime = createRuntime()
+  app.set('runtime', runtime)
   app.set('authentication', {
     entity: 'user', service: 'users', secret: 'synthetic-ap04-secret', authStrategies: ['jwt', 'local'],
     jwtOptions: { audience: 'https://ap04.invalid', algorithm: 'HS256', expiresIn: '1h' },
@@ -51,7 +54,7 @@ async function harness(t) {
   app.service('notifications').on('created', payload => events.push({ event: 'notification', payload }))
   app.service('channels').on('patched', payload => events.push({ event: 'channel', payload }))
   await app.setup()
-  t.after(() => app.teardown())
+  t.after(async () => { await runtime.stop(); await app.teardown() })
   async function paramsFor(id) {
     const accessToken = await app.service('authentication').createAccessToken({ sub: id, auth_version: 1 })
     return { provider: 'rest', authentication: { strategy: 'jwt', accessToken } }

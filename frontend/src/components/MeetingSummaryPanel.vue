@@ -309,12 +309,15 @@ import {
 } from '@vicons/ionicons5'
 import { formatEvidenceLabel, formatTranscriptTimestamp } from '../lib/meeting-artifact-format.js'
 import MeetingSummaryHistory from './MeetingSummaryHistory.vue'
+import { useNotificationsStore } from '../stores/notifications.js'
+import { observeMeetingSummaryNotifications } from '../lib/meeting-summary-notification-read.js'
 
 export default {
   name: 'MeetingSummaryPanel',
   components: { CopyIcon, DownloadIcon, ShareSocialIcon, MeetingSummaryHistory },
   props: {
     meetingId: { type: String, default: null },
+    canReadSummaryNotifications: { type: Boolean, default: false },
     canEditSummary: { type: Boolean, default: false },
     editingAvailable: { type: Boolean, default: true },
     summaryArtifact: {
@@ -352,7 +355,8 @@ export default {
   },
   data() {
     return {
-      showShareMenu: false
+      showShareMenu: false,
+      stopSummaryNotificationObserver: null
     }
   },
   emits: ['generate-summary', 'copy-summary', 'export-summary', 'share-summary', 'open-evidence', 'edit-summary'],
@@ -481,7 +485,22 @@ export default {
       return this.$t('ui.views.coverage_pending')
     }
   },
+  mounted() { this.syncSummaryNotificationObserver() },
+  beforeUnmount() { this.stopSummaryNotificationObserver?.() },
+  watch: {
+    canReadSummaryNotifications() { this.syncSummaryNotificationObserver() }
+  },
   methods: {
+    syncSummaryNotificationObserver() {
+      this.stopSummaryNotificationObserver?.()
+      this.stopSummaryNotificationObserver = null
+      if (!this.canReadSummaryNotifications) return
+      this.stopSummaryNotificationObserver = observeMeetingSummaryNotifications({
+        getMeetingId: () => this.meetingId,
+        isReady: () => this.canReadSummaryNotifications && this.summaryArtifact?.status === 'ready',
+        notificationsStore: useNotificationsStore()
+      })
+    },
     formatTranscriptTimestamp,
     emitShareAction(eventName) {
       this.showShareMenu = false

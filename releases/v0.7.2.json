@@ -1,0 +1,80 @@
+{
+  "schema_version": 1,
+  "version": "0.7.2",
+  "revision": 1,
+  "channel": "stable",
+  "published_at": "2026-10-17T00:58:07.000Z",
+  "title": { "en": "Nebulynk 0.7.2" },
+  "summary": {
+    "en": "Notifies attendees when meeting summaries are ready, restores source-channel cards for scheduled meetings, introduces fixed-version container images with runtime frontend configuration, and updates vulnerable dependencies."
+  },
+  "changes": [
+    {
+      "category": "feature",
+      "title": { "en": "Meeting summary notifications" },
+      "description": { "en": "Attendees receive a notification when a meeting summary first becomes ready. Opening the notification goes directly to the summary, and viewing a ready summary marks its notifications read. Editing or regenerating a summary does not send another completion notification; existing summaries do not trigger historical notifications during upgrade." }
+    },
+    {
+      "category": "fix",
+      "title": { "en": "Scheduled meeting cards appear when the meeting starts" },
+      "description": { "en": "Starting a scheduled meeting creates its card in the source channel at the actual start time, including when a guest starts the meeting. Card creation retries after temporary failures without undoing a successful meeting start or creating duplicate cards. Existing channel access rules remain in force; historical meetings are not backfilled." }
+    },
+    {
+      "category": "feature",
+      "title": { "en": "Prebuilt release images for self-hosting" },
+      "description": { "en": "Official backend, frontend, and transcription-worker images support Linux AMD64 and ARM64 and share one fixed release version. Self-Hosting, Coolify, Dokploy, and Plesk deployments pull these images. Release assets record their immutable digests, and Plesk validates and downloads the selected images before switching the installation. Source-build overrides remain available for custom builds and branch testing." }
+    },
+    {
+      "category": "improvement",
+      "title": { "en": "Configure the frontend when its container starts" },
+      "description": { "en": "Set public API, socket, LiveKit, Web Push, and CSRF-cookie configuration without rebuilding the frontend image. Canonical environment variables take precedence over compatible VITE aliases, and invalid required configuration stops startup. The frontend runs without root privileges and supports a read-only filesystem; HTML and runtime configuration are served without caching." }
+    },
+    {
+      "category": "fix",
+      "title": { "en": "Clearer recording and transcription banner" },
+      "description": { "en": "Recording and transcription indicators use consistent theme colors for clearer text and status badges in light and dark mode." }
+    },
+    {
+      "category": "security",
+      "title": { "en": "Dependency security updates" },
+      "description": { "en": "Updates sharp to 0.35.5, Vue and its server renderer to 3.5.43, and source-map-js to 1.2.2. These updates address upstream image-decoding, server-rendering, and source-map advisories. The Vue advisory concerns server-side rendering; Nebulynk renders its application in the browser." }
+    }
+  ],
+  "security": [
+    {
+      "severity": "high",
+      "affected_versions": "<0.7.2",
+      "summary": { "en": "Updates sharp and its bundled librsvg to address a use-after-free vulnerability when decoding crafted SVG images. Upstream describes possible code execution under specific Linux runtime conditions; this does not establish exploitability in every Nebulynk deployment." },
+      "cve": "CVE-2026-96889",
+      "advisory_url": "https://github.com/lovell/sharp/security/advisories/GHSA-wq5f-xc86-pv6w"
+    },
+    {
+      "severity": "high",
+      "affected_versions": "<0.7.2",
+      "summary": { "en": "Updates the Vue server-renderer dependency to address attribute-name validation that can permit cross-site scripting in server-rendered HTML. The vulnerable rendering path is not used by Nebulynk's browser-rendered application." },
+      "advisory_url": "https://github.com/vuejs/core/security/advisories/GHSA-g2v6-rqmx-r4w6"
+    },
+    {
+      "severity": "high",
+      "affected_versions": "<0.7.2",
+      "summary": { "en": "Updates the source-map-js build dependency to prevent excessive indexed source-map offsets from blocking the event loop. This concerns source-map processing rather than ordinary Nebulynk chat requests." },
+      "cve": "CVE-2026-93749",
+      "advisory_url": "https://github.com/advisories/GHSA-68fv-2mgg-jv7q"
+    }
+  ],
+  "upgrade": {
+    "backup_required": true,
+    "downtime_expected": true,
+    "breaking": false,
+    "manual_steps": {
+      "en": [
+        "Before updating, create and verify external backups of PostgreSQL, both Garage volumes, and deployment configuration and secrets. Keep the existing persistent volumes. When upgrading from a version before 0.7.0, also review recording-retention and transcription-worker guidance: the default 60-day retention may delete eligible older recordings at startup.",
+        "Review the deployment files and container guide from the v0.7.2 tag before switching a source-built installation to images. Keep the existing Compose project or platform resource and volume mappings. Confirm the PostgreSQL database, storage, and resolved public API/socket URLs refer to the intended installation. Set NEBULYNK_VERSION=0.7.2 and deploy backend, frontend, and transcription-worker together. The standalone Compose files require Docker Compose 2.23.1 or newer; Plesk remains Linux x86-64 only.",
+        "Configure the frontend's public API_URL at container startup; compatible VITE aliases remain supported. Check existing API_URL, BACKEND_URL, and their VITE aliases for stale overrides before recreating the frontend. Recreate affected containers after changing environment values so the new runtime configuration is applied.",
+        "Stop the old backend completely before starting its replacement and allow at least 75 seconds for shutdown. Startup applies migrations 076_meeting_summary_notifications and 077_meeting_source_messages automatically. Wait for GET /health/ready and the worker health check to pass before reopening access.",
+        "After updating, verify login, recent chat history, uploads, a newly started scheduled meeting's source-channel card, and the first completion notification for a new meeting summary. Existing summaries and historical scheduled meetings are not backfilled. Check the frontend's rendered runtime configuration and API target when adopting the prebuilt images."
+      ]
+    },
+    "docs_url": "https://github.com/sapientorius/Nebulynk/blob/v0.7.2/docs/SELF_HOSTING.md"
+  }
+}

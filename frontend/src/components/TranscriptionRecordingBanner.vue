@@ -143,7 +143,7 @@ export default {
   min-height: 28px;
   padding: 6px 16px 0;
   background: transparent;
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--app-text);
   flex-shrink: 0;
   flex-wrap: wrap;
 }
@@ -160,12 +160,12 @@ export default {
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: rgb(99, 226, 183);
+  background: var(--theme-success);
   flex-shrink: 0;
 }
 
 .transcription-recording-banner.state-paused .transcription-recording-dot {
-  background: rgb(250, 173, 20);
+  background: var(--theme-warning);
 }
 
 .transcription-recording-title,
@@ -173,18 +173,18 @@ export default {
   font-size: 12px;
   font-weight: 600;
   line-height: 1.3;
-  color: rgba(255, 255, 255, 0.84);
+  color: var(--app-text-strong);
 }
 
 .transcription-recording-info-trigger {
   padding: 0;
   min-width: auto;
-  color: rgba(255, 255, 255, 0.58);
+  color: var(--app-text-muted);
 }
 
 .transcription-recording-info-trigger:hover,
 .transcription-recording-info-trigger:focus-visible {
-  color: rgba(255, 255, 255, 0.82);
+  color: var(--app-text-strong);
 }
 
 .transcription-recording-popover {
@@ -197,7 +197,7 @@ export default {
 .transcription-recording-detail {
   font-size: 12px;
   line-height: 1.45;
-  color: rgba(255, 255, 255, 0.82);
+  color: var(--app-text);
   overflow-wrap: anywhere;
 }
 

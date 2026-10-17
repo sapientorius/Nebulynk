@@ -4,6 +4,7 @@ const context = await createContext('transcription')
 const { project, compose } = context
 const env = testEnvironment()
 const image = process.env.NEBULYNK_TEST_BACKEND_IMAGE || `${project}-backend:latest`
+const workerImage = process.env.NEBULYNK_TEST_WORKER_IMAGE || image
 const apiName = `${project}-api`
 const workerName = `${project}-worker`
 const oomName = `${project}-oom-probe`
@@ -55,7 +56,7 @@ try {
       'run', '-d', '--name', workerName, '--network', network,
       '--memory', '1536m', '--cpus', '1.0',
       ...sharedEnvironment,
-      image, 'node', 'src/transcription-worker.js'
+      workerImage, 'node', 'src/transcription-worker.js'
     ])
     await waitFor(async () => {
       try {
@@ -68,7 +69,7 @@ try {
       'run', '-d', '--name', oomName, '--network', network,
       '--memory', '256m', '--memory-swap', '256m', '--restart', 'no',
       ...sharedEnvironment,
-      image, 'node', '--input-type=module', '-e',
+      workerImage, 'node', '--input-type=module', '-e',
       "const chunks=[];setTimeout(()=>setInterval(()=>chunks.push(Buffer.alloc(16*1024*1024,1)),10),3000);await import('./src/transcription-worker.js')"
     ])
     await waitFor(async () => {

@@ -1,11 +1,9 @@
 # Deploying Nebulynk with Dokploy
 
-The Compose application now includes a private `transcription-worker` service
-using the backend image. On the first update, keep the transcription AI function
-disabled until the backend and worker are healthy, then re-enable it. Existing
-pending transcript artifacts resume one recording at a time; the worker has a
-default 1.5 GiB memory limit and one CPU. See the
-[worker upgrade notes](COOLIFY.md#transcription-worker-and-first-upgrade).
+The Compose application includes a private `transcription-worker` service using
+its own release image. It starts after the backend is healthy and processes one
+recording at a time, with a default 1.5 GiB memory limit and one CPU. See the
+[transcription worker documentation](COOLIFY.md#transcription-worker).
 
 This guide deploys the complete Nebulynk stack from the official repository
 with Dokploy. It uses the dedicated
@@ -25,9 +23,9 @@ use the complete [`dokploy-template`](../dokploy-template/README.md) package.
 Its [`import.base64`](../dokploy-template/import.base64) file can be pasted into
 **Compose → Advanced → Import**. Dokploy then creates the Compose file, its
 environment, and the four native domain entries. The template generates unique
-deployment secrets at import time and builds from the reviewed `stable` branch
-by default. Set `NEBULYNK_SOURCE_REF` to an immutable release tag before the
-first deployment when pinning is required.
+deployment secrets at import time and pulls the fixed `NEBULYNK_VERSION` included
+in that release. `NEBULYNK_SOURCE_REF` is no longer used. The template metadata
+channel remains `stable`; it is separate from the fixed application version.
 
 The packaged template intentionally imports with `NODE_ENV=development` and
 `http://` endpoint values. Dokploy's generated `sslip.io` domains can therefore
@@ -41,7 +39,7 @@ Before using the instance publicly:
    Dokploy's **Domains** tab.
 3. Change `NODE_ENV` in the imported environment to `production`.
 4. Change every dependent endpoint variable from `http://` to the matching
-   `https://` URL: `FRONTEND_URL`, `VITE_API_URL`, `LIVEKIT_PUBLIC_URL`, and
+   `https://` URL: `FRONTEND_URL`, `API_URL`, `LIVEKIT_PUBLIC_URL`, and
    `STORAGE_S3_PUBLIC_ENDPOINT`.
 
 `PASSKEY_RP_ID` contains only the frontend hostname and does not receive an
@@ -80,8 +78,8 @@ secure cookies, passkeys, and browser media require HTTPS.
 5. Leave Dokploy's custom Compose command unchanged unless a deliberate
    operational requirement needs a replacement.
 
-The file builds the application images from the repository root and bakes in
-the Garage and LiveKit configuration files. Do not add repository bind mounts:
+The file pulls the three application images from GHCR and uses versioned upstream
+Garage and LiveKit images with embedded Compose configurations. Do not add repository bind mounts:
 Dokploy can replace the checked-out source directory during automatic
 deployments.
 
@@ -89,7 +87,7 @@ deployments.
 
 In the Compose service's **Environment** tab, create the following required
 variables. Dokploy writes these values to its deployment `.env` file; the
-Compose file explicitly passes each needed value to the appropriate build or
+Compose file explicitly passes each needed value to the appropriate
 container environment.
 
 For the packaged template, leave `NODE_ENV=development` while testing the
@@ -111,7 +109,8 @@ already sets `NODE_ENV=production` in its backend service.
 | `LIVEKIT_API_SECRET` | Unique LiveKit secret |
 | `FRONTEND_URL` | `https://app.example.com` |
 | `PASSKEY_RP_ID` | `app.example.com` |
-| `VITE_API_URL` | `https://api.example.com` |
+| `API_URL` | `https://api.example.com`; the legacy `VITE_API_URL` alias is accepted |
+| `NEBULYNK_VERSION` | Selected fixed release `X.Y.Z`, shared by all three application containers |
 | `LIVEKIT_PUBLIC_URL` | `https://livekit.example.com` |
 | `STORAGE_S3_PUBLIC_ENDPOINT` | `https://files.example.com` |
 
@@ -132,9 +131,9 @@ deployments:
   `AUTH_2FA_SECRET_KEY`. Existing installations can leave it unset and use
   the backwards-compatible `JWT_SECRET` fallback.
 
-`VITE_API_URL`, `LIVEKIT_PUBLIC_URL`, the optional VAPID public key, and
-the CSRF cookie name affect the frontend build. Redeploy after changing any of
-them. Never place a secret in a variable with a `VITE_` prefix.
+`API_URL`, `LIVEKIT_PUBLIC_URL`, the optional VAPID public key, and the CSRF cookie
+name configure the frontend at container startup. Redeploy after changing any of
+them; no rebuild is needed. Never place secrets in browser configuration.
 
 ## 3. Configure domains
 
@@ -172,9 +171,12 @@ optional. Preserve the environment values with the backups; do not rotate
 database, Garage, S3, JWT, AI-encryption, or LiveKit credentials without a
 service-specific migration.
 
-Before every update, verify a restore, review the release notes, and redeploy
-the same Compose service from `stable` or the reviewed target tag. Never
-delete the persistent volumes during an update.
+Before every update, verify a restore, review the release notes, obtain matching
+deployment files, and deliberately change `NEBULYNK_VERSION` before redeploying
+the same Compose service. For imported templates, update the fixed version in
+the environment as well as any release-specific Compose changes. A redeploy
+alone keeps the selected version. Preserve volumes, the project name and secrets
+during updates.
 
 For Dokploy-specific details, see the official
 [Docker Compose](https://docs.dokploy.com/docs/core/docker-compose),

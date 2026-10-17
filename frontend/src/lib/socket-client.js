@@ -1,10 +1,6 @@
 import { io } from 'socket.io-client'
 import { resolveSocketBaseUrl } from './api-client.js'
-
-function readViteEnv(key) {
-  if (typeof import.meta === 'undefined') return ''
-  return import.meta.env?.[key]?.trim?.() || ''
-}
+import { readFrontendConfig } from './frontend-config.js'
 
 export function createSocketClient(options = {}) {
   let socket = null
@@ -39,9 +35,14 @@ export function createSocketClient(options = {}) {
     }
 
     const apiBaseUrl = options.apiClient?.getBaseUrl?.()
-    return resolveSocketBaseUrl(apiBaseUrl || readViteEnv('VITE_BACKEND_URL') || 'http://localhost:3030', {
-      backendBaseUrl: readViteEnv('VITE_BACKEND_URL') || ''
-    })
+    const configuredApiUrl = readFrontendConfig('apiUrl')
+    const configuredBackendUrl = readFrontendConfig('backendUrl')
+    // A custom API client (desktop connection) owns its endpoint. The global
+    // socket override applies to the default browser API client only.
+    const normalize = (value) => String(value || '').trim().replace(/\/+$/, '')
+    const customApi = apiBaseUrl && normalize(apiBaseUrl) !== normalize(configuredApiUrl || '/api')
+    if (configuredBackendUrl && !customApi) return resolveSocketBaseUrl(configuredBackendUrl)
+    return resolveSocketBaseUrl(apiBaseUrl || configuredApiUrl || 'http://localhost:3030')
   }
 
   function notifyAuthenticatedListeners(authenticatedSocket, result) {

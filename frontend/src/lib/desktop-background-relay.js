@@ -101,6 +101,15 @@ function createRelayEntry(profile) {
     const isBackgroundProfile = desktopState.activeProfileId !== profile.id
     const shouldShowNativeNotification = isBackgroundProfile || document.visibilityState !== 'visible'
     if (!shouldShowNativeNotification) return
+    if (notification.type === 'meeting_summary_ready') {
+      // Background profiles may have an old cached presence status.
+      let user = latestProfile?.authState?.user
+      if (user?.id) {
+        const response = await apiClient.http.get(`/users/${encodeURIComponent(user.id)}`).catch(() => null)
+        user = response?.data || user
+      }
+      if (user?.status === 'dnd') return
+    }
 
     const route = buildDesktopNotificationRoute({
       notification,

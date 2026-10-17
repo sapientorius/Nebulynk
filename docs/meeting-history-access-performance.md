@@ -17,7 +17,8 @@ Berechtigungs-Cache: Eine Änderung der Channel-Regel muss sofort wirksam sein.
 
 ## Benchmark auf einer isolierten Datenbank
 
-1. Migrationen einschließlich `066_meeting_history_access_performance` ausführen.
+1. Alle Migrationen des aktuellen Checkouts auf der dedizierten
+   Benchmark-Datenbank ausführen.
 2. Ausschließlich eine dedizierte Benchmark-Datenbank verwenden. Beide Skripte
    verweigern den Start ohne die explizite Isolierungsbestätigung.
 3. Die Fixture erzeugen. Das Script schreibt ein Manifest mit Quell- und
@@ -43,15 +44,3 @@ Der Benchmark führt zehn Sekunden Warm-up und 60 Sekunden Messung mit 100
 parallelen Requests aus. Er gibt Durchsatz, Fehlerquote sowie p50/p95 aus; die
 verbindliche Regressionserkennung erfolgt über die automatisierten
 Query-Budget-Tests.
-
-## Fehlende historische Snapshots
-
-Migration 065 bleibt unverändert. Falls ein früherer Rollout unvollständig war,
-kann der idempotente Backfill fehlende Snapshot-Zeilen in 500er-Seiten ergänzen.
-Er verlangt eine explizite Bestätigung und speichert seinen Cursor standardmäßig
-außerhalb des Repositories.
-
-```powershell
-$env:MEETING_HISTORY_BACKFILL_CONFIRM='missing-meeting-start-snapshots'
-npm run backfill:meeting-start-members -- --apply
-```
