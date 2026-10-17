@@ -1,7 +1,7 @@
 services:
   # 1. Frontend (declared first for Coolify's Compose parser)
   frontend:
-    image: ghcr.io/sapientorius/nebulynk-frontend:${NEBULYNK_VERSION:-0.7.1}
+    image: ghcr.io/sapientorius/nebulynk-frontend:${NEBULYNK_VERSION:-0.7.2}
     depends_on:
       - backend
     restart: always
@@ -115,7 +115,7 @@ services:
       timeout: 3s
       retries: 3
       start_period: 60s
-    image: ghcr.io/sapientorius/nebulynk-backend:${NEBULYNK_VERSION:-0.7.1}
+    image: ghcr.io/sapientorius/nebulynk-backend:${NEBULYNK_VERSION:-0.7.2}
     environment:
       NODE_ENV: production
       # Required production secrets. Backend startup rejects missing or placeholder
@@ -192,7 +192,7 @@ services:
     restart: always
 
   transcription-worker:
-    image: ghcr.io/sapientorius/nebulynk-transcription-worker:${NEBULYNK_VERSION:-0.7.1}
+    image: ghcr.io/sapientorius/nebulynk-transcription-worker:${NEBULYNK_VERSION:-0.7.2}
     stop_grace_period: 75s
     mem_limit: ${TRANSCRIPTION_WORKER_MEMORY_LIMIT:-1536m}
     cpus: ${TRANSCRIPTION_WORKER_CPUS:-1.0}

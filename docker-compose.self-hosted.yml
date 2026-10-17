@@ -13,7 +13,7 @@ services:
       timeout: 3s
       retries: 3
       start_period: 60s
-    image: ghcr.io/sapientorius/nebulynk-backend:${NEBULYNK_VERSION:-0.7.1}
+    image: ghcr.io/sapientorius/nebulynk-backend:${NEBULYNK_VERSION:-0.7.2}
     restart: unless-stopped
     env_file:
       - ${NEBULYNK_ENV_FILE:-.env.production}
@@ -39,7 +39,7 @@ services:
       - "127.0.0.1:${BACKEND_PORT:-3030}:3030"
 
   transcription-worker:
-    image: ghcr.io/sapientorius/nebulynk-transcription-worker:${NEBULYNK_VERSION:-0.7.1}
+    image: ghcr.io/sapientorius/nebulynk-transcription-worker:${NEBULYNK_VERSION:-0.7.2}
     stop_grace_period: 75s
     mem_limit: ${TRANSCRIPTION_WORKER_MEMORY_LIMIT:-1536m}
     cpus: ${TRANSCRIPTION_WORKER_CPUS:-1.0}
@@ -64,7 +64,7 @@ services:
         condition: service_healthy
 
   frontend:
-    image: ghcr.io/sapientorius/nebulynk-frontend:${NEBULYNK_VERSION:-0.7.1}
+    image: ghcr.io/sapientorius/nebulynk-frontend:${NEBULYNK_VERSION:-0.7.2}
     restart: unless-stopped
     depends_on:
       - backend
