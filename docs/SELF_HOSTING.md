@@ -1,11 +1,9 @@
 # Self-Hosting with Docker
 
 The production Compose overlay includes a `transcription-worker` service. It
-uses its own prebuilt image without publishing a port, waits for the backend's
-database migrations, and processes one recording at a time. On the first update,
-keep transcription disabled until both containers are healthy, then enable it
-to resume existing pending transcript artifacts. See the
-[Coolify worker upgrade notes](COOLIFY.md#transcription-worker-and-first-upgrade)
+uses its own prebuilt image without publishing a port, starts after the backend
+is healthy, and processes one recording at a time. See the
+[transcription worker documentation](COOLIFY.md#transcription-worker)
 for limits and retry behavior.
 
 This guide explains how to run your own Nebulynk instance. It is intended for
@@ -162,14 +160,6 @@ included `livekit-egress.yaml` uses `nebulynk-files`.
 | Web Push | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | Both server-side VAPID keys are required for push; the supplied Compose files pass only the public key to the frontend at runtime. |
 | GIF search | `KLIPY_API_KEY` | Optional environment fallback. The key can also be added later under Admin → Platform Settings; the encrypted platform value takes precedence. |
 
-The backend can still read legacy `MINIO_*` names during migration, but the
-Compose files and environment examples use only `STORAGE_S3_*`. Before
-updating an older installation, copy its public endpoint, access key, secret
-key, and bucket values to the corresponding `STORAGE_S3_*` variables. The
-supplied stack keeps its internal Garage endpoint at `http://garage:3900`.
-Reuse the existing values; do not rotate storage credentials as part of the
-rename.
-
 ## Docker on a self-managed host
 
 Use the two supplied Compose files together. The base
@@ -244,12 +234,10 @@ docker compose -p nebulynk --env-file .env.production \
   up -d --no-build --pull never --remove-orphans --wait
 ```
 
-On the first move from source builds, use this same procedure. Do not remove
-the existing stack or volumes first. The change introduces no database migration
-of its own. A failed image download leaves the running containers untouched.
-An older image does not undo database changes; rollback can require restoring
-the matching backup. See [custom source builds](CONTAINERS.md#custom-source-builds)
-if you maintain application changes.
+A failed image download leaves the running containers untouched. An older image
+does not undo database changes; rollback can require restoring the matching
+backup. See [custom source builds](CONTAINERS.md#custom-source-builds) if you
+maintain application changes.
 
 Do not use `docker compose down -v` during an update: it removes the database
 and Garage volumes.
@@ -302,25 +290,6 @@ storage, Docker, and host monitoring for physical capacity planning.
 
 ## Meeting-recording retention
 
-**Before the first upgrade to v0.7.0 or later:** The migration sets a 60-day
-retention period unless a value already exists. The new backend runs cleanup at
-startup, so eligible recordings older than 60 days can be deleted before an
-administrator can change the setting in the UI. Back up PostgreSQL and Garage
-first. If you need to keep older recordings, set the retention value in
-PostgreSQL *before* starting the new backend:
-
-```sql
-INSERT INTO platform_settings (key, value)
-VALUES ('meeting_recording_retention_days', 'unlimited')
-ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value;
-```
-
-You can replace `unlimited` with the desired number of days. The migration
-preserves an existing value; after startup, administrators can adjust the
-setting in **Admin → Meetings**. Deleted recording audio cannot be recovered
-from Nebulynk or transcribed again, though existing transcripts and summaries
-remain available.
-
 Platform administrators configure recording retention in **Admin → Meetings**.
 The default keeps completed meeting recordings for 60 days; it can be set to at
 least one day or to unlimited. A separate optional limit caps the combined
@@ -354,9 +323,8 @@ When an administrator saves an active AI function, Nebulynk sends a small
 synthetic test request to the selected provider and activates the configuration
 only after a successful response. Image generation produces a real test image
 and can incur API charges. A failed or timed-out test leaves the previous active
-configuration in place. Existing AI configurations show as unverified after
-upgrading; save the active function to test it. A failed meeting summary can be
-retried from the meeting history after correcting its AI configuration.
+configuration in place. A failed meeting summary can be retried from the meeting
+history after correcting its AI configuration.
 
 Useful Docker commands are `docker compose -p nebulynk ps` and
 `docker compose -p nebulynk logs -f livekit livekit-egress`. In Coolify, use

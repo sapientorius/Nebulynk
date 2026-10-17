@@ -24,11 +24,6 @@ Administrators can still regenerate a summary from transcript and chat. The
 confirmation warns that corrections may be lost and offers the same history
 publication option. Failed regeneration restores the previous summary.
 
-This feature requires migration `075_meeting_summary_revisions.js`, which runs
-with the backend's normal startup migrations. Existing summaries start at
-version 0. No additional AI configuration is required beyond the existing
-manual summary configuration and, for dictation, active transcription.
-
 ## Summary completion notifications
 
 When the first summary becomes ready, everyone who actually joined the meeting
@@ -45,12 +40,10 @@ selects the summary tab. Viewing the ready summary in a visible window also
 marks its completion notification read; other meeting tabs and invitations
 remain separate.
 
-Migration `076_meeting_summary_notifications.js` stores an internal completion
-marker with the summary. Existing completed summaries, including those being
-regenerated, do not send historical notifications. Summary completion and
-notification rows commit atomically; socket and push delivery run after commit
-without a persistent delivery queue. Delivery failures leave the notification
-available in the notification center.
+An internal completion marker is stored with the summary.
+Summary completion and notification rows commit atomically; socket and push
+delivery run after commit without a persistent delivery queue. Delivery failures
+leave the notification available in the notification center.
 
 ## API
 

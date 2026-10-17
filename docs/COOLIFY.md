@@ -158,25 +158,7 @@ Review release notes and verify backups before every update. Select the matching
 deployment files, change `NEBULYNK_VERSION` to the reviewed fixed version, then
 redeploy. All three application containers use that version from GHCR. A redeploy
 with the previous value keeps the previous version. Never delete persistent
-volumes during an update. Source-build installations follow the same first
-upgrade procedure; keep the resource identity and all existing secrets.
-
-Existing explicit standard secrets continue to override Coolify-generated
-defaults. Older installations that still use MinIO-named variables must copy
-their current values before adopting the new Compose file:
-
-| Legacy variable | Current variable |
-| --- | --- |
-| `MINIO_ROOT_USER` or `MINIO_ACCESS_KEY` | `STORAGE_S3_ACCESS_KEY` |
-| `MINIO_ROOT_PASSWORD` or `MINIO_SECRET_KEY` | `STORAGE_S3_SECRET_KEY` |
-| `MINIO_BUCKET` | `STORAGE_S3_BUCKET` |
-| `MINIO_PUBLIC_ENDPOINT` | `STORAGE_S3_PUBLIC_ENDPOINT` |
-
-Copy the existing values; do not generate replacements during this migration.
-The bundled stack sets `STORAGE_S3_ENDPOINT` internally to
-`http://garage:3900`; only map an old `MINIO_ENDPOINT` when retaining a custom
-external S3-compatible service. Changing storage credentials without rotating
-them in Garage can make existing objects inaccessible.
+volumes during an update. Keep the resource identity and all existing secrets.
 
 ## Testing branches with source builds
 
@@ -235,9 +217,9 @@ stop grace is 75 seconds. Wait for `GET /health/ready` to return HTTP 200 before
 routing traffic. Startup clears shared voice participants and stale presence;
 existing LiveKit media does not imply seamless API-session recovery.
 
-## Transcription worker and first upgrade
+## Transcription worker
 
-The Compose deployment adds one `transcription-worker` container using its own
+The Compose deployment includes one `transcription-worker` container using its own
 release image. It has no public domain or port and starts after the backend becomes
 healthy. It processes one recording at a time with a default limit of 1.5 GiB
 memory and one CPU. Temporary audio stays inside the worker container and is
@@ -245,11 +227,8 @@ removed after processing or a restart. The default temporary recording limit is
 2 GiB. Adjust `TRANSCRIPTION_WORKER_MEMORY_LIMIT`, `TRANSCRIPTION_WORKER_CPUS`,
 or `TRANSCRIPTION_MAX_TEMP_BYTES` only after checking host capacity.
 
-For the first upgrade, leave the transcription AI function disabled, back up
-PostgreSQL and Garage, and deploy during the backend maintenance window described
-above. Check that the backend and `transcription-worker` are healthy, then enable
-transcription in the admin settings. Existing transcript artifacts in `pending`
-or `processing` are migrated to the durable queue and processed oldest first.
+Check that the backend and `transcription-worker` are healthy before enabling
+transcription in the admin settings. Jobs are stored in a durable queue.
 Meetings that ended while transcription was disabled and never received a
 transcript artifact are not queued retrospectively.
 

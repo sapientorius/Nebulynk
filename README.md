@@ -72,10 +72,8 @@ prompt Windows or the browser for access to other apps and services; that
 access is needed only for the optional global shortcut. The official helper
 will be published on [GitHub Releases](https://github.com/sapientorius/Nebulynk/releases).
 
-> **Update notice for existing installations:** `v0.2.0` is the first release
-> with signed in-app update and security notices for platform administrators.
-> Installations on `v0.1.0` must update once manually. The standard production
-> deployment uses the three public GHCR images at one fixed `NEBULYNK_VERSION`.
+> **Production deployment:** The standard deployment uses the three public GHCR
+> images at one fixed `NEBULYNK_VERSION`.
 > Obtain matching configuration from an immutable `vX.Y.Z` release tag of
 > [`sapientorius/Nebulynk`](https://github.com/sapientorius/Nebulynk).
 > Updates require deliberately changing that version. `main` is not a

@@ -79,11 +79,8 @@ existing card without changing its place in the timeline.
 Activation locks the meeting row and rereads status and participant membership
 under `READ COMMITTED`. Card storage runs separately after activation commits;
 a message or search-index failure does not undo the start or block voice setup.
-Migration `077_meeting_source_messages.js` adds an internal nullable
-`source_message_pending_at` marker and a partial index. Only scheduled meetings
-that first start after this update receive a marker. Existing active or ended
-meetings are not backfilled; previously scheduled meetings are covered when
-they start.
+An internal nullable `source_message_pending_at` marker and a partial index track
+pending cards for scheduled meetings when they first start.
 
 The runtime attempts queued cards immediately, at startup and every 15 seconds,
 processing at most 50 due entries per sweep. Failed writes are retried after
@@ -148,10 +145,6 @@ constraint prevents duplicate history entries. The row is indexed for chat
 search in the same transaction. The UI localizes its label and provides a retry
 action. Individual group declines are not displayed in chat. Successful attempts
 have only the regular meeting card, not a second call-history card.
-
-Migration `072_meeting_calls.js` is additive and preserves existing meetings.
-Deploy backend and frontend together and run the standard migrations before
-starting the updated application. No recording or AI settings require changes.
 
 ## Verification
 

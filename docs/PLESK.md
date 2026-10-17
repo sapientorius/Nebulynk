@@ -1,11 +1,10 @@
 # Nebulynk on Plesk
 
 The Plesk Compose stack includes a private `transcription-worker` container.
-It starts after the backend is healthy, uses its own release image, and has no public
-route. Keep transcription disabled during the first update; enable it after both
-containers are healthy to resume existing pending transcript artifacts. Its
-default limit is 1.5 GiB memory and one CPU. See the
-[worker upgrade notes](COOLIFY.md#transcription-worker-and-first-upgrade).
+It starts after the backend is healthy, uses its own release image, and has no
+public route. It processes one recording at a time with a default limit of
+1.5 GiB memory and one CPU. See the
+[transcription worker documentation](COOLIFY.md#transcription-worker).
 
 The Plesk integration targets Plesk Obsidian on Linux x64 with the local Docker
 service. It deploys one Nebulynk instance behind one existing Plesk domain or
@@ -153,11 +152,10 @@ successful preparation. Normal stop, restart, update and extension removal
 preserve application data. **Restart** recreates containers so changed environment
 values take effect; it does not select a newer image version.
 
-The first upgrade from source builds follows this same procedure. Preserve the
-`nebulynk-plesk` project name, data paths, secrets and domain. No database migration
-is introduced by this deployment change. A failed container startup after a
-successful download requires operator recovery; the helper does not automatically
-roll back database changes. An older image alone does not replace a backup restore.
+Preserve the `nebulynk-plesk` project name, data paths, secrets and domain during
+updates. A failed container startup after a successful download requires operator
+recovery; the helper does not automatically roll back database changes. An older
+image alone does not replace a backup restore.
 
 Plesk does not include Docker volume data in its normal backup. Back up the
 directories above with an external backup system, and test restoring PostgreSQL
