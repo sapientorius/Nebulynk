@@ -1,0 +1,30 @@
+# Add after the production Self-Hosting files for development/custom source builds.
+# Always build explicitly, then start with --pull never so local images are used.
+services:
+  backend:
+    image: nebulynk-local-backend:dev
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+      target: backend
+      args:
+        BUILD_SHA: ${NEBULYNK_BUILD_SHA:-}
+        BUILD_TIME: ${NEBULYNK_BUILD_TIME:-}
+  transcription-worker:
+    image: nebulynk-local-transcription-worker:dev
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+      target: transcription-worker
+      args:
+        BUILD_SHA: ${NEBULYNK_BUILD_SHA:-}
+        BUILD_TIME: ${NEBULYNK_BUILD_TIME:-}
+  frontend:
+    image: nebulynk-local-frontend:dev
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      target: production-stage
+      args:
+        BUILD_SHA: ${NEBULYNK_BUILD_SHA:-}
+        BUILD_TIME: ${NEBULYNK_BUILD_TIME:-}

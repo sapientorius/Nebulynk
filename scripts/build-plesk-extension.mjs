@@ -19,13 +19,10 @@ const extensionIconEntries = [
 const pngSignature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
 
 const payloadEntries = [
-  'package.json',
-  'package-lock.json',
-  'backend',
-  'frontend',
   'deploy/plesk',
   'garage.toml',
-  'livekit.yaml'
+  'livekit.yaml',
+  'LICENSE'
 ]
 
 const excludedDirectoryNames = new Set([
@@ -224,7 +221,7 @@ async function copyFilteredTree(sourcePath, destinationPath, relativePath = '') 
   }
 }
 
-async function copyPayload() {
+async function copyPayload(metadata) {
   const payloadRoot = path.join(packageRoot, 'var', 'payload')
   await mkdir(payloadRoot, { recursive: true })
 
@@ -242,6 +239,19 @@ async function copyPayload() {
     } else {
       await cp(sourcePath, destinationPath)
     }
+  }
+  await writeFile(path.join(payloadRoot, 'release.env'), `NEBULYNK_VERSION=${metadata.version}\n`)
+  if (process.env.NEBULYNK_CONTAINER_MANIFEST) {
+    const manifest = JSON.parse(await readFile(process.env.NEBULYNK_CONTAINER_MANIFEST, 'utf8'))
+    const { validateContainerManifest } = await import('./container-release.mjs')
+    validateContainerManifest(manifest, { version: metadata.version })
+    const composePath = path.join(payloadRoot, 'deploy/plesk/docker-compose.yml')
+    let compose = await readFile(composePath, 'utf8')
+    for (const [component, image] of Object.entries(manifest.images)) {
+      compose = compose.replace(new RegExp(`ghcr.io/sapientorius/nebulynk-${component}:\\$\\{NEBULYNK_VERSION:-[^}]+\\}`, 'g'), `${image.repository}@${image.digest}`)
+    }
+    await writeFile(composePath, compose)
+    await writeFile(path.join(payloadRoot, 'container-images.json'), `${JSON.stringify(manifest, null, 2)}\n`)
   }
 }
 
@@ -579,7 +589,7 @@ async function stagePackage(metadata) {
   await cp(extensionLogoSource, extensionLogoTarget)
 
   await writeFile(path.join(packageRoot, 'meta.xml'), renderMetaXml(metadata), 'utf8')
-  await copyPayload()
+  await copyPayload(metadata)
   await writePayloadManifest(metadata)
 }
 
@@ -600,7 +610,7 @@ async function validateStaging(metadata) {
     'plib/hooks/LongTasks.php',
     'plib/scripts/pre-uninstall.php',
     'sbin/nebulynk-plesk',
-    'var/payload/package.json',
+    'var/payload/release.env',
     'var/payload/deploy/plesk/docker-compose.yml',
     'var/payload/manifest.json'
   ]

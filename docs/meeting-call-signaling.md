@@ -7,8 +7,9 @@ to follow the existing meeting settings after participants join. An audio
 connection failure after acceptance does not undo the meeting.
 
 Personal Notes chats start immediately. A Notes chat is the caller's own `dm`
-named `notes`, with that user as its only member. Ordinary channels and scheduled
-meetings retain their existing behavior. If a meeting is already active, callers
+named `notes`, with that user as its only member. Ordinary channels retain their
+immediate-start behavior; scheduled meeting cards appear on actual activation,
+as described below. If a meeting is already active, callers
 join it instead of creating another attempt.
 
 ## Signaling service
@@ -65,6 +66,37 @@ until the server confirms its outcome, so a missed acceptance event cannot stran
 the caller. Only the browser that started the attempt automatically joins the
 active meeting; recovered attempts on other tabs or devices still require entry.
 
+## Scheduled meeting cards
+
+Scheduling, rescheduling, guest-link preview and guest-link acceptance do not
+post a source-channel card. The first actual join that activates the meeting
+queues one normal `[Meeting] /meetings/<id>` message, attributed to the host.
+Its message timestamp is the actual `started_at`, including for early starts
+or delayed message creation. The planned appointment time never sorts the card
+after later chat messages. Ending the meeting and adding its summary update the
+existing card without changing its place in the timeline.
+
+Activation locks the meeting row and rereads status and participant membership
+under `READ COMMITTED`. Card storage runs separately after activation commits;
+a message or search-index failure does not undo the start or block voice setup.
+An internal nullable `source_message_pending_at` marker and a partial index track
+pending cards for scheduled meetings when they first start.
+
+The runtime attempts queued cards immediately, at startup and every 15 seconds,
+processing at most 50 due entries per sweep. Failed writes are retried after
+30 seconds, including after a server restart or after the meeting has ended.
+Each attempt locks the meeting with `FOR UPDATE SKIP LOCKED`; the message,
+search entry and cleared marker commit together. Existing exact references,
+including soft-deleted messages, suppress duplicate or resurrected cards.
+
+Cards respect source-channel membership, host admin bypass and channel
+archiving. A missing/archived source or a host without source access clears the
+marker with a logged reason. Guests gain no source-channel membership. The
+existing channel-scoped message event delivers cards without extra invitation,
+mention or push notifications. Storage/retry failures log the meeting and
+source-channel IDs. Event delivery is best effort; a committed card remains
+available when the channel is reloaded.
+
 ## Ending and reconciling meetings
 
 After the database commits the ended status and archived meeting channel, the
@@ -113,10 +145,6 @@ constraint prevents duplicate history entries. The row is indexed for chat
 search in the same transaction. The UI localizes its label and provides a retry
 action. Individual group declines are not displayed in chat. Successful attempts
 have only the regular meeting card, not a second call-history card.
-
-Migration `072_meeting_calls.js` is additive and preserves existing meetings.
-Deploy backend and frontend together and run the standard migrations before
-starting the updated application. No recording or AI settings require changes.
 
 ## Verification
 

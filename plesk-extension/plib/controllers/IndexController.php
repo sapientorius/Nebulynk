@@ -28,8 +28,8 @@ class IndexController extends pm_Controller_Action
             'label' => 'Action',
             'multiOptions' => [
                 'preflight' => '1. Run preflight check (recommended)',
-                'install' => '2. Install and build',
-                'update' => 'Update and rebuild',
+                'install' => '2. Download and deploy',
+                'update' => 'Update deployment',
                 'start' => 'Start',
                 'stop' => 'Stop',
                 'restart' => 'Restart',
@@ -156,7 +156,7 @@ class IndexController extends pm_Controller_Action
 
         Modules_NebulynkPlesk_Deployment::startTask($operation, $operation === 'install');
         $message = in_array($operation, ['install', 'update'], true)
-            ? 'Nebulynk installation started. The first build may take several minutes. Progress is shown in Plesk Tasks.'
+            ? 'Nebulynk installation started. The first download may take several minutes. Progress is shown in Plesk Tasks.'
             : 'Nebulynk task started. Progress is shown in Plesk Tasks.';
         $this->_status->addMessage('info', $message);
     }

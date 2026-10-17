@@ -163,6 +163,7 @@
                   }"
                 >
                   <MeetingSummaryPanel
+                    :can-read-summary-notifications="meeting.content_access?.allowed === true"
                     v-if="endedMeetingArtifactTab === 'summary' && shouldShowSummaryPanel"
                     :meeting-id="meeting.id" :can-edit-summary="canEditSummary" :editing-available="meeting.summary_edit?.available !== false"
                     @edit-summary="showSummaryEditor = true"
@@ -278,6 +279,7 @@
         </div>
 
         <MeetingSummaryPanel
+          :can-read-summary-notifications="meeting.content_access?.allowed === true"
           :meeting-id="meeting.id" :can-edit-summary="canEditSummary" :editing-available="meeting.summary_edit?.available !== false"
           @edit-summary="showSummaryEditor = true"
           v-if="shouldShowSummaryPanel"
@@ -769,6 +771,9 @@ voiceStore() {
 '$route.query.message'() {
       this.syncRouteEvidence()
     },
+'$route.query.tab'() {
+      this.ensureEndedMeetingArtifactTab(this.$route.query.tab)
+    },
 '$route.query.transcript_start_ms'() {
       this.syncRouteEvidence()
     },
@@ -780,7 +785,7 @@ endedMeetingArtifactTabs: {
       }
     },
 shareMaximized() { this.showEndedMeetingCompactMenu = false },
-meeting: { immediate: true, handler() { this.isEndedMeetingChatOpen = false; this.showEndedMeetingCompactMenu = false; this.ensureEndedMeetingArtifactTab(); this.syncRouteEvidence(); this.ensureMeetingQuestionsLoaded() } }
+meeting: { immediate: true, handler(meeting, previous) { this.isEndedMeetingChatOpen = false; this.showEndedMeetingCompactMenu = false; this.ensureEndedMeetingArtifactTab(meeting?.id !== previous?.id ? this.$route.query.tab : null); this.syncRouteEvidence(); this.ensureMeetingQuestionsLoaded() } }
   },
   mounted() { this.stopObservingShortViewport = observeShortViewport(matches => { this.isShortViewport = matches }) },
   beforeUnmount() { this.viewGeneration++; this.evidenceGeneration++; this.stopObservingShortViewport?.(); this.summaryRegenerationDialog?.destroy() },
@@ -862,6 +867,10 @@ ensureEndedMeetingArtifactTab(preferredKey = null) {
     },
 setEndedMeetingArtifactTab(tabKey) {
       this.ensureEndedMeetingArtifactTab(tabKey)
+      const query = { ...this.$route.query, tab: this.endedMeetingArtifactTab }
+      delete query.message
+      delete query.transcript_start_ms
+      this.$router.replace({ query }).catch(() => {})
       this.showEndedMeetingCompactMenu = false
       if (this.isMobileLayout) {
         this.isEndedMeetingChatOpen = false

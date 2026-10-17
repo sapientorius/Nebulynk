@@ -7,6 +7,8 @@ PSA_ROOT="/usr/local/psa"
 PAYLOAD_ROOT="$PSA_ROOT/var/modules/$MODULE_ID/payload"
 DEPLOYMENT_ROOT="/opt/nebulynk-plesk"
 SOURCE_ROOT="$DEPLOYMENT_ROOT/source"
+CANDIDATE_ROOT="$DEPLOYMENT_ROOT/candidate"
+PREVIOUS_ROOT="$DEPLOYMENT_ROOT/source.previous"
 DATA_ROOT="$DEPLOYMENT_ROOT/data"
 ENV_FILE="$DEPLOYMENT_ROOT/.env"
 COMPOSE_PROJECT="nebulynk-plesk"
@@ -146,36 +148,52 @@ ensure_env() {
     set_env_value NEBULYNK_DOMAIN "$DOMAIN"
     set_env_value NEBULYNK_DATA_ROOT "$DATA_ROOT"
     set_env_value NEBULYNK_ENV_FILE "$ENV_FILE"
-    [ -n "$PORT" ] && set_env_value EDGE_PORT "$PORT"
+    if [ -n "$PORT" ]; then set_env_value EDGE_PORT "$PORT"; fi
 }
 
-sync_payload() {
+stage_payload() {
     [ -d "$PAYLOAD_ROOT" ] || die "The installed extension payload was not found."
     [ "$SOURCE_ROOT" = "/opt/nebulynk-plesk/source" ] || die "Unsafe source path."
     if [ -L "$SOURCE_ROOT" ]; then
         die "The source path must not be a symlink."
     fi
-    rm -rf -- "$SOURCE_ROOT"
-    mkdir -p "$SOURCE_ROOT"
-    cp -a "$PAYLOAD_ROOT"/. "$SOURCE_ROOT"/
-    chmod -R u+rwX,go-rwx "$SOURCE_ROOT"
+    [ "$CANDIDATE_ROOT" = "/opt/nebulynk-plesk/candidate" ] || die "Unsafe candidate path."
+    [ ! -L "$CANDIDATE_ROOT" ] || die "The candidate path must not be a symlink."
+    rm -rf -- "$CANDIDATE_ROOT"
+    mkdir -p "$CANDIDATE_ROOT"
+    cp -a "$PAYLOAD_ROOT"/. "$CANDIDATE_ROOT"/
+    chmod -R u+rwX,go-rwx "$CANDIDATE_ROOT"
     # The unprivileged edge/LiveKit containers must be able to read their
     # non-secret bind-mounted configuration files. The environment file stays
     # outside the source tree at mode 0600.
     chmod 0644 \
-        "$SOURCE_ROOT/deploy/plesk/edge.conf" \
-        "$SOURCE_ROOT/deploy/plesk/livekit-egress.yaml" \
-        "$SOURCE_ROOT/garage.toml" \
-        "$SOURCE_ROOT/livekit.yaml"
+        "$CANDIDATE_ROOT/deploy/plesk/edge.conf" \
+        "$CANDIDATE_ROOT/deploy/plesk/livekit-egress.yaml" \
+        "$CANDIDATE_ROOT/garage.toml" \
+        "$CANDIDATE_ROOT/livekit.yaml"
+}
+
+compose_at() {
+    deployment_path="$1"
+    shift
+    [ -f "$deployment_path/deploy/plesk/docker-compose.yml" ] || die "The Plesk Compose file was not found."
+    # The installed package owns the application version. An old .env must
+    # never mix its frontend/backend/worker with a newer extension package.
+    if [ -f "$deployment_path/release.env" ]; then
+        package_version="$(awk -F= '$1 == "NEBULYNK_VERSION" { print $2; exit }' "$deployment_path/release.env")"
+        printf '%s\n' "$package_version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' || die "Invalid packaged application version."
+        export NEBULYNK_VERSION="$package_version"
+    fi
+    export NEBULYNK_ENV_FILE="$ENV_FILE"
+    docker compose \
+        --project-name "$COMPOSE_PROJECT" \
+        --project-directory "$deployment_path" \
+        --env-file "$ENV_FILE" \
+        --file "$deployment_path/deploy/plesk/docker-compose.yml" "$@"
 }
 
 compose() {
-    [ -f "$COMPOSE_FILE" ] || die "The Plesk Compose file was not found."
-    docker compose \
-        --project-name "$COMPOSE_PROJECT" \
-        --project-directory "$SOURCE_ROOT" \
-        --env-file "$ENV_FILE" \
-        --file "$COMPOSE_FILE" "$@"
+    compose_at "$SOURCE_ROOT" "$@"
 }
 
 find_free_port() {
@@ -226,17 +244,36 @@ preflight() {
 }
 
 install_stack() {
+    # Stage environment changes together with the deployment. Download errors
+    # must preserve the old .env as well as the old Compose configuration.
+    ensure_directories
+    installed_env="$ENV_FILE"
+    ENV_FILE="$DEPLOYMENT_ROOT/.env.candidate"
+    [ ! -L "$ENV_FILE" ] || die "The candidate environment must not be a symlink."
+    if [ -f "$installed_env" ]; then cp -p "$installed_env" "$ENV_FILE"; else rm -f -- "$ENV_FILE"; fi
     ensure_env
     check_edge_port
-    sync_payload
-    compose config >/dev/null
-    compose up -d --build --remove-orphans
+    stage_payload
+    [ -f "$CANDIDATE_ROOT/release.env" ] || die "The package release metadata is missing."
+    compose_at "$CANDIDATE_ROOT" config >/dev/null
+    # A pull failure must leave the active configuration and containers intact.
+    compose_at "$CANDIDATE_ROOT" pull
+    [ "$PREVIOUS_ROOT" = "/opt/nebulynk-plesk/source.previous" ] || die "Unsafe previous deployment path."
+    [ ! -L "$PREVIOUS_ROOT" ] || die "The previous deployment path must not be a symlink."
+    set_env_value NEBULYNK_ENV_FILE "$installed_env"
+    if [ -f "$installed_env" ]; then cp -p "$installed_env" "$DEPLOYMENT_ROOT/.env.previous"; fi
+    rm -rf -- "$PREVIOUS_ROOT"
+    if [ -d "$SOURCE_ROOT" ]; then mv "$SOURCE_ROOT" "$PREVIOUS_ROOT"; fi
+    mv "$CANDIDATE_ROOT" "$SOURCE_ROOT"
+    mv -f "$ENV_FILE" "$installed_env"
+    ENV_FILE="$installed_env"
+    compose up -d --no-build --pull never --remove-orphans --wait --wait-timeout 180
 }
 
 start_stack() {
     ensure_env
     check_edge_port
-    compose up -d --remove-orphans
+    compose up -d --no-build --pull never --remove-orphans
 }
 
 stop_stack() {
@@ -335,7 +372,7 @@ case "$ACTION" in
     restart)
         ensure_env
         check_edge_port
-        compose restart
+        compose up -d --no-build --pull never --force-recreate --remove-orphans
         ;;
     status)
         status_stack

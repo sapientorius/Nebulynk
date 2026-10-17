@@ -15,9 +15,10 @@ Dokploy templates repository. `import.base64` is the directly importable form.
    first deployment. Dokploy manages domains, Traefik labels, and the isolated
    deployment network; do not add those to the Compose file.
 
-The template builds Nebulynk directly from the public repository. It defaults
-to the reviewed `stable` branch. Set `NEBULYNK_SOURCE_REF` to an immutable tag
-such as `v0.4.0` before deployment when a pinned release is required.
+The template pulls Nebulynk's three public GHCR images at the fixed
+`NEBULYNK_VERSION` included in the release. No Git source or local build is needed.
+The template metadata remains `stable`; `NEBULYNK_SOURCE_REF` is no longer used.
+Change `NEBULYNK_VERSION` deliberately when updating; a redeploy alone keeps it.
 Garage, LiveKit, and LiveKit Egress use their upstream images directly. Their
 configuration is embedded in the Compose import, so no additional files need
 to be mounted on the Dokploy host.
@@ -36,7 +37,7 @@ control, enable HTTPS with Let's Encrypt in Dokploy's **Domains** tab, and set
 | Service | Port | Environment values to update after changing the domain |
 | --- | --- | --- |
 | `frontend` | `8080` | `FRONTEND_URL`, `PASSKEY_RP_ID` |
-| `backend` | `3030` | `VITE_API_URL` |
+| `backend` | `3030` | `API_URL` (legacy alias: `VITE_API_URL`) |
 | `livekit` | `7880` | `LIVEKIT_PUBLIC_URL` |
 | `garage` | `3900` | `STORAGE_S3_PUBLIC_ENDPOINT` |
 
@@ -45,14 +46,14 @@ endpoint values. For production, change all four values to their actual
 `https://` URLs:
 
 - `FRONTEND_URL`
-- `VITE_API_URL`
+- `API_URL`
 - `LIVEKIT_PUBLIC_URL`
 - `STORAGE_S3_PUBLIC_ENDPOINT`
 
 Dokploy does not synchronize the **Domains** tab back into environment
 variables. After changing a domain or enabling HTTPS, update the matching
 environment values manually and redeploy. The frontend receives the API and
-LiveKit URLs during its image build.
+LiveKit URLs at container startup, without a new image build.
 
 The template cannot encode Dokploy certificate settings. Confirm HTTPS and a
 Let's Encrypt certificate for every custom domain in the Domains tab. Do not

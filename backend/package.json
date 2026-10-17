@@ -1,6 +1,6 @@
 {
   "name": "nebulynk-backend",
-  "version": "0.7.1",
+  "version": "0.7.2",
   "private": true,
   "type": "module",
   "description": "Nebulynk Backend API",
@@ -69,7 +69,7 @@
     "qrcode": "^1.5.4",
     "redis": "^5.12.1",
     "semver": "^7.7.2",
-    "sharp": "^0.35.4",
+    "sharp": "^0.35.5",
     "web-push": "^3.6.7",
     "winston": "^3.19.0",
     "yazl": "^3.3.1"

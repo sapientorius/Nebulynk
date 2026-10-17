@@ -8,6 +8,7 @@ export const DEFAULT_LOCALE = 'en'
 
 const baseMessages = {
   en: {
+    meetingSummaryReady: { title: 'Meeting summary ready' },
     meetingHistoryAccess: {
       global_label: 'Default access to past meeting content',
       channel_label: 'Access to past meeting content',
@@ -905,6 +906,7 @@ const baseMessages = {
     }
   },
   de: {
+    meetingSummaryReady: { title: 'Meeting-Zusammenfassung fertig' },
     meetingHistoryAccess: {
       global_label: 'Standardzugriff auf vergangene Meeting-Inhalte',
       channel_label: 'Zugriff auf vergangene Meeting-Inhalte',

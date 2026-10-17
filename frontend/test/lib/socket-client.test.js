@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const socketIoMock = vi.hoisted(() => vi.fn())
 
@@ -79,6 +79,45 @@ describe('createSocketClient', () => {
   beforeEach(() => {
     vi.resetModules()
     socketIoMock.mockReset()
+  })
+
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('uses the runtime socket endpoint alongside an absolute API URL', async () => {
+    vi.stubGlobal('window', { __NEBULYNK_CONFIG__: {
+      apiUrl: 'https://api.example.com/api', backendUrl: 'https://socket.example.com'
+    } })
+    const harness = createSocketHarness()
+    socketIoMock.mockReturnValue(harness.socket)
+    const { createSocketClient } = await import('../../src/lib/socket-client.js')
+    const client = createSocketClient({ apiClient: { getBaseUrl: () => 'https://api.example.com/api', getStoredAccessToken: () => 'token' } })
+    client.connectSocket()
+    expect(socketIoMock).toHaveBeenCalledWith('https://socket.example.com', expect.any(Object))
+    client.destroy()
+  })
+
+  it('derives sockets from a custom API client ahead of the runtime endpoint', async () => {
+    vi.stubGlobal('window', { __NEBULYNK_CONFIG__: {
+      apiUrl: 'https://api.example.com/api', backendUrl: 'https://socket.example.com'
+    } })
+    const harness = createSocketHarness()
+    socketIoMock.mockReturnValue(harness.socket)
+    const { createSocketClient } = await import('../../src/lib/socket-client.js')
+    const client = createSocketClient({ apiClient: { getBaseUrl: () => 'https://desktop.example.com/api', getStoredAccessToken: () => 'token' } })
+    client.connectSocket()
+    expect(socketIoMock).toHaveBeenCalledWith('https://desktop.example.com', expect.any(Object))
+    client.destroy()
+  })
+
+  it('keeps an explicit socket endpoint ahead of runtime configuration', async () => {
+    vi.stubGlobal('window', { __NEBULYNK_CONFIG__: { apiUrl: '/api', backendUrl: 'https://socket.example.com' } })
+    const harness = createSocketHarness()
+    socketIoMock.mockReturnValue(harness.socket)
+    const { createSocketClient } = await import('../../src/lib/socket-client.js')
+    const client = createSocketClient({ backendUrl: 'https://explicit.example.com', apiClient: { getStoredAccessToken: () => 'token' } })
+    client.connectSocket()
+    expect(socketIoMock).toHaveBeenCalledWith('https://explicit.example.com', expect.any(Object))
+    client.destroy()
   })
 
   it('refreshes the session and reconnects with the rotated token after socket auth failure', async () => {

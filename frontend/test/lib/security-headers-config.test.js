@@ -23,7 +23,7 @@ describe('frontend security headers config', () => {
       .slice(1)
 
     expect(policy).toContain(buildFrontendFrameAncestorsDirective())
-    expect(policy).toContain("connect-src 'self' https://api.example.com wss://api.example.com wss://livekit.example.com ws://127.0.0.1:47641")
+    expect(policy).toContain("connect-src 'self' https://api.example.com wss://api.example.com wss://livekit.example.com https://livekit.example.com ws://127.0.0.1:47641")
     expect(policy).toContain("object-src 'none'")
     expect(policy).toContain("script-src 'self' 'wasm-unsafe-eval'")
     expect(policy).not.toContain("'unsafe-eval'")
@@ -44,6 +44,7 @@ describe('frontend security headers config', () => {
       'https://api.example.com',
       'wss://api.example.com',
       'wss://livekit.example.com',
+      'https://livekit.example.com',
       'ws://127.0.0.1:47641'
     ])
   })

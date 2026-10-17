@@ -80,6 +80,7 @@ export class MeetingsService {
       effects: {
         ...this.integrations,
         _createSourceMessage: (...args) => this._createSourceMessage(...args),
+        _queueSourceMessage: (...args) => this._queueSourceMessage(...args),
         _joinConnectionsToChannel: (...args) => this._joinConnectionsToChannel(...args),
         _emitNotificationEvents: (...args) => this._emitNotificationEvents(...args)
       },
@@ -363,6 +364,10 @@ export class MeetingsService {
 
   async _createSourceMessage(...args) {
     return integrations._createSourceMessage(this.dependencies, ...args)
+  }
+
+  _queueSourceMessage(...args) {
+    return integrations._queueSourceMessage(this.dependencies, ...args)
   }
 
   _joinConnectionsToChannel(...args) {

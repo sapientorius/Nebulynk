@@ -39,6 +39,7 @@ import { configureSystemInfoRoutes } from './routes/system-info.js'
 import { endExpiredIdleMeetings } from './services/meetings/idle-timeout.js'
 import { expireMeetingCalls } from './services/meeting-calls/meeting-calls.js'
 import { endOverdueScheduledMeetings } from './services/meetings/overdue-scheduled.js'
+import { processPendingMeetingSourceMessages, SOURCE_MESSAGE_SWEEP_MS } from './domains/meetings/source-messages.js'
 import { processPendingMeetingSummaries } from './services/meetings/summary-processor.js'
 import { deliverPendingTranscriptEvents, reconcileQueuedMeetingRecordings } from './services/meetings/transcription-api-runtime.js'
 import { processDueMessageReminders } from './services/message-reminders/processor.js'
@@ -333,6 +334,11 @@ app.hooks({
       }, intervalMs: 60_000 })
 
       runtime.register({ name: 'meeting-calls', run: () => expireMeetingCalls(app), intervalMs: 1000, immediate: true })
+
+      runtime.register({
+        name: 'meeting-source-messages', run: () => processPendingMeetingSourceMessages(app),
+        intervalMs: SOURCE_MESSAGE_SWEEP_MS, immediate: true
+      })
 
       // Periodic cleanup: end active meetings after 10 minutes without participants.
       runtime.register({ name: 'meeting-idle', run: async () => {

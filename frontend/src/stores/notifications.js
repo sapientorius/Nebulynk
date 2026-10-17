@@ -1,6 +1,7 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import api from '../lib/api.js'
+import { readFrontendConfig } from '../lib/frontend-config.js'
 import {
   getDesktopWorkspaceNotificationState,
   requestDesktopWorkspaceNotificationPermission,
@@ -216,7 +217,9 @@ export const useNotificationsStore = defineStore('notifications', () => {
       }
 
       const updated = Number(data?.updated)
-      const decrementBy = Number.isInteger(updated) ? updated : localUpdated
+      // A socket event can carry an unread snapshot after an earlier patch has
+      // already marked the server row read. Clear that local badge as well.
+      const decrementBy = Number.isInteger(updated) ? Math.max(updated, localUpdated) : localUpdated
       setUnreadCount(unreadCount.value - decrementBy)
       return decrementBy
     } catch (error) {
@@ -282,6 +285,15 @@ export const useNotificationsStore = defineStore('notifications', () => {
     )
   }
 
+  function markMeetingSummaryReadyRead(meetingId) {
+    if (!meetingId) return Promise.resolve(0)
+    return markMatchingNotificationsRead(
+      `meeting-summary:${meetingId}`,
+      { meeting_id: meetingId, type: 'meeting_summary_ready' },
+      (notification) => notification.type === 'meeting_summary_ready' && notification.meeting_id === meetingId
+    )
+  }
+
   async function updatePreference(pref) {
     const channelsStore = useChannelsStore()
     if (!channelsStore.myMembership) return
@@ -300,7 +312,7 @@ export const useNotificationsStore = defineStore('notifications', () => {
       throw new Error(t('ui.stores.web_push_is_not_supported_by_this_browser'))
     }
 
-    const vapidKey = import.meta.env.VITE_VAPID_PUBLIC_KEY
+    const vapidKey = readFrontendConfig('vapidPublicKey')
     if (!vapidKey) {
       throw new Error(t('ui.stores.vite_vapid_public_key_is_not_configured'))
     }
@@ -468,6 +480,7 @@ export const useNotificationsStore = defineStore('notifications', () => {
     markMessageNotificationsRead,
     markMessageNotificationsReadBatch,
     markMeetingInviteRead,
+    markMeetingSummaryReadyRead,
     updatePreference,
     enableNotifications,
     disableNotifications,

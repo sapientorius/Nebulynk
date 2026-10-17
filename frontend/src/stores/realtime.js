@@ -123,6 +123,7 @@ export function setupRealtimeListeners(socket, {
 
   async function maybeDispatchDesktopNotification(notification) {
     if (!isElectronDesktopRuntime()) return false
+    if (notification.type === 'meeting_summary_ready' && sessionStore.user?.status === 'dnd') return false
 
     const desktopNotificationState = getDesktopWorkspaceNotificationState()
     if (desktopNotificationState.enabled === false) {
