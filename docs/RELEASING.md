@@ -90,6 +90,22 @@ Missing metadata, version drift,
 prereleases, a missing key, a rollback, or an unverifiable signature stop
 publication.
 
+## Completing a release
+
+1. Wait for the publication workflow to succeed and verify the public release,
+   image/package artifacts, and signed update feed.
+2. As a required final step of every stable release, merge `stable` back into
+   `main` through the normal reviewed merge process and complete the required
+   CI checks. Preserve commit ancestry: use a regular merge or a fast-forward
+   when possible, without squash, rebase, or cherry-pick. Resolve any conflicts
+   while retaining released fixes and subsequent development on `main`.
+3. Fetch the remote branch refs and verify
+   `git merge-base --is-ancestor origin/stable origin/main` succeeds. `main` may
+   be ahead after the merge; it must contain the complete `stable` history.
+   The published release tag remains on its original release commit.
+4. Record the merge and ancestry-check result in the release handoff before
+   declaring the release process complete.
+
 ## Release checklist for automation agents
 
 Before declaring a release prepared, compare the stable SemVer in the release
@@ -99,6 +115,10 @@ verify separately that `dokploy-template/meta.json` remains `stable`. Then run
 `npm run release:validate`; the CI Dokploy check must pass before committing or
 tagging. This explicit metadata step is required even when the Compose files
 did not change.
+
+After publication, complete the [release completion steps](#completing-a-release),
+including the ancestry-preserving merge from `stable` into `main` and its
+verification.
 
 ## One-time GHCR setup and recovery
 

@@ -1,5 +1,5 @@
 # Stage 1: Build
-ARG NODE_IMAGE=node:22.23.1-alpine3.24
+ARG NODE_IMAGE=node:22.23.4-alpine3.24@sha256:fe4f6d74e20370acb04ad889077d14d0f64a9c8ea6a42bc60cddf1e844699914
 ARG NGINX_IMAGE=nginxinc/nginx-unprivileged:1.31-alpine3.23@sha256:6320020c7da8714feab524e02c08c5a1958675c4e68700e93a2fd8970b065786
 FROM ${NODE_IMAGE} AS build-stage
 WORKDIR /app
@@ -33,7 +33,7 @@ COPY LICENSE /licenses/LICENSE
 # document root before dropping privileges so Nginx can serve every asset.
 USER root
 RUN chmod -R a+rX /usr/share/nginx/html
-RUN apk upgrade --no-cache && apk add --no-cache nodejs && chmod -R a+rX /opt/nebulynk /licenses \
+RUN apk upgrade --no-cache && apk add --no-cache 'nodejs>=24.22.1-r0' && chmod -R a+rX /opt/nebulynk /licenses \
     && sed -i 's/\r$//' /opt/nebulynk/frontend/scripts/start-frontend.sh
 USER 101
 EXPOSE 8080

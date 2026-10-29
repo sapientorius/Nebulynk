@@ -1,0 +1,81 @@
+{
+  "schema_version": 1,
+  "version": "0.8.0",
+  "revision": 1,
+  "channel": "stable",
+  "published_at": "2026-10-29T00:00:00.000Z",
+  "title": { "en": "Nebulynk 0.8.0" },
+  "summary": {
+    "en": "Rebuilds all official container images with patched Node.js runtimes to address Node2Shell (CVE-2026-111497), verifies the runtime security baseline before publication, and updates dependencies flagged by the release security audit."
+  },
+  "changes": [
+    {
+      "category": "security",
+      "title": { "en": "Patched Node.js runtimes in all release images" },
+      "description": { "en": "Updates the backend, transcription worker, frontend build and runtime-test base to Node.js 22.23.4, pinned to the official multiarch image digest. The frontend runtime requires Alpine's patched Node.js 24.22.1 or newer. All three official images are rebuilt for Linux AMD64 and ARM64, with Alpine package upgrades applied during the build." }
+    },
+    {
+      "category": "improvement",
+      "title": { "en": "Verify the Node2Shell fix in actual container runtimes" },
+      "description": { "en": "Container verification checks the Node.js security baseline and the patched Brotli decoder's block-switch error constant inside every backend, frontend and transcription-worker image. These checks run on both native release architectures before image promotion." }
+    },
+    {
+      "category": "security",
+      "title": { "en": "Dependency security updates required by the release audit" },
+      "description": { "en": "Updates DOMPurify to 3.4.17, markdown-it to 15.0.3, fast-uri to 4.2.3, follow-redirects to 1.16.2, Nodemailer to 10.3.1, qs to 6.17.1 and Zod to 4.6.7. Frontend build/test tooling moves to Vite 7.3.7 and Vitest 4.1.12. These compatible updates address the audit's sanitization, rendering, redirect, parsing, validation and development-tool advisories without changing dependency major versions." }
+    }
+  ],
+  "security": [
+    {
+      "severity": "high",
+      "affected_versions": "<0.8.0",
+      "summary": { "en": "Replaces vulnerable Node.js runtimes in official Nebulynk images. Node2Shell is an out-of-bounds write in the bundled Brotli decoder: applications that decompress attacker-controlled Brotli data can suffer a crash, memory disclosure or remote code execution. This upstream risk does not establish exploitability in every Nebulynk deployment. Custom source builds must also use a patched Node.js runtime." },
+      "cve": "CVE-2026-111497",
+      "advisory_url": "https://nodejs.org/en/blog/vulnerability/october-2026-security-releases"
+    },
+    {
+      "severity": "critical",
+      "affected_versions": "<0.8.0",
+      "summary": { "en": "Updates DOMPurify to address template-expression sanitization bypasses in shadow-root DOM output modes and related sanitizer fixes. Upstream impact depends on the sanitizer configuration and downstream DOM/template handling; this does not establish that Nebulynk's ordinary string-rendering path is exploitable." },
+      "advisory_url": "https://github.com/cure53/DOMPurify/security/advisories/GHSA-cg2g-xh64-v4q7"
+    },
+    {
+      "severity": "high",
+      "affected_versions": "<0.8.0",
+      "summary": { "en": "Updates markdown-it to prevent quadratic-time rendering of crafted multiline reference definitions. The upstream issue can affect default Markdown rendering options, so a malicious message can cause excessive rendering work." },
+      "advisory_url": "https://github.com/markdown-it/markdown-it/security/advisories/GHSA-gfr2-rv44-r23c"
+    },
+    {
+      "severity": "medium",
+      "affected_versions": "<0.8.0",
+      "summary": { "en": "Updates follow-redirects to correct credential-header stripping during cross-origin redirects, including array-form headers and custom sensitive header names. Exploitability depends on the caller's header configuration and redirect target." },
+      "advisory_url": "https://github.com/follow-redirects/follow-redirects/security/advisories/GHSA-q3jh-wrc6-jgq8"
+    },
+    {
+      "severity": "high",
+      "affected_versions": "<0.8.0",
+      "summary": { "en": "Updates the transitive Zod dependency to address excessive memory consumption while validating oversized constrained collections. This is an upstream validation risk, not evidence of a confirmed exploit against a Nebulynk endpoint." },
+      "advisory_url": "https://github.com/advisories/GHSA-mrhx-c7xc-m3w5"
+    },
+    {
+      "severity": "medium",
+      "affected_versions": "<0.8.0",
+      "summary": { "en": "Updates Vite and Vitest development/test tooling to address development-server file-access and mock-registration advisories. These tools are used for building and testing; the published frontend is served by Nginx." },
+      "advisory_url": "https://github.com/vitest-dev/vitest/security/advisories/GHSA-qxg6-89mg-rqv8"
+    }
+  ],
+  "upgrade": {
+    "backup_required": true,
+    "downtime_expected": true,
+    "breaking": false,
+    "manual_steps": {
+      "en": [
+        "Before updating, create and verify external backups of PostgreSQL, both Garage volumes, and deployment configuration and secrets. Keep the existing Compose project or platform resource and persistent-volume mappings. For upgrades from versions before 0.7.2, also follow the intervening release instructions, including recording-retention guidance and migrations.",
+        "Set NEBULYNK_VERSION=0.8.0, pull the new backend, frontend and transcription-worker images, and recreate all three services together. Restarting an existing container does not replace its Node.js runtime. Published older release tags remain immutable and do not receive this fix.",
+        "Stop the old backend completely before starting its replacement and allow at least 75 seconds for shutdown. Wait for GET /health/ready and the worker health check to pass, then verify login, chat, uploads and transcription. Version 0.8.0 adds no database migrations or breaking configuration changes relative to 0.7.2.",
+        "For custom source builds, rebuild from the v0.8.0 tag with current base images and recreate the services. If overriding NODE_IMAGE, use a supported runtime with the Node2Shell fix: Node.js 22.23.4, 24.22.1 or 26.12.1 or a newer patched release in the same line."
+      ]
+    },
+    "docs_url": "https://github.com/sapientorius/Nebulynk/blob/v0.8.0/docs/SELF_HOSTING.md"
+  }
+}
