@@ -2,12 +2,21 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { createHash } from 'node:crypto'
 import { access, readdir } from 'node:fs/promises'
-import { assertSameDescriptors, candidateTag, components, inspectCandidate, inspectRemote, platforms, promoteImages, publicationIdentity, repository,
+import { assertPatchedNodeVersion, assertSameDescriptors, candidateTag, components, inspectCandidate, inspectRemote, platforms, promoteImages, publicationIdentity, repository,
   validateContainerManifest, validateStagingManifest, verifyPublicAccess } from './container-release.mjs'
 import { assertReleaseAssets } from './verify-release-container-assets.mjs'
 
 const digest = (number) => `sha256:${number.toString(16).padStart(64, '0')}`
 const revision = 'a'.repeat(40)
+
+test('container runtimes require the Node2Shell fix in a supported release line', () => {
+  for (const version of ['22.23.4', '22.24.0', '24.22.1', '24.23.0', '26.12.1', '26.13.0']) {
+    assert.doesNotThrow(() => assertPatchedNodeVersion(version))
+  }
+  for (const version of ['20.20.0', '22.23.1', '22.23.3', '23.11.0', '24.22.0', '25.0.0', '26.12.0', '27.0.0', '22.23.4-rc.1', '', null]) {
+    assert.throws(() => assertPatchedNodeVersion(version), /Node2Shell/)
+  }
+})
 const candidates = () => platforms.map((platform, index) => ({
   version: '1.2.3', revision, platform, verified: true,
   images: Object.fromEntries(components.map((component, componentIndex) => [component, digest(index * 10 + componentIndex + 1)]))

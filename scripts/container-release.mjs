@@ -3,6 +3,7 @@ import { mkdir, readFile, readdir, writeFile, mkdtemp, rm } from 'node:fs/promis
 import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import semver from 'semver'
 import { root, run } from './ci-support.mjs'
 import { scanners } from './run-ci-security.mjs'
 
@@ -11,6 +12,14 @@ export const platforms = ['linux/amd64', 'linux/arm64']
 const validDigest = (value) => /^sha256:[a-f0-9]{64}$/.test(value || '')
 export const repository = (component) => `ghcr.io/sapientorius/nebulynk-${component}`
 const docker = (args, options = {}) => run('docker', args, { quiet: true, timeout: 120000, ...options })
+
+// Minimum upstream fixes for CVE-2026-111497 (Node2Shell). Unknown release
+// lines must be reviewed before they can pass the publication gate.
+export function assertPatchedNodeVersion(version) {
+  if (!semver.valid(version) || !semver.satisfies(version, '>=22.23.4 <23 || >=24.22.1 <25 || >=26.12.1 <27')) {
+    throw new Error(`Node.js ${version} does not meet the Node2Shell security baseline`)
+  }
+}
 
 const stagingTagMatches = (tag, revision) => typeof revision === 'string' &&
   new RegExp(`^staging-${revision.slice(0, 12)}-[1-9]\\d*$`).test(tag || '')
