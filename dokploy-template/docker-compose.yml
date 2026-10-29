@@ -5,7 +5,7 @@
 version: "3.8"
 services:
   frontend:
-    image: ghcr.io/sapientorius/nebulynk-frontend:${NEBULYNK_VERSION:-0.7.2}
+    image: ghcr.io/sapientorius/nebulynk-frontend:${NEBULYNK_VERSION:-0.8.0}
     depends_on:
       - backend
     expose:
@@ -115,7 +115,7 @@ services:
       timeout: 3s
       retries: 3
       start_period: 60s
-    image: ghcr.io/sapientorius/nebulynk-backend:${NEBULYNK_VERSION:-0.7.2}
+    image: ghcr.io/sapientorius/nebulynk-backend:${NEBULYNK_VERSION:-0.8.0}
     environment:
       NODE_ENV: "${NODE_ENV:-development}"
       JWT_SECRET: "${JWT_SECRET:?JWT_SECRET must be set}"
@@ -182,7 +182,7 @@ services:
     restart: unless-stopped
 
   transcription-worker:
-    image: ghcr.io/sapientorius/nebulynk-transcription-worker:${NEBULYNK_VERSION:-0.7.2}
+    image: ghcr.io/sapientorius/nebulynk-transcription-worker:${NEBULYNK_VERSION:-0.8.0}
     stop_grace_period: 75s
     mem_limit: ${TRANSCRIPTION_WORKER_MEMORY_LIMIT:-1536m}
     cpus: ${TRANSCRIPTION_WORKER_CPUS:-1.0}

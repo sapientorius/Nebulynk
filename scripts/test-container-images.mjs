@@ -4,6 +4,7 @@ import { writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { chromium, expect } from '@playwright/test'
 import { createContext, freePort, requireDocker, root, testEnvironment, waitFor, withCleanup } from './ci-support.mjs'
+import { assertPatchedNodeVersion } from './container-release.mjs'
 
 const context = await createContext('containers')
 const { project, reports, compose } = context
@@ -76,6 +77,7 @@ try {
   await withCleanup(async () => {
     await requireDocker(context.execute)
     const images = {}
+    const nodeRuntimes = {}
     for (const component of ['backend', 'frontend', 'transcription-worker']) {
       const key = { backend: 'NEBULYNK_TEST_BACKEND_IMAGE', frontend: 'NEBULYNK_TEST_FRONTEND_IMAGE', 'transcription-worker': 'NEBULYNK_TEST_WORKER_IMAGE' }[component]
       images[component] = process.env[key] || `${project}-${component}:test`
@@ -89,6 +91,12 @@ try {
       assert.notEqual(image.Config.User, 'root')
       assert.ok(image.Config.User)
       assert.ok(image.Config.Healthcheck)
+      const runtime = JSON.parse(await docker(['run', '--rm', '--entrypoint', 'node', images[component], '-e',
+        "console.log(JSON.stringify({node:process.versions.node,brotli:process.versions.brotli,blockSwitchError:require('node:zlib').constants.BROTLI_DECODER_ERROR_FORMAT_BLOCK_SWITCH}))"
+      ]))
+      assertPatchedNodeVersion(runtime.node)
+      assert.equal(typeof runtime.blockSwitchError, 'number', `${component} must include the Brotli block-switch security fix`)
+      nodeRuntimes[component] = runtime
       await docker(['run', '--rm', '--entrypoint', 'node', images[component], '-e',
         "require('fs').accessSync('/licenses/LICENSE')"
       ])
@@ -227,7 +235,7 @@ try {
     await start(invalid, ['--read-only', '--tmpfs', '/tmp:rw,size=64m', images.frontend])
     await waitFor(async () => (await docker(['inspect', '--format', '{{.State.Running}}', invalid])).trim() === 'false')
     assert.notEqual((await docker(['inspect', '--format', '{{.State.ExitCode}}', invalid])).trim(), '0')
-    await writeFile(resolve(reports, 'result.json'), JSON.stringify({ status: 'passed', images }, null, 2))
+    await writeFile(resolve(reports, 'result.json'), JSON.stringify({ status: 'passed', images, nodeRuntimes }, null, 2))
     console.log('Production images: runtime configuration, CSP, non-root/read-only startup, native dependencies, real worker transcription, browser login/chat/sockets/uploads and persistent recreation passed')
   }, async () => {
     await browser?.close()
