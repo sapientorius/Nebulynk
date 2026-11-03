@@ -13,6 +13,11 @@
       "category": "fix",
       "title": { "en": "Local Push-to-Talk works in focused message fields" },
       "description": { "en": "The configured key now activates the microphone even while a message input or another editable field has focus. Normal keyboard behavior remains available at the same time: Shift enables uppercase letters, letters and spaces are entered, and Enter still sends messages. Repeated key presses do not replay the activation sound, and an unmatched key release no longer plays a misleading release sound." }
+    },
+    {
+      "category": "improvement",
+      "title": { "en": "Keep browser release checks on a supported runner" },
+      "description": { "en": "Pins the browser CI job to Ubuntu 24.04 so the project's installed Playwright version can install Chromium after the default hosted runner moved to Ubuntu 26.04. All existing browser tests and release gates remain enabled." }
     }
   ],
   "security": [],
