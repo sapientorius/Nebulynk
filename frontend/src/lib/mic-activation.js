@@ -462,14 +462,16 @@ function startPtt() {
   if (!manualMuteOverride) {
     setTransmitting(false)
   }
-  window.addEventListener('keydown', onPttKeyDown)
-  window.addEventListener('keyup', onPttKeyUp)
+  // Observe keys before focused fields stop propagation, preserving their normal
+  // behavior. The settings key recorder on window can still intercept them first.
+  document.addEventListener('keydown', onPttKeyDown, true)
+  document.addEventListener('keyup', onPttKeyUp, true)
   window.addEventListener('blur', onPttBlur)
 }
 
 function stopPtt() {
-  window.removeEventListener('keydown', onPttKeyDown)
-  window.removeEventListener('keyup', onPttKeyUp)
+  document.removeEventListener('keydown', onPttKeyDown, true)
+  document.removeEventListener('keyup', onPttKeyUp, true)
   window.removeEventListener('blur', onPttBlur)
   if (keyboardPttActive || externalPttActive) {
     keyboardPttActive = false
@@ -481,13 +483,9 @@ function stopPtt() {
 function onPttKeyDown(e) {
   if (shouldUseDesktopPttEventBinding(desktopPttBindingStatus)) return
   if (e.code !== pttKey) return
-  if (e.repeat) return
   if (!hasActiveVoiceSession()) return
   if (manualMuteOverride) return
-  // Don't trigger when typing in inputs
-  const tag = e.target?.tagName
-  if (tag === 'INPUT' || tag === 'TEXTAREA' || e.target?.isContentEditable) return
-  e.preventDefault()
+  if (e.repeat || keyboardPttActive) return
   keyboardPttActive = true
   setTransmitting(true)
   playSfx(SFX_EVENTS.VOICE_PTT_SELF_DOWN)
@@ -496,8 +494,8 @@ function onPttKeyDown(e) {
 function onPttKeyUp(e) {
   if (shouldUseDesktopPttEventBinding(desktopPttBindingStatus)) return
   if (e.code !== pttKey) return
+  if (!keyboardPttActive) return
   if (!hasActiveVoiceSession()) return
-  e.preventDefault()
   keyboardPttActive = false
   if (!externalPttActive) {
     setTransmitting(false)

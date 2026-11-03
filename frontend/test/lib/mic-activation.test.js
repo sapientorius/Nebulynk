@@ -71,6 +71,10 @@ describe('external push-to-talk bridge', () => {
         listeners.delete(type)
       }
     }
+    globalThis.document = {
+      addEventListener: globalThis.window.addEventListener,
+      removeEventListener: globalThis.window.removeEventListener
+    }
     globalThis.localStorage = {
       getItem: vi.fn(() => null),
       setItem: vi.fn(),
