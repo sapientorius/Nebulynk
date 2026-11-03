@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "version": "0.8.1",
+  "revision": 1,
+  "channel": "stable",
+  "published_at": "2026-11-03T00:00:00.000Z",
+  "title": { "en": "Nebulynk 0.8.1" },
+  "summary": {
+    "en": "Fixes local Push-to-Talk while a message field is focused and preserves the assigned key's normal typing behavior."
+  },
+  "changes": [
+    {
+      "category": "fix",
+      "title": { "en": "Local Push-to-Talk works in focused message fields" },
+      "description": { "en": "The configured key now activates the microphone even while a message input or another editable field has focus. Normal keyboard behavior remains available at the same time: Shift enables uppercase letters, letters and spaces are entered, and Enter still sends messages. Repeated key presses do not replay the activation sound, and an unmatched key release no longer plays a misleading release sound." }
+    }
+  ],
+  "security": [],
+  "upgrade": {
+    "backup_required": true,
+    "downtime_expected": true,
+    "breaking": false,
+    "manual_steps": {
+      "en": [
+        "Before updating, create and verify external backups of PostgreSQL, both Garage volumes, and deployment configuration and secrets. Keep the existing Compose project or platform resource and persistent-volume mappings. For upgrades from versions before 0.8.0, also follow the intervening release instructions.",
+        "Set NEBULYNK_VERSION=0.8.1, pull the backend, frontend and transcription-worker images, and recreate all three services together. Stop the old backend completely before starting its replacement and allow at least 75 seconds for shutdown.",
+        "Wait for GET /health/ready and the worker health check to pass, then verify login, chat and Push-to-Talk with the message field focused. This release adds no database migrations or breaking configuration changes relative to 0.8.0."
+      ]
+    },
+    "docs_url": "https://github.com/sapientorius/Nebulynk/blob/v0.8.1/docs/SELF_HOSTING.md"
+  }
+}
