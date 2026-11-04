@@ -8,7 +8,7 @@
     "dev:rtk": "rtk tauri dev",
     "build": "tauri build",
     "build:rtk": "rtk tauri build",
-    "build:macos": "tauri build --config src-tauri/tauri.macos.conf.json",
+    "build:macos": "node scripts/build-macos.mjs",
     "build:macos:rtk": "rtk npm run build:macos"
   },
   "devDependencies": {

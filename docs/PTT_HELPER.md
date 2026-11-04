@@ -122,6 +122,11 @@ npm run build:macos --workspace=desktop-ptt-helper
 cargo test --locked --manifest-path desktop-ptt-helper/src-tauri/Cargo.toml
 ```
 
+The macOS build command asks Tauri to build and ad-hoc sign the app, then uses
+Apple's ditto and hdiutil to create a compressed disk image containing the app
+and an Applications shortcut. It does not need Finder automation or an
+interactive desktop to arrange the installer window.
+
 The **Build PTT Helper** Actions workflow can be run manually against a branch
 or tag. It uploads three `ptt-helper-*` Actions artifacts with installers,
 checksums and per-platform metadata; a manual run does not publish a release.
