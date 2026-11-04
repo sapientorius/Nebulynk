@@ -4,7 +4,7 @@ use crate::ptt::{DesktopPttBindingRequest, DesktopPttBindingStatus, PttEvent};
 use std::ffi::c_void;
 use std::ptr::null_mut;
 use std::sync::{mpsc, Arc, Mutex};
-use std::time::{Duration, Instant};
+use std::time::{Duration, SystemTime};
 
 type Ref = *mut c_void;
 type TapCallback = unsafe extern "C" fn(Ref, u32, Ref, Ref) -> Ref;
@@ -77,7 +77,9 @@ impl MacosPttService {
                 tap: null_mut(),
                 source: null_mut(),
             });
-            let mut last_tick = Instant::now();
+            // macOS monotonic clocks can stop during sleep. Wall time also detects
+            // suspension; a backwards clock adjustment conservatively releases PTT.
+            let mut last_tick = SystemTime::now();
             loop {
                 let mut shutdown = false;
                 while let Ok(command) = receive.try_recv() {
@@ -103,11 +105,11 @@ impl MacosPttService {
                     break;
                 }
                 // A stalled runloop (including sleep) invalidates an in-flight hold.
-                if last_tick.elapsed() > Duration::from_millis(500) {
+                if last_tick.elapsed().unwrap_or(Duration::MAX) > Duration::from_millis(500) {
                     state.release();
                 }
                 state.refresh();
-                last_tick = Instant::now();
+                last_tick = SystemTime::now();
                 if state.source.is_null() {
                     std::thread::sleep(Duration::from_millis(50));
                 } else {
