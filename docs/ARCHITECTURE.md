@@ -11,8 +11,11 @@ backend, and supporting data services.
 - PostgreSQL for application data, Redis for transient coordination and rate
   limiting, and S3-compatible storage for media.
 - LiveKit for voice and meeting media when those features are enabled.
-- An optional Windows push-to-talk helper that pairs only with an explicitly
-  trusted browser or PWA origin.
+- An optional Windows/macOS (Beta) push-to-talk helper that pairs only with an
+  explicitly trusted browser or PWA origin over a loopback WebSocket. Windows
+  uses Raw Input; macOS uses a listen-only CoreGraphics event tap with Input
+  Monitoring permission. Both retain the key's normal behavior and forward
+  events to one authorized target session. See the [helper guide](PTT_HELPER.md).
 
 ## Design Principles
 
