@@ -8,5 +8,6 @@ commands.allow = [
   "helper_revoke_origin",
   "helper_set_paused",
   "helper_set_autostart",
-  "helper_show_settings"
+  "helper_show_settings",
+  "helper_request_input_monitoring"
 ]

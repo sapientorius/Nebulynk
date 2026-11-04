@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "version": "0.9.0",
+  "revision": 1,
+  "channel": "stable",
+  "published_at": "2026-11-04T00:00:00.000Z",
+  "title": {
+    "en": "Nebulynk 0.9.0"
+  },
+  "summary": {
+    "en": "Adds the macOS PTT Helper beta for Apple Silicon and Intel, automatic native helper downloads, and clearer permission and recovery states."
+  },
+  "changes": [
+    {
+      "category": "feature",
+      "title": {
+        "en": "macOS PTT Helper (Beta)"
+      },
+      "description": {
+        "en": "Browser and PWA users on macOS can opt in to global hold-to-talk with a separate menu bar helper. Apple Silicon and Intel disk images are included with this release. The beta uses a free ad-hoc signature and is not notarized by Apple; first launch requires manual approval in macOS Privacy & Security and global keyboard capture requires Input Monitoring permission. Follow docs/PTT_HELPER.md for installation and known limitations."
+      }
+    },
+    {
+      "category": "improvement",
+      "title": {
+        "en": "Automatic helper builds and verified downloads"
+      },
+      "description": {
+        "en": "Native Windows and macOS helper builds now participate in required CI. Release installers include SHA-256 checksums and a versioned artifact manifest, and voice settings link to the matching platform release."
+      }
+    },
+    {
+      "category": "fix",
+      "title": {
+        "en": "Release PTT when the helper loses capture or its target"
+      },
+      "description": {
+        "en": "The browser releases helper-driven transmission when permissions, the active target or the local connection are lost. macOS capture observes keys without suppressing their normal behavior and handles key repeats and modifier releases."
+      }
+    }
+  ],
+  "security": [],
+  "upgrade": {
+    "backup_required": true,
+    "downtime_expected": true,
+    "breaking": false,
+    "manual_steps": {
+      "en": [
+        "Before updating, create and verify external backups of PostgreSQL, both Garage volumes, and deployment configuration and secrets. Keep the existing Compose project or platform resource and persistent-volume mappings. For upgrades from versions before 0.8.0, also follow the intervening release instructions.",
+        "Set NEBULYNK_VERSION=0.9.0, pull the backend, frontend and transcription-worker images, and recreate all three services together. Stop the old backend completely before starting its replacement and allow at least 75 seconds for shutdown.",
+        "Wait for GET /health/ready and the worker health check to pass, then verify login, chat and Push-to-Talk. This release adds no database migrations or breaking configuration changes relative to 0.8.1.",
+        "macOS users may optionally download PTT Helper (Beta) for Apple Silicon or Intel from this release. Move it to Applications, approve first launch in Privacy & Security and grant Input Monitoring permission. See https://github.com/sapientorius/Nebulynk/blob/v0.9.0/docs/PTT_HELPER.md. Windows users can install the Windows helper from the same release."
+      ]
+    },
+    "docs_url": "https://github.com/sapientorius/Nebulynk/blob/v0.9.0/docs/SELF_HOSTING.md"
+  }
+}

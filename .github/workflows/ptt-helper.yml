@@ -1,0 +1,78 @@
+name: Build PTT Helper
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: PTT Helper (${{ matrix.platform }} ${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos
+            arch: aarch64
+            target: aarch64-apple-darwin
+            runner: macos-15
+            script: build:macos
+          - platform: macos
+            arch: x86_64
+            target: x86_64-apple-darwin
+            runner: macos-15-intel
+            script: build:macos
+          - platform: windows
+            arch: x86_64
+            target: x86_64-pc-windows-msvc
+            runner: windows-2022
+            script: build
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: desktop-ptt-helper/src-tauri -> target
+          key: ${{ matrix.target }}
+      - run: npm ci
+      - name: Test helper and trust boundaries without interactive OS permissions
+        run: cargo test --locked --manifest-path desktop-ptt-helper/src-tauri/Cargo.toml --target ${{ matrix.target }}
+      - name: Build native installer
+        env:
+          MACOSX_DEPLOYMENT_TARGET: '13.0'
+        run: npm run ${{ matrix.script }} --workspace=desktop-ptt-helper -- --target ${{ matrix.target }}
+      - name: Verify macOS architecture, ad-hoc signature and disk image
+        if: matrix.platform == 'macos'
+        shell: bash
+        run: |
+          set -euo pipefail
+          bundle="desktop-ptt-helper/src-tauri/target/${{ matrix.target }}/release/bundle"
+          app="$bundle/macos/Nebulynk PTT Helper.app"
+          codesign --verify --deep --strict --verbose=2 "$app"
+          codesign --display --verbose=4 "$app" 2>&1 | grep -F 'Signature=adhoc'
+          arch="${{ matrix.arch }}"
+          if [ "$arch" = aarch64 ]; then arch=arm64; fi
+          lipo -verify_arch "$arch" "$app/Contents/MacOS/nebulynk-ptt-helper"
+          shopt -s nullglob
+          images=("$bundle"/dmg/*.dmg)
+          test "${#images[@]}" -eq 1
+          hdiutil verify "${images[0]}"
+      - name: Package versioned downloads and checksums
+        run: node scripts/ptt-helper-artifacts.mjs package ${{ matrix.platform }} ${{ matrix.arch }} desktop-ptt-helper/src-tauri/target/${{ matrix.target }}/release/bundle dist/ptt-helper
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ptt-helper-${{ matrix.platform }}-${{ matrix.arch }}
+          path: dist/ptt-helper/
+          if-no-files-found: error

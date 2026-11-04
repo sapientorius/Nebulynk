@@ -122,20 +122,24 @@
         >
           <div class="global-ptt-card">
             <div class="global-ptt-copy">
-              <strong>{{ $t('ui.components.global_ptt_install_helper') }}</strong>
+              <strong>{{ $t(isMacHelper ? 'ui.components.global_ptt_install_macos_helper' : 'ui.components.global_ptt_install_helper') }}</strong>
               <div class="setting-hint global-ptt-hint">
-                {{ $t('ui.components.global_ptt_helper_download_available') }}
+                {{ $t(isMacHelper ? 'ui.components.global_ptt_macos_beta_description' : 'ui.components.global_ptt_helper_download_available') }}
                 <a
-                  href="https://github.com/sapientorius/Nebulynk/releases/tag/ptt-helper-v0.1.0"
+                  :href="pttHelperReleaseUrl"
+                  data-testid="ptt-helper-download"
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  {{ $t('ui.components.global_ptt_download_windows_helper') }}
+                  {{ $t(isMacHelper ? 'ui.components.global_ptt_download_macos_helper' : 'ui.components.global_ptt_download_windows_helper') }}
                 </a>
               </div>
               <div class="setting-hint global-ptt-hint">
-                {{ $t('ui.components.global_ptt_permission_explanation') }}
+                {{ $t(isMacHelper ? 'ui.components.global_ptt_macos_permission_explanation' : 'ui.components.global_ptt_permission_explanation') }}
               </div>
+              <a v-if="isMacHelper" :href="pttHelperGuideUrl" target="_blank" rel="noopener noreferrer" data-testid="ptt-helper-guide">
+                {{ $t('ui.components.global_ptt_macos_installation_guide') }}
+              </a>
             </div>
             <n-button
               :type="browserPttHelperEnabled ? 'warning' : 'primary'"
@@ -178,6 +182,7 @@ import {
 import { isDesktopPttTextEntryKey } from '../lib/desktop-ptt-shortcut.js'
 import * as micActivation from '../lib/mic-activation.js'
 import { isDesktopWorkspaceWindow } from '../lib/runtime.js'
+import { PTT_HELPER_RELEASE_URL, PTT_HELPER_GUIDE_URL } from '../lib/ptt-helper-platform.js'
 
 export default {
   name: 'VoiceSettingsContent',
@@ -205,6 +210,11 @@ export default {
     }
   },
   computed: {
+    isMacHelper() {
+      return browserPttHelperState.platform === 'macos'
+    },
+    pttHelperReleaseUrl() { return PTT_HELPER_RELEASE_URL },
+    pttHelperGuideUrl() { return PTT_HELPER_GUIDE_URL },
     voiceStore() {
       return useVoiceStore()
     },
@@ -285,6 +295,13 @@ export default {
       if (!status) return null
       const mode = status.mode
       const reason = status.reason || null
+      if (reason?.startsWith('macos-')) {
+        return { type: 'warning', label: this.$t('ui.components.global_ptt_macos_attention'),
+          detail: this.$t(reason === 'macos-input-monitoring-required'
+            ? 'ui.components.global_ptt_macos_permission_explanation'
+            : reason === 'macos-secure-input' ? 'ui.components.global_ptt_macos_secure_input'
+              : 'ui.components.global_ptt_macos_capture_unavailable') }
+      }
       if (this.nativePttHelperState === 'pairing-required') {
         return { type: 'warning', label: 'Pairing benoetigt', detail: 'Freigabe im lokalen Helper bestaetigen' }
       }

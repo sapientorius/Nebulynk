@@ -11,10 +11,24 @@ const nodes = {
   sessionCount: document.getElementById('session-count'),
   activeSessions: document.getElementById('active-sessions'),
   pauseToggle: document.getElementById('pause-toggle'),
-  autostartToggle: document.getElementById('autostart-toggle')
+  autostartToggle: document.getElementById('autostart-toggle'),
+  title: document.getElementById('helper-title'),
+  macPermissions: document.getElementById('mac-permissions'),
+  permissionStatus: document.getElementById('input-permission-status'),
+  permissionButton: document.getElementById('input-permission-button'),
+  error: document.getElementById('helper-error')
 }
 
 let currentSnapshot = null
+
+const statusReasons = {
+  'macos-input-monitoring-required': 'Allow Input Monitoring in System Settings > Privacy & Security.',
+  'macos-secure-input': 'macOS Secure Input is active. Global PTT is paused until protected input ends.',
+  'macos-key-unsupported': 'This key cannot be used for global hold-to-talk on macOS. Choose another key.',
+  'macos-event-tap-unavailable': 'Keyboard monitoring could not start. Check Input Monitoring and restart the helper.',
+  'macos-event-tap-restarting': 'Keyboard monitoring is restarting. Release your key before trying again.',
+  'macos-input-thread-unavailable': 'Keyboard monitoring stopped responding. Restart the helper.'
+}
 
 function displayValue(value, fallback = '') {
   if (value === null || value === undefined || value === '') return fallback
@@ -44,7 +58,7 @@ function renderEmptyState(node, message) {
 function statusPillClass(snapshot) {
   if (!snapshot) return 'pill pill-muted'
   if (snapshot.paused) return 'pill pill-warn'
-  if (snapshot.bindingStatus?.mode === 'global-raw-input') return 'pill pill-ok'
+  if (['global-raw-input', 'global-native'].includes(snapshot.bindingStatus?.mode)) return 'pill pill-ok'
   if (snapshot.bindingStatus?.mode === 'unsupported') return 'pill pill-danger'
   return 'pill pill-muted'
 }
@@ -54,6 +68,7 @@ function statusPillLabel(snapshot) {
   if (snapshot.paused) return 'Paused'
   switch (snapshot.bindingStatus?.mode) {
     case 'global-raw-input':
+    case 'global-native':
       return 'Global Active'
     case 'unsupported':
       return 'Unsupported'
@@ -178,14 +193,20 @@ function renderStatus(snapshot) {
     helperSettingCard('Binding Mode', status.mode || 'focused-only'),
     helperSettingCard('Key', status.keyCode || 'None'),
     helperSettingCard('Current Target', snapshot.currentTargetSessionId || 'None'),
-    helperSettingCard('Transport', status.usesRawInput ? 'Windows Raw Input' : 'Focused only'),
+    helperSettingCard('Transport', status.usesRawInput ? 'Windows Raw Input' : status.isGlobal ? 'macOS keyboard monitoring' : 'Focused only'),
     helperSettingCard('Pairing State', `${(snapshot.trustedOrigins || []).length} trusted origins`),
-    helperSettingCard('Reason', status.reason || 'Ready')
+    helperSettingCard('Reason', statusReasons[status.reason] || status.reason || 'Ready')
   ])
 }
 
 function renderSnapshot(snapshot) {
   currentSnapshot = snapshot
+  const mac = snapshot.platform === 'macos'
+  nodes.title.textContent = mac ? 'macOS Push-to-Talk (Beta)' : 'Windows Push-to-Talk'
+  nodes.macPermissions.hidden = !mac
+  nodes.permissionStatus.textContent = snapshot.inputMonitoringGranted
+    ? 'Input Monitoring is allowed.' : 'Input Monitoring permission is required for global Push-to-Talk.'
+  nodes.permissionButton.hidden = snapshot.inputMonitoringGranted === true
   nodes.pauseToggle.checked = snapshot.paused === true
   nodes.autostartToggle.checked = snapshot.autostartEnabled === true
   renderStatus(snapshot)
@@ -207,7 +228,7 @@ nodes.pauseToggle.addEventListener('change', async (event) => {
   try {
     await invoke('helper_set_paused', { paused: event.target.checked })
   } catch (error) {
-    console.error(error)
+    showError(error)
   } finally {
     await refreshSnapshot()
   }
@@ -217,10 +238,22 @@ nodes.autostartToggle.addEventListener('change', async (event) => {
   try {
     await invoke('helper_set_autostart', { enabled: event.target.checked })
   } catch (error) {
-    console.error(error)
+    showError(error)
   } finally {
     await refreshSnapshot()
   }
+})
+
+function showError(error) {
+  nodes.error.hidden = false
+  nodes.error.textContent = String(error)
+}
+
+nodes.permissionButton.addEventListener('click', async () => {
+  try {
+    await invoke('helper_request_input_monitoring')
+    await refreshSnapshot()
+  } catch (error) { showError(error) }
 })
 
 document.body.addEventListener('click', async (event) => {

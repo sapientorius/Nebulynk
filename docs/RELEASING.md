@@ -92,6 +92,30 @@ publication.
 
 ## Completing a release
 
+### Native PTT Helper downloads
+
+From 0.9.0, full CI requires the reusable `ptt-helper.yml` workflow: Windows x64
+MSI and macOS Apple Silicon/Intel DMGs. Mac packages carry a Beta label and a
+free ad-hoc signature; no Apple Developer ID or notarization secrets are used.
+Keep helper versions synchronized in its npm package, Cargo manifest/lockfile
+and Tauri configuration. They remain independent of the platform SemVer.
+
+The publication job downloads native CI artifacts, validates all three variants
+against this release commit/version, and adds installers, checksums and
+`ptt-helper-assets.json` when first creating the immutable GitHub release.
+Reruns must verify the existing helper manifest and downloaded bytes as well as
+container/Plesk assets. Missing or conflicting helper files stop the feed.
+Changes to packaging must keep `scripts/ptt-helper-artifacts.mjs` and its tests
+aligned with the helper filenames and manifest contract.
+
+Before tagging the first Mac Beta, complete and record the device acceptance
+in [PTT Helper testing](PTT_HELPER.md#pre-release-tester-checklist). A successful
+CI build alone is not device acceptance. Run **Build PTT Helper** manually to
+provide candidates without publishing an official release. Verify public
+installer downloads and checksums after publication, including the Beta label.
+
+### Release completion steps
+
 1. Wait for the publication workflow to succeed and verify the public release,
    image/package artifacts, and signed update feed.
 2. As a required final step of every stable release, merge `stable` back into

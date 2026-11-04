@@ -144,8 +144,8 @@ describe('browser ptt helper bridge', () => {
     expect(MockWebSocket.instances).toHaveLength(0)
   })
 
-  it('does not expose the browser helper on non-Windows platforms', async () => {
-    globalThis.window.navigator.userAgent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0)'
+  it('does not expose the browser helper on unsupported platforms', async () => {
+    globalThis.window.navigator.userAgent = 'Mozilla/5.0 (X11; Linux x86_64)'
 
     const { initializeBrowserPttHelperBridge, browserPttHelperState } = await import('../../src/lib/browser-ptt-helper-bridge.js')
 
@@ -321,6 +321,10 @@ describe('browser ptt helper bridge', () => {
     enableBrowserPttHelper()
     const socket = MockWebSocket.instances[0]
     socket.emit('open')
+    socket.emit('message', { data: JSON.stringify({ type: 'hello_ack', payload: {
+      authorized: true, targetState: { isTarget: true },
+      bindingStatus: { mode: 'global-native', isGlobal: true, platform: 'macos', keyCode: 'KeyV' }
+    } }) })
     socket.emit('message', {
       data: JSON.stringify({ type: 'ptt_down' })
     })
@@ -330,6 +334,44 @@ describe('browser ptt helper bridge', () => {
 
     expect(triggerExternalPttDownMock).toHaveBeenCalledTimes(1)
     expect(triggerExternalPttUpMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('exposes macOS as an opt-in beta without connecting on first load', async () => {
+    window.navigator = { platform: 'MacIntel', maxTouchPoints: 0 }
+    const { initializeBrowserPttHelperBridge, browserPttHelperState, enableBrowserPttHelper } = await import('../../src/lib/browser-ptt-helper-bridge.js')
+    initializeBrowserPttHelperBridge()
+    expect(browserPttHelperState.platform).toBe('macos')
+    expect(MockWebSocket.instances).toHaveLength(0)
+    enableBrowserPttHelper()
+    expect(MockWebSocket.instances).toHaveLength(1)
+  })
+
+  it('ignores unpaired presses and releases transmission on permission loss, target loss and disconnect', async () => {
+    const { initializeBrowserPttHelperBridge, enableBrowserPttHelper } = await import('../../src/lib/browser-ptt-helper-bridge.js')
+    const { nativePttState } = await import('../../src/lib/native-ptt-state.js')
+    initializeBrowserPttHelperBridge()
+    enableBrowserPttHelper()
+    const socket = MockWebSocket.instances[0]
+    socket.emit('open')
+    const emit = (type, payload = {}) => socket.emit('message', { data: JSON.stringify({ type, payload }) })
+    emit('ptt_down')
+    expect(triggerExternalPttDownMock).not.toHaveBeenCalled()
+    emit('hello_ack', { authorized: true, targetState: { isTarget: true },
+      bindingStatus: { mode: 'global-native', isGlobal: true, platform: 'macos', keyCode: 'ShiftLeft' } })
+    emit('ptt_down')
+    expect(triggerExternalPttDownMock).toHaveBeenCalledTimes(1)
+    emit('binding_status', { mode: 'global-native', isGlobal: true, platform: 'macos', keyCode: 'ShiftLeft' })
+    expect(nativePttState.isTarget).toBe(true)
+    triggerExternalPttUpMock.mockClear()
+    emit('binding_status', { mode: 'unsupported', isGlobal: false, platform: 'macos', reason: 'macos-input-monitoring-required' })
+    expect(triggerExternalPttUpMock).toHaveBeenCalledTimes(1)
+    emit('target_state', { isTarget: false })
+    expect(nativePttState.helperState).toBe('unsupported')
+    expect(triggerExternalPttUpMock).toHaveBeenCalledTimes(2)
+    emit('ptt_down')
+    expect(triggerExternalPttDownMock).toHaveBeenCalledTimes(1)
+    socket.emit('close')
+    expect(triggerExternalPttUpMock).toHaveBeenCalledTimes(3)
   })
 
   it('ignores stale close events after a replacement socket is connected', async () => {

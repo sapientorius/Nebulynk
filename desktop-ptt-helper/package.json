@@ -1,13 +1,15 @@
 {
   "name": "desktop-ptt-helper",
-  "version": "0.0.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "tauri dev",
     "dev:rtk": "rtk tauri dev",
     "build": "tauri build",
-    "build:rtk": "rtk tauri build"
+    "build:rtk": "rtk tauri build",
+    "build:macos": "tauri build --config src-tauri/tauri.macos.conf.json",
+    "build:macos:rtk": "rtk npm run build:macos"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.0.0"

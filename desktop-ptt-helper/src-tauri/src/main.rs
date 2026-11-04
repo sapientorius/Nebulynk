@@ -1,10 +1,16 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod autostart;
+#[cfg(any(target_os = "macos", test))]
+mod macos_ptt;
+mod ptt;
+#[cfg(not(target_os = "macos"))]
 mod windows_ptt;
 
 use base64::Engine;
 use chrono::Utc;
 use futures_util::{SinkExt, StreamExt};
+use ptt::{DesktopPttBindingRequest, DesktopPttBindingStatus, PttEvent, PttService};
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -28,7 +34,6 @@ use tokio_tungstenite::accept_hdr_async;
 use tokio_tungstenite::tungstenite::handshake::server::{Request, Response};
 use tokio_tungstenite::tungstenite::Message;
 use url::Url;
-use windows_ptt::{DesktopPttBindingRequest, DesktopPttBindingStatus, PttEvent, WindowsPttService};
 
 const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
 const MAIN_WINDOW_LABEL: &str = "main";
@@ -41,6 +46,7 @@ const MAX_WS_TEXT_FRAME_BYTES: usize = 64 * 1024;
 const PAIRING_TOKEN_BYTES: usize = 32;
 const STORAGE_FILE_NAME: &str = "helper-state.json";
 const LOG_FILE_NAME: &str = "helper.log";
+#[cfg(target_os = "windows")]
 const AUTOSTART_REGISTRY_NAME: &str = "Nebulynk PTT Helper";
 const EVENT_STATE_CHANGED: &str = "helper:state-changed";
 const MENU_STATUS_ID: &str = "status";
@@ -104,6 +110,9 @@ struct ActiveSessionSnapshot {
 #[serde(rename_all = "camelCase")]
 struct HelperStateSnapshot {
     helper_version: String,
+    platform: String,
+    beta: bool,
+    input_monitoring_granted: bool,
     binding_status: DesktopPttBindingStatus,
     paused: bool,
     autostart_enabled: bool,
@@ -182,7 +191,7 @@ impl RuntimeState {
 struct HelperStateHandle {
     app_handle: AppHandle,
     runtime: Mutex<RuntimeState>,
-    ptt_service: WindowsPttService,
+    ptt_service: PttService,
 }
 
 struct TrayMenuHandle {
@@ -359,7 +368,7 @@ fn status_menu_label(status: &DesktopPttBindingStatus, paused: bool) -> String {
         "Status: Paused".to_string()
     } else {
         match status.mode.as_str() {
-            "global-raw-input" => format!(
+            "global-raw-input" | "global-native" => format!(
                 "Status: Global ({})",
                 status.key_code.clone().unwrap_or_else(|| "PTT".to_string())
             ),
@@ -396,6 +405,9 @@ fn helper_snapshot(runtime: &RuntimeState) -> HelperStateSnapshot {
 
     HelperStateSnapshot {
         helper_version: APP_VERSION.to_string(),
+        platform: runtime.binding_status.platform.clone(),
+        beta: cfg!(target_os = "macos"),
+        input_monitoring_granted: input_monitoring_granted(),
         binding_status: runtime.binding_status.clone(),
         paused: runtime.persisted.paused,
         autostart_enabled: runtime.persisted.autostart_enabled,
@@ -744,7 +756,18 @@ fn recompute_target_and_binding(
             .runtime
             .lock()
             .map_err(|error| error.to_string())?;
-        runtime.target_connection_id = choose_target_connection(&runtime);
+        let target = choose_target_connection(&runtime);
+        if target != runtime.target_connection_id {
+            // Release the previous owner before handing a held shortcut to another session.
+            for session in runtime
+                .sessions
+                .values()
+                .filter(|session| session.authorized)
+            {
+                send_json(&session.sender, json!({ "type": "ptt_up", "payload": {} }));
+            }
+        }
+        runtime.target_connection_id = target;
         runtime.persisted.last_target = runtime
             .target_connection_id
             .and_then(|connection_id| runtime.sessions.get(&connection_id))
@@ -1466,7 +1489,32 @@ fn helper_get_state_snapshot(
         .runtime
         .lock()
         .map_err(|error| error.to_string())?;
-    Ok(helper_snapshot(&runtime))
+    let mut snapshot = helper_snapshot(&runtime);
+    snapshot.autostart_enabled = is_autostart_enabled().unwrap_or(false);
+    Ok(snapshot)
+}
+
+fn input_monitoring_granted() -> bool {
+    #[cfg(target_os = "macos")]
+    {
+        macos_ptt::native::permission_granted()
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        true
+    }
+}
+
+#[tauri::command]
+fn helper_request_input_monitoring() -> Result<bool, String> {
+    #[cfg(target_os = "macos")]
+    {
+        Ok(macos_ptt::native::request_permission())
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        Ok(true)
+    }
 }
 
 #[tauri::command]
@@ -1550,7 +1598,19 @@ fn handle_menu_event(app: &AppHandle, helper_state: &Arc<HelperStateHandle>, men
             }
             let _ = recompute_target_and_binding(app, helper_state);
         }
-        MENU_QUIT_ID => app.exit(0),
+        MENU_QUIT_ID => {
+            helper_state.ptt_service.shutdown();
+            if let Ok(runtime) = helper_state.runtime.lock() {
+                for session in runtime
+                    .sessions
+                    .values()
+                    .filter(|session| session.authorized)
+                {
+                    send_json(&session.sender, json!({ "type": "ptt_up", "payload": {} }));
+                }
+            }
+            app.exit(0);
+        }
         _ => {}
     }
 }
@@ -1605,9 +1665,14 @@ fn set_autostart_enabled(_app: &AppHandle, enabled: bool) -> Result<(), String> 
     Ok(())
 }
 
-#[cfg(not(target_os = "windows"))]
+#[cfg(target_os = "macos")]
+fn set_autostart_enabled(_app: &AppHandle, enabled: bool) -> Result<(), String> {
+    autostart::set_enabled(enabled)
+}
+
+#[cfg(not(any(target_os = "windows", target_os = "macos")))]
 fn set_autostart_enabled(_app: &AppHandle, _enabled: bool) -> Result<(), String> {
-    Ok(())
+    Err("Autostart is not supported on this platform.".into())
 }
 
 #[cfg(target_os = "windows")]
@@ -1659,7 +1724,12 @@ fn is_autostart_enabled() -> Result<bool, String> {
     }
 }
 
-#[cfg(not(target_os = "windows"))]
+#[cfg(target_os = "macos")]
+fn is_autostart_enabled() -> Result<bool, String> {
+    autostart::is_enabled()
+}
+
+#[cfg(not(any(target_os = "windows", target_os = "macos")))]
 fn is_autostart_enabled() -> Result<bool, String> {
     Ok(false)
 }
@@ -1670,6 +1740,8 @@ fn main() {
             let _ = show_settings_window(app);
         }))
         .setup(|app| {
+            #[cfg(target_os = "macos")]
+            app.set_activation_policy(tauri::ActivationPolicy::Accessory);
             let app_handle = app.handle().clone();
             append_helper_log(&app_handle, "helper setup starting");
             let mut persisted = load_persisted_state(&app_handle)?;
@@ -1681,7 +1753,7 @@ fn main() {
                     persisted,
                     DesktopPttBindingStatus::default(),
                 )),
-                ptt_service: WindowsPttService::new({
+                ptt_service: PttService::new({
                     let weak_state = weak_state.clone();
                     Arc::new(move |event| {
                         if let Some(helper_state) = weak_state.upgrade() {
@@ -1692,6 +1764,33 @@ fn main() {
             });
 
             app.manage(helper_state.clone());
+
+            // Native capture can lose/recover permissions without a new browser binding.
+            let weak_state = Arc::downgrade(&helper_state);
+            thread::spawn(move || loop {
+                thread::sleep(std::time::Duration::from_millis(250));
+                let Some(state) = weak_state.upgrade() else {
+                    break;
+                };
+                let mut status = state.ptt_service.current_status();
+                let changed = if let Ok(mut runtime) = state.runtime.lock() {
+                    if runtime.persisted.paused {
+                        status.reason = Some("paused".into());
+                    }
+                    if status != runtime.binding_status {
+                        runtime.binding_status = status;
+                        true
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                };
+                if changed {
+                    broadcast_binding_status(&state);
+                    let _ = emit_state_changed(&state.app_handle, &state);
+                }
+            });
 
             let status = MenuItemBuilder::with_id(MENU_STATUS_ID, "Status: Loading").build(app)?;
             let trusted =
@@ -1721,7 +1820,11 @@ fn main() {
                 .ok_or_else(|| "Helper tray icon is missing from the Tauri bundle.".to_string())?;
             TrayIconBuilder::with_id(TRAY_ID)
                 .icon(tray_icon)
-                .tooltip("Nebulynk PTT Helper")
+                .tooltip(if cfg!(target_os = "macos") {
+                    "Nebulynk PTT Helper (Beta)"
+                } else {
+                    "Nebulynk PTT Helper"
+                })
                 .menu(&menu)
                 .show_menu_on_left_click(false)
                 .build(app)?;
@@ -1778,6 +1881,11 @@ fn main() {
             append_helper_log(&app_handle, "websocket thread spawned");
             append_helper_log(&app_handle, "helper setup complete");
 
+            #[cfg(target_os = "macos")]
+            if !input_monitoring_granted() {
+                show_settings_window(&app_handle)?;
+            }
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -1787,7 +1895,8 @@ fn main() {
             helper_revoke_origin,
             helper_set_paused,
             helper_set_autostart,
-            helper_show_settings
+            helper_show_settings,
+            helper_request_input_monitoring
         ])
         .run(tauri::generate_context!())
         .expect("error while running Nebulynk PTT Helper");
@@ -1804,7 +1913,7 @@ mod tests {
         OutboundMessage, PendingPairingRequest, RuntimeState, SessionState, TrustedOriginRecord,
         MAX_WS_TEXT_FRAME_BYTES,
     };
-    use crate::windows_ptt::{DesktopPttBindingRequest, DesktopPttBindingStatus};
+    use crate::ptt::{DesktopPttBindingRequest, DesktopPttBindingStatus};
     use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver};
     use tokio_tungstenite::tungstenite::handshake::server::Request;
 

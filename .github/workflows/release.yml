@@ -96,6 +96,16 @@ jobs:
           name: container-release-manifest
           path: dist/containers
 
+      - name: Download native PTT Helper installers from the required CI gate
+        uses: actions/download-artifact@v4
+        with:
+          pattern: ptt-helper-*
+          path: dist/ptt-helper
+          merge-multiple: true
+
+      - name: Require all helper architectures and verify installer checksums
+        run: node scripts/ptt-helper-artifacts.mjs collect dist/ptt-helper
+
       - name: Build and validate Plesk extension package
         env:
           NEBULYNK_CONTAINER_MANIFEST: dist/containers/container-images.json
@@ -138,6 +148,11 @@ jobs:
           fi
 
           plesk_archive="${plesk_archives[0]}"
+          mapfile -t helper_assets < <(node scripts/ptt-helper-artifacts.mjs list dist/ptt-helper)
+          if [ "${#helper_assets[@]}" -ne 7 ]; then
+            echo "Expected three PTT Helper installers, three checksums and the helper manifest."
+            exit 1
+          fi
           plesk_checksum="${plesk_archive}.sha256"
           if [ ! -f "$plesk_checksum" ]; then
             echo "Plesk extension checksum is missing: $plesk_checksum"
@@ -156,7 +171,10 @@ jobs:
             gh release download "${{ github.ref_name }}" --dir output/published-release \
               --pattern container-images.json --pattern "$(basename "$plesk_archive")" \
               --pattern "$(basename "$plesk_checksum")"
+            gh release download "${{ github.ref_name }}" --dir output/published-release \
+              --pattern 'nebulynk-ptt-helper_*' --pattern ptt-helper-assets.json
             node scripts/verify-release-container-assets.mjs output/published-release "$plesk_archive"
+            node scripts/ptt-helper-artifacts.mjs verify-published dist/ptt-helper output/published-release
             echo "GitHub release ${{ github.ref_name }} already exists; leaving immutable release unchanged."
           else
             gh release create "${{ github.ref_name }}" \
@@ -166,8 +184,12 @@ jobs:
               dist-release-notes/CHANGELOG.md \
               dist/containers/container-images.json \
               "$plesk_archive" \
-              "$plesk_checksum"
+              "$plesk_checksum" \
+              "${helper_assets[@]}"
           fi
+
+      - name: Verify helper downloads without authentication before advancing the feed
+        run: node scripts/ptt-helper-artifacts.mjs verify-public dist/ptt-helper
 
       - name: Upload signed GitHub Pages artifact
         uses: actions/upload-pages-artifact@v3

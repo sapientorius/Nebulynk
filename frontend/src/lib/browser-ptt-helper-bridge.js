@@ -12,6 +12,7 @@ import {
   updateNativePttState
 } from './native-ptt-state.js'
 import { isDesktopRuntime } from './runtime.js'
+import { browserPttHelperPlatform } from './ptt-helper-platform.js'
 
 const HELPER_URL = 'ws://127.0.0.1:47641/ws'
 const HELPER_PROTOCOL_VERSION = '1'
@@ -36,17 +37,16 @@ let heartbeatTimer = null
 
 export const browserPttHelperState = reactive({
   available: false,
-  enabled: false
+  enabled: false,
+  platform: null
 })
 
-function isWindowsBrowserHelperCandidate(targetWindow = typeof window !== 'undefined' ? window : null) {
+function isBrowserHelperCandidate(targetWindow = typeof window !== 'undefined' ? window : null) {
   if (!targetWindow || isDesktopRuntime(targetWindow) || typeof WebSocket === 'undefined') {
     return false
   }
 
-  const platform = targetWindow.navigator?.userAgentData?.platform || targetWindow.navigator?.platform || ''
-  const userAgent = targetWindow.navigator?.userAgent || ''
-  return /win/i.test(platform) || /windows/i.test(userAgent)
+  return browserPttHelperPlatform(targetWindow.navigator) !== null
 }
 
 function getEnabledPreference() {
@@ -150,6 +150,7 @@ function currentSessionStatePayload() {
 }
 
 function applyBindingStatus(status, overrides = {}) {
+  if (!status?.isGlobal || status?.reason === 'paused') micActivation.triggerExternalPttUp()
   micActivation.setDesktopPttBindingStatus(status || DEFAULT_DESKTOP_PTT_BINDING_STATUS)
   applyNativePttBindingStatus(status || DEFAULT_DESKTOP_PTT_BINDING_STATUS, {
     transport: 'browser-helper',
@@ -159,6 +160,7 @@ function applyBindingStatus(status, overrides = {}) {
 }
 
 function resetUnavailableState(message = null) {
+  micActivation.triggerExternalPttUp()
   micActivation.setDesktopPttBindingStatus(DEFAULT_DESKTOP_PTT_BINDING_STATUS)
   resetNativePttState({
     transport: 'browser-helper',
@@ -261,21 +263,23 @@ function handleMessage(event) {
       break
     case 'binding_status':
       applyBindingStatus(payload, {
-        authorized: true,
-        isTarget: undefined
+        authorized: true
       })
       break
     case 'target_state':
+      if (!payload.isTarget) micActivation.triggerExternalPttUp()
       updateNativePttState({
         transport: 'browser-helper',
-        helperState: 'connected',
+        helperState: helperStateFromStatus(nativePttState.bindingStatus),
         authorized: true,
         isTarget: payload.isTarget === true,
         targetSessionId: payload.targetSessionId || null
       })
       break
     case 'ptt_down':
-      micActivation.triggerExternalPttDown()
+      if (nativePttState.authorized && nativePttState.isTarget && nativePttState.bindingStatus.isGlobal) {
+        micActivation.triggerExternalPttDown()
+      }
       break
     case 'ptt_up':
       micActivation.triggerExternalPttUp()
@@ -294,7 +298,7 @@ function handleMessage(event) {
 }
 
 function connect() {
-  if (!started || !isWindowsBrowserHelperCandidate()) return
+  if (!started || !isBrowserHelperCandidate()) return
   if (isLiveSocket(socket)) return
 
   const nextSocket = new WebSocket(HELPER_URL)
@@ -335,7 +339,7 @@ function connect() {
 }
 
 function startBrowserPttHelperConnection() {
-  if (!initialized || !isWindowsBrowserHelperCandidate() || started) {
+  if (!initialized || !isBrowserHelperCandidate() || started) {
     return
   }
 
@@ -409,8 +413,9 @@ function stopBrowserPttHelperConnection() {
 }
 
 export function initializeBrowserPttHelperBridge({ router } = {}) {
-  const available = isWindowsBrowserHelperCandidate()
+  const available = isBrowserHelperCandidate()
   browserPttHelperState.available = available
+  browserPttHelperState.platform = available ? browserPttHelperPlatform(window.navigator) : null
 
   if (!available) {
     browserPttHelperState.enabled = false
@@ -434,12 +439,13 @@ export function initializeBrowserPttHelperBridge({ router } = {}) {
     initialized = false
     bridgeRouter = null
     browserPttHelperState.available = false
+    browserPttHelperState.platform = null
     browserPttHelperState.enabled = false
   }
 }
 
 export function enableBrowserPttHelper() {
-  if (!isWindowsBrowserHelperCandidate()) {
+  if (!isBrowserHelperCandidate()) {
     browserPttHelperState.available = false
     browserPttHelperState.enabled = false
     return false

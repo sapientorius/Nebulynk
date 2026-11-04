@@ -11,7 +11,7 @@
       <header class="hero">
         <div>
           <p class="eyebrow">Nebulynk Local Helper</p>
-          <h1>Windows Push-to-Talk</h1>
+          <h1 id="helper-title">Nebulynk Push-to-Talk</h1>
           <p class="hero-copy">
             Pair Nebulynk browser and PWA sessions once, keep one active target window, and forward
             global push-to-talk through the local helper.
@@ -19,6 +19,17 @@
         </div>
         <button id="refresh-button" class="ghost-button" type="button">Refresh</button>
       </header>
+
+      <section id="mac-permissions" class="panel" hidden>
+        <h2>macOS Beta</h2>
+        <p>This beta is not notarized by Apple. Install it in Applications and allow this app in
+          System Settings &gt; Privacy &amp; Security when macOS blocks the first launch.</p>
+        <p id="input-permission-status" role="status"></p>
+        <button id="input-permission-button" class="action-button" type="button">Allow Input Monitoring</button>
+        <p>Enable Nebulynk PTT Helper under Privacy &amp; Security &gt; Input Monitoring, then restart
+          the helper if requested. Your PTT key keeps its normal behavior in other apps.</p>
+      </section>
+      <p id="helper-error" role="alert" hidden></p>
 
       <section class="panel panel-wide">
         <div class="panel-head">
@@ -75,8 +86,8 @@
           <label class="toggle-row">
             <input id="autostart-toggle" type="checkbox" />
             <span>
-              <strong>Start on Windows login</strong>
-              <small>Register the helper in the current user Run key.</small>
+              <strong>Start at login</strong>
+              <small id="autostart-description">Start the helper automatically when you sign in.</small>
             </span>
           </label>
         </section>

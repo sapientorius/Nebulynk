@@ -3,7 +3,7 @@ import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 describe('static source contract: VoiceSettingsContent', () => {
-  it('shows opt-in global PTT guidance only for Windows browser helper candidates', () => {
+  it('shows opt-in global PTT guidance for supported browser helper candidates', () => {
     const source = readFileSync(resolve('src/components/VoiceSettingsContent.vue'), 'utf8')
 
     expect(source).toContain("desktop_ptt_passthrough_hint")
@@ -25,11 +25,11 @@ describe('static source contract: VoiceSettingsContent', () => {
     expect(source).toContain('browserPttHelperState.enabled === true')
     expect(source).toContain('enableBrowserPttHelper()')
     expect(source).toContain('disableBrowserPttHelper()')
-    expect(source).toContain('https://github.com/sapientorius/Nebulynk/releases/tag/ptt-helper-v0.1.0')
-    expect(source).toContain("$t('ui.components.global_ptt_install_helper')")
-    expect(source).toContain("$t('ui.components.global_ptt_helper_download_available')")
-    expect(source).toContain("$t('ui.components.global_ptt_download_windows_helper')")
-    expect(source).toContain("$t('ui.components.global_ptt_permission_explanation')")
+    expect(source).toContain(':href="pttHelperReleaseUrl"')
+    expect(source).toContain('ui.components.global_ptt_install_macos_helper')
+    expect(source).toContain('ui.components.global_ptt_macos_beta_description')
+    expect(source).toContain('ui.components.global_ptt_download_windows_helper')
+    expect(source).toContain('ui.components.global_ptt_macos_permission_explanation')
     expect(source).toContain("$t('ui.components.global_ptt_enable')")
     expect(source).toContain("$t('ui.components.global_ptt_disable')")
     expect(source).not.toContain('syncDesktopWorkspacePttConfig')

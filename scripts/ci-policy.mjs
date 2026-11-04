@@ -38,7 +38,9 @@ export function planChecks({ eventName, paths = null, profile = 'auto', localCon
     const documentationOnly = Array.isArray(paths) && paths.every(isDocumentationPath)
     profile = automatic && documentationOnly ? 'documentation' : eventName === 'push' ? 'quick' : 'full'
   }
-  return { profile, core: profile !== 'documentation', full: profile === 'full', containers: profile === 'full' && localContainers }
+  const helper = profile === 'full' || (profile === 'quick' && (!Array.isArray(paths) || paths.some(path =>
+    /^(?:desktop-ptt-helper\/|scripts\/ptt-helper|\.github\/workflows\/(?:ci|ptt-helper|release)\.yml$|package(?:-lock)?\.json$)/.test(path))))
+  return { profile, core: profile !== 'documentation', full: profile === 'full', containers: profile === 'full' && localContainers, helper }
 }
 
 export function requireChecks(needs) {
@@ -52,10 +54,12 @@ export function requireChecks(needs) {
   const core = flag('core')
   const full = flag('full')
   const containers = flag('containers')
-  if (core !== (outputs.profile !== 'documentation') || full !== (outputs.profile === 'full') || (containers && !full)) {
+  const helper = flag('helper')
+  if (core !== (outputs.profile !== 'documentation') || full !== (outputs.profile === 'full') || (containers && !full)
+    || (full && !helper) || (!core && helper)) {
     throw new Error('Inconsistent CI scope outputs')
   }
-  const required = { validate: core, 'postgres-integration': full, plesk: full, security: full, e2e: full, containers }
+  const required = { validate: core, 'postgres-integration': full, plesk: full, security: full, e2e: full, containers, helper }
   const failures = Object.entries(required).filter(([name, mandatory]) => {
     const result = needs[name]?.result
     return mandatory ? result !== 'success' : !['success', 'skipped'].includes(result)

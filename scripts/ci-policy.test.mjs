@@ -11,21 +11,21 @@ const before = 'a'.repeat(40)
 const after = 'b'.repeat(40)
 const statuses = (plan) => {
   const needs = { scope: { result: 'success', outputs: Object.fromEntries(Object.entries(plan).map(([key, value]) => [key, String(value)])) } }
-  for (const [name, mandatory] of Object.entries({ validate: plan.core, 'postgres-integration': plan.full, plesk: plan.full, security: plan.full, e2e: plan.full, containers: plan.containers })) {
+  for (const [name, mandatory] of Object.entries({ validate: plan.core, 'postgres-integration': plan.full, plesk: plan.full, security: plan.full, e2e: plan.full, containers: plan.containers, helper: plan.helper })) {
     needs[name] = { result: mandatory ? 'success' : 'skipped' }
   }
   return needs
 }
 
 test('normal code pushes select quick checks; code PRs select the complete gate', () => {
-  assert.deepEqual(planChecks({ eventName: 'push', paths: ['backend/src/app.js'] }), { profile: 'quick', core: true, full: false, containers: false })
-  assert.deepEqual(planChecks({ eventName: 'pull_request', paths: ['frontend/src/App.vue'] }), { profile: 'full', core: true, full: true, containers: true })
+  assert.deepEqual(planChecks({ eventName: 'push', paths: ['backend/src/app.js'] }), { profile: 'quick', core: true, full: false, containers: false, helper: false })
+  assert.deepEqual(planChecks({ eventName: 'pull_request', paths: ['frontend/src/App.vue'] }), { profile: 'full', core: true, full: true, containers: true, helper: true })
 })
 
 test('only recognized documentation can skip automatic application checks', () => {
   const docs = ['README.md', 'docs/STAGING.md', 'docs/images/example.png', 'backend/README.md']
   for (const eventName of ['push', 'pull_request']) {
-    assert.deepEqual(planChecks({ eventName, paths: docs }), { profile: 'documentation', core: false, full: false, containers: false })
+    assert.deepEqual(planChecks({ eventName, paths: docs }), { profile: 'documentation', core: false, full: false, containers: false, helper: false })
   }
   for (const path of ['package-lock.json', '.github/workflows/ci.yml', 'docker-compose.yml', 'docs/example.mjs', 'docs/example.yml', 'frontend/public/example.svg', 'frontend/src/help.md']) {
     assert.equal(isDocumentationPath(path), false, path)
@@ -35,14 +35,14 @@ test('only recognized documentation can skip automatic application checks', () =
 
 test('explicit staging/release and manual full profiles ignore documentation-only changes', () => {
   for (const eventName of ['push', 'workflow_dispatch', 'pull_request']) {
-    assert.deepEqual(planChecks({ eventName, paths: ['README.md'], profile: 'full' }), { profile: 'full', core: true, full: true, containers: true })
+    assert.deepEqual(planChecks({ eventName, paths: ['README.md'], profile: 'full' }), { profile: 'full', core: true, full: true, containers: true, helper: true })
   }
   assert.equal(planChecks({ eventName: 'workflow_dispatch', paths: ['README.md'] }).profile, 'full')
 })
 
 test('publication pipelines can use their native candidate checks while retaining all other full gates', () => {
   const plan = planChecks({ eventName: 'workflow_dispatch', profile: 'full', localContainers: false })
-  assert.deepEqual(plan, { profile: 'full', core: true, full: true, containers: false })
+  assert.deepEqual(plan, { profile: 'full', core: true, full: true, containers: false, helper: true })
   requireChecks(statuses(plan))
 })
 
@@ -102,7 +102,7 @@ test('required status accepts only deliberate skips for each profile', () => {
 
 test('failed, cancelled, missing and unexpectedly skipped required groups block publication', () => {
   const plan = planChecks({ eventName: 'pull_request', paths: ['backend/src/app.js'] })
-  for (const name of ['validate', 'postgres-integration', 'plesk', 'security', 'e2e', 'containers']) {
+  for (const name of ['validate', 'postgres-integration', 'plesk', 'security', 'e2e', 'containers', 'helper']) {
     for (const result of ['failure', 'cancelled', 'skipped', undefined]) {
       const needs = statuses(plan)
       needs[name].result = result
@@ -119,7 +119,7 @@ test('a failed planner, absent flags or inconsistent profile cannot turn CI gree
   const failed = create()
   failed.scope.result = 'failure'
   assert.throws(() => requireChecks(failed), /planning/)
-  for (const key of ['profile', 'core', 'full', 'containers']) {
+  for (const key of ['profile', 'core', 'full', 'containers', 'helper']) {
     const needs = create()
     delete needs.scope.outputs[key]
     assert.throws(() => requireChecks(needs), /Missing or invalid/)
@@ -141,7 +141,7 @@ test('GitHub output and result commands round-trip full publication inputs and f
       CI_PROFILE: 'full', CI_LOCAL_CONTAINERS: 'false' }
     execFileSync(process.execPath, [script, 'plan'], { env, stdio: 'pipe' })
     const values = Object.fromEntries((await readFile(output, 'utf8')).trim().split('\n').map((line) => line.split('=')))
-    assert.deepEqual(values, { profile: 'full', core: 'true', full: 'true', containers: 'false' })
+    assert.deepEqual(values, { profile: 'full', core: 'true', full: 'true', containers: 'false', helper: 'true' })
     const needs = statuses(planChecks({ eventName: 'push', profile: 'full', localContainers: false }))
     needs.scope.outputs = values
     execFileSync(process.execPath, [script, 'verify'], { env: { ...env, CI_RESULTS: JSON.stringify(needs) }, stdio: 'pipe' })
@@ -150,4 +150,14 @@ test('GitHub output and result commands round-trip full publication inputs and f
       env: { ...env, CI_RESULTS: JSON.stringify(needs) }, stdio: 'pipe'
     }), (error) => error.status === 1 && /e2e: skipped/.test(error.stderr.toString()))
   } finally { await rm(directory, { recursive: true, force: true }) }
+})
+
+
+test('helper source and packaging pushes select the native gate without forcing container tests', () => {
+  for (const path of ['desktop-ptt-helper/src-tauri/src/macos_ptt.rs', 'scripts/ptt-helper-artifacts.mjs', '.github/workflows/ptt-helper.yml', 'package-lock.json']) {
+    const plan = planChecks({ eventName: 'push', paths: [path] })
+    assert.equal(plan.helper, true, path)
+    assert.equal(plan.containers, false, path)
+    requireChecks(statuses(plan))
+  }
 })

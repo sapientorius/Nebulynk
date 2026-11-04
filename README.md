@@ -40,7 +40,7 @@ self-hosting rather than as an afterthought.
 - Voice, video, screen sharing, and scheduled meetings in the same workspace.
 - Roles, permissions, invites, guest access, passkeys, and two-factor
   authentication for controlled collaboration.
-- Browser and PWA access, plus an optional Windows helper for global
+- Browser and PWA access, plus an optional Windows/macOS (Beta) helper for global
   push-to-talk.
 
 ## A fair, transparent source-available model
@@ -59,7 +59,7 @@ npm ci
 npm run dev
 ```
 
-The optional Windows push-to-talk helper requires a Rust and Cargo toolchain:
+The optional Windows/macOS push-to-talk helper requires a Rust and Cargo toolchain:
 
 ```bash
 npm run dev:desktop:ptt-helper
@@ -70,7 +70,10 @@ selecting **Push-to-Talk**. Nebulynk does not contact the helper when the site
 first opens. Enabling global Push-to-Talk starts the local connection and may
 prompt Windows or the browser for access to other apps and services; that
 access is needed only for the optional global shortcut. The official helper
-will be published on [GitHub Releases](https://github.com/sapientorius/Nebulynk/releases).
+is included in matching [GitHub Releases](https://github.com/sapientorius/Nebulynk/releases).
+The macOS helper is a **Beta**, available for Apple Silicon and Intel, with
+no Apple Developer ID or notarization. See the [PTT Helper guide](docs/PTT_HELPER.md)
+for installation, macOS first-launch approval, Input Monitoring and testing.
 
 > **Production deployment:** The standard deployment uses the three public GHCR
 > images at one fixed `NEBULYNK_VERSION`.
