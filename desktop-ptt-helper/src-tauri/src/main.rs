@@ -1735,7 +1735,7 @@ async fn run_websocket_server(
 
 #[tauri::command]
 fn helper_get_state_snapshot(
-    helper_state: State<Arc<HelperStateHandle>>,
+    helper_state: State<'_, Arc<HelperStateHandle>>,
 ) -> Result<HelperStateSnapshot, String> {
     let runtime = helper_state
         .runtime
@@ -1770,154 +1770,194 @@ fn helper_request_input_monitoring() -> Result<bool, String> {
 }
 
 #[tauri::command]
-fn helper_approve_pairing(
+async fn helper_approve_pairing(
     app: AppHandle,
-    helper_state: State<Arc<HelperStateHandle>>,
+    helper_state: State<'_, Arc<HelperStateHandle>>,
     request_id: String,
 ) -> Result<(), String> {
-    handle_pairing_approval(&app, &helper_state, &request_id)
+    let helper_state = helper_state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        handle_pairing_approval(&app, &helper_state, &request_id)
+    })
+    .await
+    .map_err(|error| error.to_string())?
 }
 
 #[tauri::command]
-fn helper_reject_pairing(
+async fn helper_reject_pairing(
     app: AppHandle,
-    helper_state: State<Arc<HelperStateHandle>>,
+    helper_state: State<'_, Arc<HelperStateHandle>>,
     request_id: String,
 ) -> Result<(), String> {
-    handle_pairing_rejection(&app, &helper_state, &request_id)
+    let helper_state = helper_state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        handle_pairing_rejection(&app, &helper_state, &request_id)
+    })
+    .await
+    .map_err(|error| error.to_string())?
 }
 
 #[tauri::command]
-fn helper_revoke_origin(
+async fn helper_revoke_origin(
     app: AppHandle,
-    helper_state: State<Arc<HelperStateHandle>>,
+    helper_state: State<'_, Arc<HelperStateHandle>>,
     origin: String,
 ) -> Result<(), String> {
-    handle_origin_revocation(&app, &helper_state, &origin)
+    let helper_state = helper_state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        handle_origin_revocation(&app, &helper_state, &origin)
+    })
+    .await
+    .map_err(|error| error.to_string())?
 }
 
 #[tauri::command]
-fn helper_approve_binding(
+async fn helper_approve_binding(
     app: AppHandle,
-    helper_state: State<Arc<HelperStateHandle>>,
+    helper_state: State<'_, Arc<HelperStateHandle>>,
     request_id: String,
 ) -> Result<(), String> {
-    let _update = helper_state
-        .binding_update
-        .lock()
-        .map_err(|e| e.to_string())?;
-    {
-        let mut runtime = helper_state.runtime.lock().map_err(|e| e.to_string())?;
-        // Do not change the live grant until its durable replacement has succeeded.
-        commit_binding_approval(&mut runtime, &request_id, |proposed| {
-            save_persisted_state(&app, proposed)
-        })?;
-    }
-    append_helper_log(&app, "key approval saved");
-    recompute_target_and_binding(&app, &helper_state)
-}
-
-#[tauri::command]
-fn helper_reject_binding(
-    app: AppHandle,
-    helper_state: State<Arc<HelperStateHandle>>,
-    request_id: String,
-) -> Result<(), String> {
-    let _update = helper_state
-        .binding_update
-        .lock()
-        .map_err(|e| e.to_string())?;
-    {
-        let mut runtime = helper_state.runtime.lock().map_err(|e| e.to_string())?;
-        let request = binding_request(&runtime, &request_id)?;
-        for session in runtime
-            .sessions
-            .values_mut()
-            .filter(|s| s.origin == request.origin)
-        {
-            if session_key(session) == Some(request.key_code.as_str()) {
-                session.rejected_binding_key = Some(request.key_code.clone());
-            }
-        }
-        release_transmission(&mut runtime);
-    }
-    append_helper_log(&app, "key request rejected");
-    recompute_target_and_binding(&app, &helper_state)
-}
-
-#[tauri::command]
-fn helper_revoke_binding(
-    app: AppHandle,
-    helper_state: State<Arc<HelperStateHandle>>,
-    origin: String,
-) -> Result<(), String> {
-    let _update = helper_state
-        .binding_update
-        .lock()
-        .map_err(|e| e.to_string())?;
-    let origin = normalize_origin(&origin)?;
-    {
-        let mut runtime = helper_state.runtime.lock().map_err(|e| e.to_string())?;
-        release_transmission(&mut runtime);
-        let record = runtime
-            .persisted
-            .trusted_origins
-            .iter_mut()
-            .find(|r| r.origin == origin)
-            .ok_or_else(|| "Unknown paired site.".to_string())?;
-        record.approved_key_code = None;
-    }
-    let persisted = persist_runtime(&app, &helper_state);
-    recompute_target_and_binding(&app, &helper_state)?;
-    append_helper_log(&app, "key approval revoked");
-    persisted
-}
-
-#[tauri::command]
-fn helper_set_paused(
-    app: AppHandle,
-    helper_state: State<Arc<HelperStateHandle>>,
-    paused: bool,
-) -> Result<(), String> {
-    let _update = helper_state
-        .binding_update
-        .lock()
-        .map_err(|error| error.to_string())?;
-    {
-        let mut runtime = helper_state
-            .runtime
+    let helper_state = helper_state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let _update = helper_state
+            .binding_update
             .lock()
-            .map_err(|error| error.to_string())?;
-        runtime.persisted.paused = paused;
-        if paused {
+            .map_err(|e| e.to_string())?;
+        {
+            let mut runtime = helper_state.runtime.lock().map_err(|e| e.to_string())?;
+            // Do not change the live grant until its durable replacement has succeeded.
+            commit_binding_approval(&mut runtime, &request_id, |proposed| {
+                save_persisted_state(&app, proposed)
+            })?;
+        }
+        append_helper_log(&app, "key approval saved");
+        recompute_target_and_binding(&app, &helper_state)
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+async fn helper_reject_binding(
+    app: AppHandle,
+    helper_state: State<'_, Arc<HelperStateHandle>>,
+    request_id: String,
+) -> Result<(), String> {
+    let helper_state = helper_state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let _update = helper_state
+            .binding_update
+            .lock()
+            .map_err(|e| e.to_string())?;
+        {
+            let mut runtime = helper_state.runtime.lock().map_err(|e| e.to_string())?;
+            let request = binding_request(&runtime, &request_id)?;
+            for session in runtime
+                .sessions
+                .values_mut()
+                .filter(|s| s.origin == request.origin)
+            {
+                if session_key(session) == Some(request.key_code.as_str()) {
+                    session.rejected_binding_key = Some(request.key_code.clone());
+                }
+            }
             release_transmission(&mut runtime);
         }
-    }
-    let persisted = persist_runtime(&app, &helper_state);
-    recompute_target_and_binding(&app, &helper_state)?;
-    persisted
+        append_helper_log(&app, "key request rejected");
+        recompute_target_and_binding(&app, &helper_state)
+    })
+    .await
+    .map_err(|error| error.to_string())?
 }
 
 #[tauri::command]
-fn helper_set_autostart(
+async fn helper_revoke_binding(
     app: AppHandle,
-    helper_state: State<Arc<HelperStateHandle>>,
-    enabled: bool,
+    helper_state: State<'_, Arc<HelperStateHandle>>,
+    origin: String,
 ) -> Result<(), String> {
-    let _update = helper_state
-        .binding_update
-        .lock()
-        .map_err(|error| error.to_string())?;
-    set_autostart_enabled(&app, enabled)?;
-    {
-        let mut runtime = helper_state
-            .runtime
+    let helper_state = helper_state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let _update = helper_state
+            .binding_update
+            .lock()
+            .map_err(|e| e.to_string())?;
+        let origin = normalize_origin(&origin)?;
+        {
+            let mut runtime = helper_state.runtime.lock().map_err(|e| e.to_string())?;
+            release_transmission(&mut runtime);
+            let record = runtime
+                .persisted
+                .trusted_origins
+                .iter_mut()
+                .find(|r| r.origin == origin)
+                .ok_or_else(|| "Unknown paired site.".to_string())?;
+            record.approved_key_code = None;
+        }
+        let persisted = persist_runtime(&app, &helper_state);
+        recompute_target_and_binding(&app, &helper_state)?;
+        append_helper_log(&app, "key approval revoked");
+        persisted
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+async fn helper_set_paused(
+    app: AppHandle,
+    helper_state: State<'_, Arc<HelperStateHandle>>,
+    paused: bool,
+) -> Result<(), String> {
+    let helper_state = helper_state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let _update = helper_state
+            .binding_update
             .lock()
             .map_err(|error| error.to_string())?;
-        runtime.persisted.autostart_enabled = enabled;
-    }
-    persist_runtime(&app, &helper_state)?;
-    emit_state_changed(&app, &helper_state)
+        {
+            let mut runtime = helper_state
+                .runtime
+                .lock()
+                .map_err(|error| error.to_string())?;
+            runtime.persisted.paused = paused;
+            if paused {
+                release_transmission(&mut runtime);
+            }
+        }
+        let persisted = persist_runtime(&app, &helper_state);
+        recompute_target_and_binding(&app, &helper_state)?;
+        persisted
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+async fn helper_set_autostart(
+    app: AppHandle,
+    helper_state: State<'_, Arc<HelperStateHandle>>,
+    enabled: bool,
+) -> Result<(), String> {
+    let helper_state = helper_state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let _update = helper_state
+            .binding_update
+            .lock()
+            .map_err(|error| error.to_string())?;
+        set_autostart_enabled(&app, enabled)?;
+        {
+            let mut runtime = helper_state
+                .runtime
+                .lock()
+                .map_err(|error| error.to_string())?;
+            runtime.persisted.autostart_enabled = enabled;
+        }
+        persist_runtime(&app, &helper_state)?;
+        emit_state_changed(&app, &helper_state)
+    })
+    .await
+    .map_err(|error| error.to_string())?
 }
 
 #[tauri::command]
@@ -2196,7 +2236,12 @@ fn main() {
 
             let menu_state = helper_state.clone();
             app.on_menu_event(move |app_handle, event| {
-                handle_menu_event(app_handle, &menu_state, event.id().as_ref());
+                // Menu callbacks run on the UI thread. Binding operations can wait
+                // for native workers, whose notifications need that UI thread.
+                let app = app_handle.clone();
+                let state = menu_state.clone();
+                let id = event.id().as_ref().to_string();
+                tauri::async_runtime::spawn_blocking(move || handle_menu_event(&app, &state, &id));
             });
 
             app.on_tray_icon_event(|app_handle, event| {
