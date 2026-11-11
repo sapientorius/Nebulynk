@@ -72,6 +72,12 @@ pub enum PttEvent {
     Up,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct NativePttEvent {
+    pub action: PttEvent,
+    pub generation: u64,
+}
+
 fn platform_name() -> &'static str {
     #[cfg(target_os = "windows")]
     {

@@ -1,6 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod autostart;
+mod helper_log;
 #[cfg(any(target_os = "macos", test))]
 mod macos_ptt;
 mod ptt;
@@ -10,7 +11,9 @@ mod windows_ptt;
 use base64::Engine;
 use chrono::Utc;
 use futures_util::{SinkExt, StreamExt};
-use ptt::{DesktopPttBindingRequest, DesktopPttBindingStatus, PttEvent, PttService};
+use ptt::{
+    DesktopPttBindingRequest, DesktopPttBindingStatus, NativePttEvent, PttEvent, PttService,
+};
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -41,11 +44,10 @@ const TRAY_ID: &str = "main-tray";
 const WS_HOST: &str = "127.0.0.1";
 const WS_PORT: u16 = 47641;
 const WS_PATH: &str = "/ws";
-const WS_PROTOCOL_VERSION: &str = "1";
+const WS_PROTOCOL_VERSION: &str = "2";
 const MAX_WS_TEXT_FRAME_BYTES: usize = 64 * 1024;
 const PAIRING_TOKEN_BYTES: usize = 32;
 const STORAGE_FILE_NAME: &str = "helper-state.json";
-const LOG_FILE_NAME: &str = "helper.log";
 #[cfg(target_os = "windows")]
 const AUTOSTART_REGISTRY_NAME: &str = "Nebulynk PTT Helper";
 const EVENT_STATE_CHANGED: &str = "helper:state-changed";
@@ -62,6 +64,8 @@ struct TrustedOriginRecord {
     token_hash: String,
     approved_at: String,
     last_client_kind: String,
+    #[serde(default)]
+    approved_key_code: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -73,7 +77,7 @@ struct LastTargetMetadata {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-#[serde(rename_all = "camelCase")]
+#[serde(default, rename_all = "camelCase")]
 struct PersistedHelperState {
     trusted_origins: Vec<TrustedOriginRecord>,
     paused: bool,
@@ -118,6 +122,7 @@ struct HelperStateSnapshot {
     autostart_enabled: bool,
     trusted_origins: Vec<TrustedOriginRecord>,
     pending_pairing_requests: Vec<PendingPairingSnapshot>,
+    pending_binding_requests: Vec<BindingApprovalRequest>,
     active_sessions: Vec<ActiveSessionSnapshot>,
     current_target_session_id: Option<String>,
 }
@@ -138,6 +143,17 @@ struct PendingPairingRequest {
     created_at: String,
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct BindingApprovalRequest {
+    request_id: String,
+    origin: String,
+    key_code: String,
+    previous_key_code: Option<String>,
+    connection_id: u64,
+    revision: u64,
+}
+
 #[derive(Debug, Clone)]
 struct SessionState {
     connection_id: u64,
@@ -151,6 +167,8 @@ struct SessionState {
     authorized: bool,
     last_foreground_at: Option<String>,
     ptt_config: DesktopPttBindingRequest,
+    rejected_binding_key: Option<String>,
+    binding_revision: u64,
     sender: UnboundedSender<OutboundMessage>,
 }
 
@@ -168,6 +186,11 @@ struct RuntimeState {
     next_connection_id: u64,
     next_request_id: u64,
     target_connection_id: Option<u64>,
+    binding_target: Option<u64>,
+    binding_generation: u64,
+    next_binding_revision: u64,
+    binding_requests: Vec<BindingApprovalRequest>,
+    transmitting: Option<(u64, u64)>,
 }
 
 impl RuntimeState {
@@ -184,6 +207,11 @@ impl RuntimeState {
             next_connection_id: 1,
             next_request_id: 1,
             target_connection_id: None,
+            binding_target: None,
+            binding_generation: 0,
+            next_binding_revision: 0,
+            binding_requests: Vec::new(),
+            transmitting: None,
         }
     }
 }
@@ -191,6 +219,7 @@ impl RuntimeState {
 struct HelperStateHandle {
     app_handle: AppHandle,
     runtime: Mutex<RuntimeState>,
+    binding_update: Mutex<()>,
     ptt_service: PttService,
 }
 
@@ -250,26 +279,8 @@ fn state_file_path(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(base_dir.join(STORAGE_FILE_NAME))
 }
 
-fn log_file_path(_app: &AppHandle) -> Result<PathBuf, String> {
-    let mut base_dir = std::env::temp_dir();
-    base_dir.push("NebulynkPttHelper");
-    if !base_dir.exists() {
-        fs::create_dir_all(&base_dir).map_err(|error| error.to_string())?;
-    }
-    Ok(base_dir.join(LOG_FILE_NAME))
-}
-
-fn append_helper_log(app: &AppHandle, message: &str) {
-    let Ok(path) = log_file_path(app) else {
-        return;
-    };
-    let Ok(mut file) = OpenOptions::new().create(true).append(true).open(path) else {
-        return;
-    };
-    let _ = std::io::Write::write_all(
-        &mut file,
-        format!("[{}] {}\n", now_rfc3339(), message).as_bytes(),
-    );
+fn append_helper_log(_app: &AppHandle, message: &str) {
+    helper_log::log(message);
 }
 
 fn load_persisted_state(app: &AppHandle) -> Result<PersistedHelperState, String> {
@@ -284,7 +295,26 @@ fn load_persisted_state(app: &AppHandle) -> Result<PersistedHelperState, String>
 fn save_persisted_state(app: &AppHandle, persisted: &PersistedHelperState) -> Result<(), String> {
     let path = state_file_path(app)?;
     let content = serde_json::to_string_pretty(persisted).map_err(|error| error.to_string())?;
-    fs::write(path, content).map_err(|error| error.to_string())
+    use std::io::Write;
+    let temporary = path.with_extension("json.tmp");
+    let mut options = OpenOptions::new();
+    options.write(true).create(true).truncate(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+    let result = (|| -> std::io::Result<()> {
+        let mut file = options.open(&temporary)?;
+        file.write_all(content.as_bytes())?;
+        file.sync_all()?;
+        drop(file);
+        fs::rename(&temporary, &path)
+    })();
+    if result.is_err() {
+        let _ = fs::remove_file(&temporary);
+    }
+    result.map_err(|error| error.to_string())
 }
 
 fn generate_pairing_token() -> String {
@@ -422,6 +452,7 @@ fn helper_snapshot(runtime: &RuntimeState) -> HelperStateSnapshot {
                 created_at: request.created_at.clone(),
             })
             .collect(),
+        pending_binding_requests: runtime.binding_requests.clone(),
         active_sessions,
         current_target_session_id,
     }
@@ -565,6 +596,201 @@ fn choose_target_connection(runtime: &RuntimeState) -> Option<u64> {
         .map(|session| session.connection_id)
 }
 
+fn session_key(session: &SessionState) -> Option<&str> {
+    (session.ptt_config.mode.as_deref() == Some("ptt"))
+        .then(|| session.ptt_config.key_code.as_deref())
+        .flatten()
+}
+
+fn binding_block_reason(runtime: &RuntimeState, session: &SessionState) -> Option<&'static str> {
+    let key = session_key(session)?;
+    if trusted_origin_for(runtime, &session.origin).and_then(|r| r.approved_key_code.as_deref())
+        == Some(key)
+    {
+        return None;
+    }
+    Some(if session.rejected_binding_key.as_deref() == Some(key) {
+        "binding-rejected"
+    } else {
+        "binding-approval-required"
+    })
+}
+
+fn sync_binding_requests(runtime: &mut RuntimeState) {
+    let mut candidates: HashMap<String, &SessionState> = HashMap::new();
+    for session in runtime.sessions.values().filter(|s| s.authorized) {
+        if binding_block_reason(runtime, session) != Some("binding-approval-required") {
+            continue;
+        }
+        let rank = |s: &SessionState| {
+            (
+                Some(s.connection_id) == runtime.target_connection_id,
+                s.binding_revision,
+                s.connection_id,
+            )
+        };
+        if candidates
+            .get(&session.origin)
+            .is_none_or(|previous| rank(session) > rank(previous))
+        {
+            candidates.insert(session.origin.clone(), session);
+        }
+    }
+    runtime.binding_requests.retain(|request| {
+        candidates.get(&request.origin).is_some_and(|session| {
+            session.connection_id == request.connection_id
+                && session.binding_revision == request.revision
+                && session_key(session) == Some(request.key_code.as_str())
+        })
+    });
+    for (origin, session) in candidates {
+        if runtime.binding_requests.iter().any(|r| r.origin == origin) {
+            continue;
+        }
+        runtime.binding_requests.push(BindingApprovalRequest {
+            request_id: cuid2::create_id(),
+            origin: origin.clone(),
+            key_code: session_key(session).unwrap().to_string(),
+            previous_key_code: runtime
+                .persisted
+                .trusted_origins
+                .iter()
+                .find(|r| r.origin == origin)
+                .and_then(|r| r.approved_key_code.clone()),
+            connection_id: session.connection_id,
+            revision: session.binding_revision,
+        });
+    }
+    runtime
+        .binding_requests
+        .sort_by(|a, b| a.origin.cmp(&b.origin));
+}
+
+fn binding_request(
+    runtime: &RuntimeState,
+    request_id: &str,
+) -> Result<BindingApprovalRequest, String> {
+    let request = runtime
+        .binding_requests
+        .iter()
+        .find(|r| r.request_id == request_id)
+        .ok_or_else(|| {
+            "The key request changed or expired. Review the current request again.".to_string()
+        })?;
+    let valid = runtime
+        .sessions
+        .get(&request.connection_id)
+        .is_some_and(|session| {
+            session.authorized
+                && session.origin == request.origin
+                && session.binding_revision == request.revision
+                && session_key(session) == Some(request.key_code.as_str())
+                && binding_block_reason(runtime, session) == Some("binding-approval-required")
+        });
+    if !valid {
+        return Err("The key request changed or expired. Review the current request again.".into());
+    }
+    Ok(request.clone())
+}
+
+fn proposed_binding_approval(
+    runtime: &RuntimeState,
+    request_id: &str,
+) -> Result<PersistedHelperState, String> {
+    let request = binding_request(runtime, request_id)?;
+    let mut proposed = runtime.persisted.clone();
+    let record = proposed
+        .trusted_origins
+        .iter_mut()
+        .find(|r| r.origin == request.origin)
+        .ok_or_else(|| "Pair the site before approving a key.".to_string())?;
+    record.approved_key_code = Some(request.key_code);
+    Ok(proposed)
+}
+
+fn commit_binding_approval(
+    runtime: &mut RuntimeState,
+    request_id: &str,
+    save: impl FnOnce(&PersistedHelperState) -> Result<(), String>,
+) -> Result<(), String> {
+    let proposed = proposed_binding_approval(runtime, request_id)?;
+    save(&proposed)?;
+    runtime.persisted = proposed;
+    Ok(())
+}
+
+fn effective_status(
+    runtime: &RuntimeState,
+    mut native: DesktopPttBindingStatus,
+) -> DesktopPttBindingStatus {
+    let reason = if runtime.persisted.paused {
+        Some("paused")
+    } else {
+        runtime
+            .target_connection_id
+            .and_then(|id| runtime.sessions.get(&id))
+            .and_then(|session| binding_block_reason(runtime, session))
+    };
+    if let Some(reason) = reason {
+        let key = runtime
+            .target_connection_id
+            .and_then(|id| runtime.sessions.get(&id))
+            .and_then(session_key)
+            .map(str::to_string);
+        let platform = native.platform;
+        native = DesktopPttBindingStatus {
+            key_code: key,
+            reason: Some(reason.into()),
+            platform,
+            ..DesktopPttBindingStatus::default()
+        };
+    }
+    native
+}
+
+fn release_transmission(runtime: &mut RuntimeState) {
+    if let Some((owner, _)) = runtime.transmitting.take() {
+        if let Some(session) = runtime.sessions.get(&owner) {
+            send_json(&session.sender, json!({ "type": "ptt_up" }));
+        }
+    }
+}
+
+fn route_ptt_event(runtime: &mut RuntimeState, event: NativePttEvent) {
+    if event.action == PttEvent::Up {
+        if runtime
+            .transmitting
+            .is_some_and(|(_, generation)| generation == event.generation)
+        {
+            release_transmission(runtime);
+        }
+        return;
+    }
+    if event.generation != runtime.binding_generation
+        || runtime.persisted.paused
+        || !runtime.binding_status.is_global
+        || runtime.transmitting.is_some()
+        || runtime.target_connection_id != runtime.binding_target
+    {
+        return;
+    }
+    let Some(id) = runtime.target_connection_id else {
+        return;
+    };
+    let Some(session) = runtime.sessions.get(&id) else {
+        return;
+    };
+    if !session.authorized
+        || binding_block_reason(runtime, session).is_some()
+        || session_key(session) != runtime.active_binding_request.key_code.as_deref()
+        || session_key(session).is_none()
+    {
+        return;
+    }
+    send_json(&session.sender, json!({ "type": "ptt_down" }));
+    runtime.transmitting = Some((id, event.generation));
+}
+
 fn effective_binding_request(runtime: &RuntimeState) -> DesktopPttBindingRequest {
     if runtime.persisted.paused {
         return default_ptt_request();
@@ -577,7 +803,7 @@ fn effective_binding_request(runtime: &RuntimeState) -> DesktopPttBindingRequest
         return default_ptt_request();
     };
 
-    if !session.authorized {
+    if !session.authorized || binding_block_reason(runtime, session).is_some() {
         return default_ptt_request();
     }
 
@@ -686,17 +912,6 @@ fn revoke_origin_in_runtime(
         .collect::<Vec<_>>()
 }
 
-fn target_sender_for_ptt(runtime: &RuntimeState) -> Option<UnboundedSender<OutboundMessage>> {
-    if runtime.persisted.paused {
-        return None;
-    }
-    runtime
-        .target_connection_id
-        .and_then(|connection_id| runtime.sessions.get(&connection_id))
-        .filter(|session| session.authorized)
-        .map(|session| session.sender.clone())
-}
-
 fn broadcast_target_states(helper_state: &HelperStateHandle) {
     let sessions = {
         let runtime = helper_state.runtime.lock().unwrap();
@@ -724,112 +939,99 @@ fn broadcast_target_states(helper_state: &HelperStateHandle) {
     }
 }
 
+fn session_binding_status(
+    runtime: &RuntimeState,
+    session: &SessionState,
+) -> DesktopPttBindingStatus {
+    let reason = if runtime.persisted.paused {
+        Some("paused")
+    } else {
+        binding_block_reason(runtime, session)
+    };
+    if let Some(reason) = reason {
+        return DesktopPttBindingStatus {
+            key_code: session_key(session).map(str::to_string),
+            reason: Some(reason.into()),
+            ..DesktopPttBindingStatus::default()
+        };
+    }
+    if runtime.target_connection_id != Some(session.connection_id) {
+        return DesktopPttBindingStatus {
+            reason: Some("another-session-active".into()),
+            ..DesktopPttBindingStatus::default()
+        };
+    }
+    runtime.binding_status.clone()
+}
+
 fn broadcast_binding_status(helper_state: &HelperStateHandle) {
-    let (binding_status, sessions) = {
-        let runtime = helper_state.runtime.lock().unwrap();
-        let sessions = runtime
+    if let Ok(runtime) = helper_state.runtime.lock() {
+        for session in runtime
             .sessions
             .values()
             .filter(|session| session.authorized)
-            .map(|session| session.sender.clone())
-            .collect::<Vec<_>>();
-        (runtime.binding_status.clone(), sessions)
-    };
-
-    for sender in sessions {
-        send_json(
-            &sender,
-            json!({
-                "type": "binding_status",
-                "payload": binding_status
-            }),
-        );
+        {
+            send_json(
+                &session.sender,
+                json!({"type":"binding_status", "payload":session_binding_status(&runtime, session)}),
+            );
+        }
     }
 }
 
+// Caller holds binding_update; native callbacks can still acquire runtime.
 fn recompute_target_and_binding(
     app: &AppHandle,
     helper_state: &HelperStateHandle,
 ) -> Result<(), String> {
-    {
-        let mut runtime = helper_state
-            .runtime
-            .lock()
-            .map_err(|error| error.to_string())?;
+    let (request, generation, changed) = {
+        let mut runtime = helper_state.runtime.lock().map_err(|e| e.to_string())?;
         let target = choose_target_connection(&runtime);
-        if target != runtime.target_connection_id {
-            // Release the previous owner before handing a held shortcut to another session.
-            for session in runtime
-                .sessions
-                .values()
-                .filter(|session| session.authorized)
-            {
-                send_json(&session.sender, json!({ "type": "ptt_up", "payload": {} }));
-            }
-        }
         runtime.target_connection_id = target;
-        runtime.persisted.last_target = runtime
-            .target_connection_id
-            .and_then(|connection_id| runtime.sessions.get(&connection_id))
-            .map(|session| LastTargetMetadata {
-                origin: session.origin.clone(),
-                session_id: session.session_id.clone(),
-                updated_at: now_rfc3339(),
-            });
-    }
-
-    let (binding_request, should_apply_binding) = {
-        let runtime = helper_state
-            .runtime
-            .lock()
-            .map_err(|error| error.to_string())?;
-        let binding_request = effective_binding_request(&runtime);
-        let should_apply_binding = binding_request != runtime.active_binding_request;
-        (binding_request, should_apply_binding)
+        sync_binding_requests(&mut runtime);
+        let request = effective_binding_request(&runtime);
+        let changed = request != runtime.active_binding_request || target != runtime.binding_target;
+        if changed {
+            release_transmission(&mut runtime);
+            runtime.binding_generation = runtime
+                .binding_generation
+                .checked_add(1)
+                .expect("Binding generation exhausted");
+            runtime.binding_target = target;
+            runtime.active_binding_request = request.clone();
+            runtime.binding_status = DesktopPttBindingStatus::default();
+            runtime.persisted.last_target =
+                target
+                    .and_then(|id| runtime.sessions.get(&id))
+                    .map(|session| LastTargetMetadata {
+                        origin: session.origin.clone(),
+                        session_id: session.session_id.clone(),
+                        updated_at: now_rfc3339(),
+                    });
+        }
+        (request, runtime.binding_generation, changed)
     };
-
-    let mut binding_status = if should_apply_binding {
-        helper_state
-            .ptt_service
-            .set_binding(binding_request.clone())
+    let native = if changed {
+        helper_state.ptt_service.set_binding(request, generation)
     } else {
         helper_state.ptt_service.current_status()
     };
-    let paused = {
-        let runtime = helper_state
-            .runtime
-            .lock()
-            .map_err(|error| error.to_string())?;
-        runtime.persisted.paused
-    };
-    if paused {
-        binding_status.reason = Some("paused".to_string());
-    }
-
     {
-        let mut runtime = helper_state
-            .runtime
-            .lock()
-            .map_err(|error| error.to_string())?;
-        runtime.active_binding_request = binding_request;
-        runtime.binding_status = binding_status;
-        append_helper_log(
-            app,
-            &format!(
-                "recompute target_connection={:?} mode={} key={:?} applied_binding={}",
-                runtime.target_connection_id,
-                runtime.binding_status.mode,
-                runtime.binding_status.key_code,
-                should_apply_binding
-            ),
-        );
+        let mut runtime = helper_state.runtime.lock().map_err(|e| e.to_string())?;
+        runtime.binding_status = effective_status(&runtime, native);
+        if !runtime.binding_status.is_global {
+            release_transmission(&mut runtime);
+        }
     }
-
-    persist_runtime(app, helper_state)?;
+    let persisted = if changed {
+        persist_runtime(app, helper_state)
+    } else {
+        Ok(())
+    };
     broadcast_binding_status(helper_state);
     broadcast_target_states(helper_state);
     emit_state_changed(app, helper_state)?;
-    Ok(())
+    persisted
 }
 
 fn register_connection(
@@ -856,6 +1058,8 @@ fn register_connection(
             authorized: false,
             last_foreground_at: None,
             ptt_config: default_ptt_request(),
+            rejected_binding_key: None,
+            binding_revision: 0,
             sender,
         },
     );
@@ -867,11 +1071,21 @@ fn cleanup_connection(
     helper_state: &HelperStateHandle,
     connection_id: u64,
 ) -> Result<(), String> {
+    let _update = helper_state
+        .binding_update
+        .lock()
+        .map_err(|error| error.to_string())?;
     {
         let mut runtime = helper_state
             .runtime
             .lock()
             .map_err(|error| error.to_string())?;
+        if runtime
+            .transmitting
+            .is_some_and(|(owner, _)| owner == connection_id)
+        {
+            release_transmission(&mut runtime);
+        }
         runtime.sessions.remove(&connection_id);
         runtime
             .pending_pairings
@@ -887,6 +1101,10 @@ fn handle_hello(
     normalized_origin: String,
     payload: HelloPayload,
 ) -> Result<(), String> {
+    let _update = helper_state
+        .binding_update
+        .lock()
+        .map_err(|error| error.to_string())?;
     let client_kind = normalize_client_kind(payload.client_kind.as_deref());
     let normalized_session_id = payload.session_id.trim().to_string();
 
@@ -980,16 +1198,6 @@ fn handle_hello(
     }
 
     let sender = maybe_sender;
-    append_helper_log(
-        app,
-        &format!(
-            "hello connection={} origin={} authorized={} request_pending={}",
-            connection_id,
-            normalized_origin,
-            maybe_request_id.is_none(),
-            maybe_request_id.is_some()
-        ),
-    );
     for duplicate_sender in duplicate_senders {
         let _ = duplicate_sender.send(OutboundMessage::Close(Some(json!({
             "type": "error",
@@ -1019,6 +1227,7 @@ fn handle_hello(
         );
         emit_state_changed(app, helper_state)?;
         let _ = show_settings_window(app);
+        recompute_target_and_binding(app, helper_state)?;
         return Ok(());
     }
 
@@ -1029,6 +1238,7 @@ fn handle_hello(
             "payload": {
                 "authorized": true,
                 "helperVersion": APP_VERSION,
+                "protocolVersion": WS_PROTOCOL_VERSION,
                 "bindingStatus": binding_status.unwrap_or_default(),
                 "targetState": target_state.unwrap_or(TargetStateMessage {
                     is_target: false,
@@ -1047,6 +1257,10 @@ fn handle_session_state(
     connection_id: u64,
     payload: SessionStatePayload,
 ) -> Result<(), String> {
+    let _update = helper_state
+        .binding_update
+        .lock()
+        .map_err(|error| error.to_string())?;
     {
         let mut runtime = helper_state
             .runtime
@@ -1074,21 +1288,44 @@ fn handle_session_state(
         } else if session.visible && session.last_foreground_at.is_none() {
             session.last_foreground_at = Some(now_rfc3339());
         }
-        append_helper_log(
-            app,
-            &format!(
-                "session_state connection={} focused={} visible={}",
-                connection_id, session.focused, session.visible
-            ),
-        );
     }
 
     recompute_target_and_binding(app, helper_state)
 }
 
 fn parse_ptt_config(value: Option<Value>) -> Result<DesktopPttBindingRequest, String> {
-    let payload = value.unwrap_or(Value::Null);
-    serde_json::from_value::<DesktopPttBindingRequest>(payload).map_err(|error| error.to_string())
+    let mut request: DesktopPttBindingRequest =
+        serde_json::from_value(value.unwrap_or(Value::Null))
+            .map_err(|_| "Invalid PTT configuration.".to_string())?;
+    let mode = request.mode.as_deref().unwrap_or("live").trim().to_string();
+    if !matches!(mode.as_str(), "live" | "vad" | "ptt") {
+        return Err("Invalid PTT mode.".into());
+    }
+    request.mode = Some(mode.clone());
+    request.key_code = if mode == "ptt" {
+        let key = request
+            .key_code
+            .as_deref()
+            .map(str::trim)
+            .filter(|k| !k.is_empty());
+        if let Some(key) = key {
+            #[cfg(target_os = "macos")]
+            let supported = macos_ptt::key_code(key).is_some();
+            #[cfg(target_os = "windows")]
+            let supported = windows_ptt::supports_key(key);
+            #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+            let supported = false;
+            if key.len() > 64 || !supported {
+                return Err("Unsupported global PTT key.".into());
+            }
+        }
+        key.map(str::to_string)
+    } else {
+        None
+    };
+    request.allow_pass_through = Some(true);
+    request.platform_strategy = Some("auto".into());
+    Ok(request)
 }
 
 fn handle_ptt_config(
@@ -1097,6 +1334,10 @@ fn handle_ptt_config(
     connection_id: u64,
     payload: DesktopPttBindingRequest,
 ) -> Result<(), String> {
+    let _update = helper_state
+        .binding_update
+        .lock()
+        .map_err(|error| error.to_string())?;
     {
         let mut runtime = helper_state
             .runtime
@@ -1114,14 +1355,19 @@ fn handle_ptt_config(
             );
             return Ok(());
         }
-        session.ptt_config = payload;
-        append_helper_log(
-            app,
-            &format!(
-                "ptt_config connection={} mode={:?} key={:?}",
-                connection_id, session.ptt_config.mode, session.ptt_config.key_code
-            ),
-        );
+        let changed = session.ptt_config != payload;
+        if changed {
+            session.rejected_binding_key = None;
+            session.ptt_config = payload;
+            runtime.next_binding_revision += 1;
+            let revision = runtime.next_binding_revision;
+            runtime
+                .sessions
+                .get_mut(&connection_id)
+                .unwrap()
+                .binding_revision = revision;
+        }
+        sync_binding_requests(&mut runtime);
     }
     recompute_target_and_binding(app, helper_state)
 }
@@ -1144,11 +1390,16 @@ fn handle_pairing_approval(
     helper_state: &HelperStateHandle,
     request_id: &str,
 ) -> Result<(), String> {
+    let _update = helper_state
+        .binding_update
+        .lock()
+        .map_err(|error| error.to_string())?;
     let (pairing_token, sender, connection_id) = {
         let mut runtime = helper_state
             .runtime
             .lock()
             .map_err(|error| error.to_string())?;
+        release_transmission(&mut runtime);
         let index = runtime
             .pending_pairings
             .iter()
@@ -1164,12 +1415,14 @@ fn handle_pairing_approval(
             .find(|candidate| candidate.origin == request.origin)
         {
             existing.token_hash = token_hash;
+            existing.approved_key_code = None;
             existing.approved_at = now_rfc3339();
             existing.last_client_kind = request.client_kind.clone();
         } else {
             runtime.persisted.trusted_origins.push(TrustedOriginRecord {
                 origin: request.origin.clone(),
                 token_hash,
+                approved_key_code: None,
                 approved_at: now_rfc3339(),
                 last_client_kind: request.client_kind.clone(),
             });
@@ -1190,6 +1443,7 @@ fn handle_pairing_approval(
             "type": "paired",
             "payload": {
                 "pairingToken": pairing_token,
+                "protocolVersion": WS_PROTOCOL_VERSION,
                 "bindingStatus": helper_state.ptt_service.current_status()
             }
         }),
@@ -1210,12 +1464,14 @@ fn handle_pairing_approval(
             "payload": {
                 "authorized": true,
                 "helperVersion": APP_VERSION,
+                "protocolVersion": WS_PROTOCOL_VERSION,
                 "bindingStatus": helper_state.ptt_service.current_status(),
                 "targetState": target_state
             }
         }),
     );
 
+    append_helper_log(app, "site pairing approved");
     hide_settings_window(app);
     emit_state_changed(app, helper_state)?;
     recompute_target_and_binding(app, helper_state)
@@ -1226,6 +1482,10 @@ fn handle_pairing_rejection(
     helper_state: &HelperStateHandle,
     request_id: &str,
 ) -> Result<(), String> {
+    let _update = helper_state
+        .binding_update
+        .lock()
+        .map_err(|error| error.to_string())?;
     let maybe_sender = {
         let mut runtime = helper_state
             .runtime
@@ -1253,6 +1513,7 @@ fn handle_pairing_rejection(
         );
     }
 
+    append_helper_log(app, "site pairing rejected");
     emit_state_changed(app, helper_state)
 }
 
@@ -1261,12 +1522,17 @@ fn handle_origin_revocation(
     helper_state: &HelperStateHandle,
     origin: &str,
 ) -> Result<(), String> {
+    let _update = helper_state
+        .binding_update
+        .lock()
+        .map_err(|error| error.to_string())?;
     let normalized_origin = normalize_origin(origin)?;
     let senders = {
         let mut runtime = helper_state
             .runtime
             .lock()
             .map_err(|error| error.to_string())?;
+        release_transmission(&mut runtime);
         revoke_origin_in_runtime(&mut runtime, &normalized_origin)
     };
 
@@ -1278,30 +1544,15 @@ fn handle_origin_revocation(
         );
     }
 
-    persist_runtime(app, helper_state)?;
-    recompute_target_and_binding(app, helper_state)
+    let persisted = persist_runtime(app, helper_state);
+    recompute_target_and_binding(app, helper_state)?;
+    append_helper_log(app, "site pairing revoked");
+    persisted
 }
 
-fn forward_ptt_event(helper_state: &HelperStateHandle, event: PttEvent) {
-    append_helper_log(&helper_state.app_handle, &format!("ptt_event {:?}", event));
-    let sender = {
-        let runtime = match helper_state.runtime.lock() {
-            Ok(runtime) => runtime,
-            Err(_) => return,
-        };
-        target_sender_for_ptt(&runtime)
-    };
-
-    if let Some(sender) = sender {
-        send_json(
-            &sender,
-            json!({
-                "type": match event {
-                    PttEvent::Down => "ptt_down",
-                    PttEvent::Up => "ptt_up"
-                }
-            }),
-        );
+fn forward_ptt_event(helper_state: &HelperStateHandle, event: NativePttEvent) {
+    if let Ok(mut runtime) = helper_state.runtime.lock() {
+        route_ptt_event(&mut runtime, event);
     }
 }
 
@@ -1476,6 +1727,7 @@ async fn run_websocket_server(
             }
 
             let _ = cleanup_connection(&app_handle, &helper_state_handle, connection_id);
+            drop(sender);
             let _ = write_task.await;
         });
     }
@@ -1545,19 +1797,105 @@ fn helper_revoke_origin(
 }
 
 #[tauri::command]
+fn helper_approve_binding(
+    app: AppHandle,
+    helper_state: State<Arc<HelperStateHandle>>,
+    request_id: String,
+) -> Result<(), String> {
+    let _update = helper_state
+        .binding_update
+        .lock()
+        .map_err(|e| e.to_string())?;
+    {
+        let mut runtime = helper_state.runtime.lock().map_err(|e| e.to_string())?;
+        // Do not change the live grant until its durable replacement has succeeded.
+        commit_binding_approval(&mut runtime, &request_id, |proposed| {
+            save_persisted_state(&app, proposed)
+        })?;
+    }
+    append_helper_log(&app, "key approval saved");
+    recompute_target_and_binding(&app, &helper_state)
+}
+
+#[tauri::command]
+fn helper_reject_binding(
+    app: AppHandle,
+    helper_state: State<Arc<HelperStateHandle>>,
+    request_id: String,
+) -> Result<(), String> {
+    let _update = helper_state
+        .binding_update
+        .lock()
+        .map_err(|e| e.to_string())?;
+    {
+        let mut runtime = helper_state.runtime.lock().map_err(|e| e.to_string())?;
+        let request = binding_request(&runtime, &request_id)?;
+        for session in runtime
+            .sessions
+            .values_mut()
+            .filter(|s| s.origin == request.origin)
+        {
+            if session_key(session) == Some(request.key_code.as_str()) {
+                session.rejected_binding_key = Some(request.key_code.clone());
+            }
+        }
+        release_transmission(&mut runtime);
+    }
+    append_helper_log(&app, "key request rejected");
+    recompute_target_and_binding(&app, &helper_state)
+}
+
+#[tauri::command]
+fn helper_revoke_binding(
+    app: AppHandle,
+    helper_state: State<Arc<HelperStateHandle>>,
+    origin: String,
+) -> Result<(), String> {
+    let _update = helper_state
+        .binding_update
+        .lock()
+        .map_err(|e| e.to_string())?;
+    let origin = normalize_origin(&origin)?;
+    {
+        let mut runtime = helper_state.runtime.lock().map_err(|e| e.to_string())?;
+        release_transmission(&mut runtime);
+        let record = runtime
+            .persisted
+            .trusted_origins
+            .iter_mut()
+            .find(|r| r.origin == origin)
+            .ok_or_else(|| "Unknown paired site.".to_string())?;
+        record.approved_key_code = None;
+    }
+    let persisted = persist_runtime(&app, &helper_state);
+    recompute_target_and_binding(&app, &helper_state)?;
+    append_helper_log(&app, "key approval revoked");
+    persisted
+}
+
+#[tauri::command]
 fn helper_set_paused(
     app: AppHandle,
     helper_state: State<Arc<HelperStateHandle>>,
     paused: bool,
 ) -> Result<(), String> {
+    let _update = helper_state
+        .binding_update
+        .lock()
+        .map_err(|error| error.to_string())?;
     {
         let mut runtime = helper_state
             .runtime
             .lock()
             .map_err(|error| error.to_string())?;
         runtime.persisted.paused = paused;
+        if paused {
+            release_transmission(&mut runtime);
+        }
     }
-    recompute_target_and_binding(&app, &helper_state)
+    let persisted = persist_runtime(&app, &helper_state);
+    recompute_target_and_binding(&app, &helper_state)?;
+    persisted
 }
 
 #[tauri::command]
@@ -1566,6 +1904,10 @@ fn helper_set_autostart(
     helper_state: State<Arc<HelperStateHandle>>,
     enabled: bool,
 ) -> Result<(), String> {
+    let _update = helper_state
+        .binding_update
+        .lock()
+        .map_err(|error| error.to_string())?;
     set_autostart_enabled(&app, enabled)?;
     {
         let mut runtime = helper_state
@@ -1589,16 +1931,26 @@ fn handle_menu_event(app: &AppHandle, helper_state: &Arc<HelperStateHandle>, men
             let _ = show_settings_window(app);
         }
         MENU_TOGGLE_PAUSE_ID => {
+            let Ok(_update) = helper_state.binding_update.lock() else {
+                return;
+            };
             let paused = match helper_state.runtime.lock() {
                 Ok(runtime) => !runtime.persisted.paused,
                 Err(_) => return,
             };
             if let Ok(mut runtime) = helper_state.runtime.lock() {
                 runtime.persisted.paused = paused;
+                if paused {
+                    release_transmission(&mut runtime);
+                }
             }
+            let _ = persist_runtime(app, helper_state);
             let _ = recompute_target_and_binding(app, helper_state);
         }
         MENU_QUIT_ID => {
+            let Ok(_update) = helper_state.binding_update.lock() else {
+                return;
+            };
             helper_state.ptt_service.shutdown();
             if let Ok(runtime) = helper_state.runtime.lock() {
                 for session in runtime
@@ -1743,12 +2095,19 @@ fn main() {
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
             let app_handle = app.handle().clone();
-            append_helper_log(&app_handle, "helper setup starting");
+            if let Ok(directory) = app_handle.path().app_log_dir() {
+                helper_log::initialize(directory);
+            }
+            append_helper_log(
+                &app_handle,
+                &format!("helper starting version={APP_VERSION}"),
+            );
             let mut persisted = load_persisted_state(&app_handle)?;
             persisted.autostart_enabled = read_initial_autostart();
 
             let helper_state = Arc::new_cyclic(|weak_state| HelperStateHandle {
                 app_handle: app_handle.clone(),
+                binding_update: Mutex::new(()),
                 runtime: Mutex::new(RuntimeState::from_persisted(
                     persisted,
                     DesktopPttBindingStatus::default(),
@@ -1772,12 +2131,16 @@ fn main() {
                 let Some(state) = weak_state.upgrade() else {
                     break;
                 };
-                let mut status = state.ptt_service.current_status();
+                let Ok(_update) = state.binding_update.lock() else {
+                    break;
+                };
+                let native = state.ptt_service.current_status();
                 let changed = if let Ok(mut runtime) = state.runtime.lock() {
-                    if runtime.persisted.paused {
-                        status.reason = Some("paused".into());
-                    }
+                    let status = effective_status(&runtime, native);
                     if status != runtime.binding_status {
+                        if !status.is_global {
+                            release_transmission(&mut runtime);
+                        }
                         runtime.binding_status = status;
                         true
                     } else {
@@ -1828,7 +2191,6 @@ fn main() {
                 .menu(&menu)
                 .show_menu_on_left_click(false)
                 .build(app)?;
-            append_helper_log(&app_handle, "tray icon created");
 
             emit_state_changed(&app_handle, &helper_state)?;
 
@@ -1851,7 +2213,6 @@ fn main() {
             let websocket_state = helper_state.clone();
             let websocket_app_handle = app_handle.clone();
             thread::spawn(move || {
-                append_helper_log(&websocket_app_handle, "websocket thread starting");
                 let runtime = match tokio::runtime::Builder::new_multi_thread()
                     .enable_all()
                     .build()
@@ -1865,7 +2226,6 @@ fn main() {
                         return;
                     }
                 };
-                append_helper_log(&websocket_app_handle, "websocket runtime created");
 
                 let result = runtime.block_on(run_websocket_server(
                     websocket_app_handle.clone(),
@@ -1878,8 +2238,6 @@ fn main() {
                     );
                 }
             });
-            append_helper_log(&app_handle, "websocket thread spawned");
-            append_helper_log(&app_handle, "helper setup complete");
 
             #[cfg(target_os = "macos")]
             if !input_monitoring_granted() {
@@ -1893,6 +2251,9 @@ fn main() {
             helper_approve_pairing,
             helper_reject_pairing,
             helper_revoke_origin,
+            helper_approve_binding,
+            helper_reject_binding,
+            helper_revoke_binding,
             helper_set_paused,
             helper_set_autostart,
             helper_show_settings,
@@ -1904,13 +2265,14 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use super::{
         choose_target_connection, current_target_state, default_ptt_request,
         effective_binding_request, hash_pairing_token, helper_snapshot, is_pairing_token_valid,
         normalize_base_url, normalize_hello_origin, normalize_origin,
         normalize_request_origin_header, parse_text_envelope, remove_duplicate_sessions,
-        revoke_origin_in_runtime, target_sender_for_ptt, validate_hello_protocol, HelloPayload,
-        OutboundMessage, PendingPairingRequest, RuntimeState, SessionState, TrustedOriginRecord,
+        revoke_origin_in_runtime, validate_hello_protocol, HelloPayload, OutboundMessage,
+        PendingPairingRequest, RuntimeState, SessionState, TrustedOriginRecord,
         MAX_WS_TEXT_FRAME_BYTES,
     };
     use crate::ptt::{DesktopPttBindingRequest, DesktopPttBindingStatus};
@@ -1940,6 +2302,8 @@ mod tests {
                 authorized: true,
                 last_foreground_at: None,
                 ptt_config: default_ptt_request(),
+                rejected_binding_key: None,
+                binding_revision: 0,
                 sender,
             },
             _receiver,
@@ -1999,6 +2363,10 @@ mod tests {
         runtime.target_connection_id = Some(1);
         runtime.sessions.insert(1, target);
 
+        runtime
+            .persisted
+            .trusted_origins
+            .push(trust("https://one.example", Some("KeyV")));
         let binding = effective_binding_request(&runtime);
         assert_eq!(binding.mode.as_deref(), Some("ptt"));
         assert_eq!(binding.key_code.as_deref(), Some("KeyV"));
@@ -2047,19 +2415,19 @@ mod tests {
 
     #[test]
     fn hello_requires_matching_origin_and_protocol() {
-        let payload = hello("https://chat.example.com", Some("1"));
+        let payload = hello("https://chat.example.com", Some("2"));
         assert!(validate_hello_protocol(&payload).is_ok());
         assert_eq!(
             normalize_hello_origin("https://chat.example.com", &payload.origin).unwrap(),
             "https://chat.example.com"
         );
 
-        let spoofed = hello("https://evil.example.com", Some("1"));
+        let spoofed = hello("https://evil.example.com", Some("2"));
         assert!(normalize_hello_origin("https://chat.example.com", &spoofed.origin).is_err());
         assert!(
             normalize_hello_origin("https://chat.example.com", "file:///tmp/helper.html").is_err()
         );
-        assert!(validate_hello_protocol(&hello("https://chat.example.com", Some("2"))).is_err());
+        assert!(validate_hello_protocol(&hello("https://chat.example.com", Some("1"))).is_err());
         assert!(validate_hello_protocol(&hello("https://chat.example.com", None)).is_err());
     }
 
@@ -2110,6 +2478,7 @@ mod tests {
             RuntimeState::from_persisted(Default::default(), DesktopPttBindingStatus::default());
         runtime.persisted.trusted_origins = vec![TrustedOriginRecord {
             origin: "https://chat.example.com".to_string(),
+            approved_key_code: None,
             token_hash: hash_pairing_token("token-123"),
             approved_at: "2026-06-02T10:00:00Z".to_string(),
             last_client_kind: "browser".to_string(),
@@ -2162,12 +2531,14 @@ mod tests {
         runtime.persisted.trusted_origins = vec![
             TrustedOriginRecord {
                 origin: "https://chat.example.com".to_string(),
+                approved_key_code: None,
                 token_hash: hash_pairing_token("token-123"),
                 approved_at: "2026-06-02T10:00:00Z".to_string(),
                 last_client_kind: "browser".to_string(),
             },
             TrustedOriginRecord {
                 origin: "https://other.example.com".to_string(),
+                approved_key_code: None,
                 token_hash: hash_pairing_token("token-456"),
                 approved_at: "2026-06-02T10:00:00Z".to_string(),
                 last_client_kind: "browser".to_string(),
@@ -2201,34 +2572,6 @@ mod tests {
     }
 
     #[test]
-    fn ptt_event_sender_requires_authorized_current_target() {
-        let mut runtime =
-            RuntimeState::from_persisted(Default::default(), DesktopPttBindingStatus::default());
-        let (target, mut receiver) =
-            session_with_receiver(1, "https://chat.example.com", "session-a");
-        runtime.target_connection_id = Some(1);
-        runtime.sessions.insert(1, target);
-
-        let sender = target_sender_for_ptt(&runtime).expect("authorized target sender");
-        sender
-            .send(OutboundMessage::Json(
-                serde_json::json!({ "type": "ptt_down" }),
-            ))
-            .unwrap();
-        match receiver.try_recv().unwrap() {
-            OutboundMessage::Json(value) => assert_eq!(value["type"], "ptt_down"),
-            OutboundMessage::Close(_) => panic!("expected json message"),
-        }
-
-        runtime.sessions.get_mut(&1).unwrap().authorized = false;
-        assert!(target_sender_for_ptt(&runtime).is_none());
-
-        runtime.sessions.get_mut(&1).unwrap().authorized = true;
-        runtime.persisted.paused = true;
-        assert!(target_sender_for_ptt(&runtime).is_none());
-    }
-
-    #[test]
     fn snapshot_marks_target_sessions() {
         let mut runtime =
             RuntimeState::from_persisted(Default::default(), DesktopPttBindingStatus::default());
@@ -2238,6 +2581,7 @@ mod tests {
             .insert(1, session(1, "https://one.example", "session-a"));
         runtime.persisted.trusted_origins = vec![TrustedOriginRecord {
             origin: "https://one.example".to_string(),
+            approved_key_code: None,
             token_hash: "hash".to_string(),
             approved_at: "2026-06-02T10:00:00Z".to_string(),
             last_client_kind: "browser".to_string(),
@@ -2252,5 +2596,270 @@ mod tests {
         assert!(snapshot.active_sessions[0].is_target);
         let target_state = current_target_state(&runtime, 1);
         assert!(target_state.is_target);
+    }
+
+    fn trust(origin: &str, key: Option<&str>) -> TrustedOriginRecord {
+        TrustedOriginRecord {
+            origin: origin.into(),
+            token_hash: hash_pairing_token("token"),
+            approved_at: "2026-11-11T00:00:00Z".into(),
+            last_client_kind: "browser".into(),
+            approved_key_code: key.map(str::to_string),
+        }
+    }
+
+    fn configured_runtime(
+        approved: Option<&str>,
+    ) -> (RuntimeState, UnboundedReceiver<OutboundMessage>) {
+        let mut runtime =
+            RuntimeState::from_persisted(Default::default(), DesktopPttBindingStatus::default());
+        runtime
+            .persisted
+            .trusted_origins
+            .push(trust("https://one.example", approved));
+        let (mut active, receiver) = session_with_receiver(1, "https://one.example", "one");
+        active.ptt_config = DesktopPttBindingRequest {
+            mode: Some("ptt".into()),
+            key_code: Some("KeyV".into()),
+            allow_pass_through: Some(true),
+            platform_strategy: Some("auto".into()),
+        };
+        runtime.sessions.insert(1, active);
+        runtime.target_connection_id = Some(1);
+        runtime.binding_target = Some(1);
+        runtime.binding_generation = 7;
+        runtime.active_binding_request = runtime.sessions[&1].ptt_config.clone();
+        runtime.binding_status.is_global = true;
+        sync_binding_requests(&mut runtime);
+        (runtime, receiver)
+    }
+
+    fn change_key(runtime: &mut RuntimeState, id: u64, key: &str) {
+        runtime.next_binding_revision += 1;
+        let session = runtime.sessions.get_mut(&id).unwrap();
+        session.ptt_config.key_code = Some(key.into());
+        session.binding_revision = runtime.next_binding_revision;
+        session.rejected_binding_key = None;
+        sync_binding_requests(runtime);
+    }
+
+    fn next_type(receiver: &mut UnboundedReceiver<OutboundMessage>) -> String {
+        match receiver.try_recv().unwrap() {
+            OutboundMessage::Json(value) => value["type"].as_str().unwrap().into(),
+            _ => panic!("Expected PTT event"),
+        }
+    }
+
+    #[test]
+    fn legacy_pairings_migrate_without_implicit_key_permission() {
+        let persisted: PersistedHelperState = serde_json::from_str(r#"{"trustedOrigins":[{"origin":"https://one.example","tokenHash":"hash","approvedAt":"then","lastClientKind":"browser"}]}"#).unwrap();
+        assert_eq!(persisted.trusted_origins[0].approved_key_code, None);
+        let (runtime, _) = configured_runtime(None);
+        assert_eq!(effective_binding_request(&runtime), default_ptt_request());
+        assert!(!effective_status(&runtime, runtime.binding_status.clone()).is_global);
+    }
+
+    #[test]
+    fn identical_heartbeats_keep_one_stable_request_and_rejection_is_connection_local() {
+        let (mut runtime, _) = configured_runtime(None);
+        let request = runtime.binding_requests[0].request_id.clone();
+        for _ in 0..100 {
+            sync_binding_requests(&mut runtime);
+        }
+        assert_eq!(runtime.binding_requests.len(), 1);
+        assert_eq!(runtime.binding_requests[0].request_id, request);
+        runtime.sessions.get_mut(&1).unwrap().rejected_binding_key = Some("KeyV".into());
+        sync_binding_requests(&mut runtime);
+        assert!(runtime.binding_requests.is_empty());
+        assert_eq!(
+            binding_block_reason(&runtime, &runtime.sessions[&1]),
+            Some("binding-rejected")
+        );
+        let mut replacement = session(2, "https://one.example", "new");
+        replacement.ptt_config = runtime.sessions[&1].ptt_config.clone();
+        runtime.sessions.remove(&1);
+        runtime.sessions.insert(2, replacement);
+        sync_binding_requests(&mut runtime);
+        assert_eq!(runtime.binding_requests.len(), 1);
+        assert_ne!(runtime.binding_requests[0].request_id, request);
+    }
+
+    #[test]
+    fn rotating_keys_invalidates_all_old_confirmations_and_never_emits_down() {
+        let (mut runtime, mut receiver) = configured_runtime(None);
+        let mut expired = Vec::new();
+        for key in ["KeyA", "KeyB", "KeyC", "KeyV", "KeyA", "KeyV"] {
+            expired.push(runtime.binding_requests[0].request_id.clone());
+            change_key(&mut runtime, 1, key);
+            assert_eq!(runtime.binding_requests.len(), 1);
+            route_ptt_event(
+                &mut runtime,
+                NativePttEvent {
+                    action: PttEvent::Down,
+                    generation: 7,
+                },
+            );
+        }
+        for request in expired {
+            assert!(proposed_binding_approval(&runtime, &request).is_err());
+        }
+        assert!(receiver.try_recv().is_err());
+    }
+
+    #[test]
+    fn saving_is_required_before_grant_changes_and_only_one_key_survives_restart() {
+        let (mut runtime, _) = configured_runtime(Some("KeyA"));
+        let request = runtime.binding_requests[0].request_id.clone();
+        assert!(
+            commit_binding_approval(&mut runtime, &request, |_| Err("disk full".into())).is_err()
+        );
+        assert_eq!(
+            runtime.persisted.trusted_origins[0]
+                .approved_key_code
+                .as_deref(),
+            Some("KeyA")
+        );
+        assert_eq!(effective_binding_request(&runtime), default_ptt_request());
+        let mut saved = String::new();
+        commit_binding_approval(&mut runtime, &request, |proposed| {
+            saved = serde_json::to_string(proposed).unwrap();
+            Ok(())
+        })
+        .unwrap();
+        assert_eq!(
+            effective_binding_request(&runtime).key_code.as_deref(),
+            Some("KeyV")
+        );
+        let restored: PersistedHelperState = serde_json::from_str(&saved).unwrap();
+        assert_eq!(
+            restored.trusted_origins[0].approved_key_code.as_deref(),
+            Some("KeyV")
+        );
+        change_key(&mut runtime, 1, "KeyA");
+        assert_eq!(effective_binding_request(&runtime), default_ptt_request());
+    }
+
+    #[test]
+    fn another_origin_and_a_second_session_cannot_borrow_key_permissions() {
+        let (mut runtime, mut receiver) = configured_runtime(Some("KeyV"));
+        let (mut second, mut second_receiver) =
+            session_with_receiver(2, "https://other.example", "other");
+        second.ptt_config = runtime.sessions[&1].ptt_config.clone();
+        runtime
+            .persisted
+            .trusted_origins
+            .push(trust("https://other.example", None));
+        runtime.sessions.insert(2, second);
+        runtime.target_connection_id = Some(2);
+        runtime.binding_target = Some(2);
+        sync_binding_requests(&mut runtime);
+        route_ptt_event(
+            &mut runtime,
+            NativePttEvent {
+                action: PttEvent::Down,
+                generation: 7,
+            },
+        );
+        assert!(receiver.try_recv().is_err());
+        assert!(second_receiver.try_recv().is_err());
+        assert_eq!(runtime.binding_requests[0].origin, "https://other.example");
+    }
+
+    #[test]
+    fn old_generations_and_duplicate_events_cannot_activate_or_release_a_new_hold() {
+        let (mut runtime, mut receiver) = configured_runtime(Some("KeyV"));
+        route_ptt_event(
+            &mut runtime,
+            NativePttEvent {
+                action: PttEvent::Down,
+                generation: 6,
+            },
+        );
+        assert!(receiver.try_recv().is_err());
+        for _ in 0..2 {
+            route_ptt_event(
+                &mut runtime,
+                NativePttEvent {
+                    action: PttEvent::Down,
+                    generation: 7,
+                },
+            );
+        }
+        assert_eq!(next_type(&mut receiver), "ptt_down");
+        assert!(receiver.try_recv().is_err());
+        route_ptt_event(
+            &mut runtime,
+            NativePttEvent {
+                action: PttEvent::Up,
+                generation: 6,
+            },
+        );
+        assert!(receiver.try_recv().is_err());
+        assert!(runtime.transmitting.is_some());
+        route_ptt_event(
+            &mut runtime,
+            NativePttEvent {
+                action: PttEvent::Up,
+                generation: 7,
+            },
+        );
+        assert_eq!(next_type(&mut receiver), "ptt_up");
+        assert!(runtime.transmitting.is_none());
+    }
+
+    #[test]
+    fn every_event_rechecks_pause_pairing_target_and_grant() {
+        for guard in 0..5 {
+            let (mut runtime, mut receiver) = configured_runtime(Some("KeyV"));
+            match guard {
+                0 => runtime.persisted.paused = true,
+                1 => runtime.sessions.get_mut(&1).unwrap().authorized = false,
+                2 => runtime.persisted.trusted_origins[0].approved_key_code = None,
+                3 => runtime.target_connection_id = None,
+                _ => {
+                    change_key(&mut runtime, 1, "KeyB");
+                }
+            }
+            route_ptt_event(
+                &mut runtime,
+                NativePttEvent {
+                    action: PttEvent::Down,
+                    generation: 7,
+                },
+            );
+            assert!(receiver.try_recv().is_err());
+        }
+    }
+
+    #[test]
+    fn release_cleanup_and_native_status_refresh_preserve_the_approval_gate() {
+        let (mut runtime, mut receiver) = configured_runtime(Some("KeyV"));
+        route_ptt_event(
+            &mut runtime,
+            NativePttEvent {
+                action: PttEvent::Down,
+                generation: 7,
+            },
+        );
+        assert_eq!(next_type(&mut receiver), "ptt_down");
+        change_key(&mut runtime, 1, "KeyB");
+        let status = effective_status(&runtime, runtime.binding_status.clone());
+        assert_eq!(status.reason.as_deref(), Some("binding-approval-required"));
+        assert!(!status.is_global);
+        release_transmission(&mut runtime);
+        assert_eq!(next_type(&mut receiver), "ptt_up");
+        assert!(runtime.transmitting.is_none());
+    }
+
+    #[test]
+    fn config_normalization_rejects_arbitrary_keys_and_never_enables_suppression() {
+        let request = parse_ptt_config(Some(json!({"mode":"ptt","keyCode":"KeyV","allowPassThrough":false,"platformStrategy":"hook"}))).unwrap();
+        assert_eq!(request.allow_pass_through, Some(true));
+        assert_eq!(request.platform_strategy.as_deref(), Some("auto"));
+        assert!(parse_ptt_config(Some(
+            json!({"mode":"ptt","keyCode":"arbitrary client payload"})
+        ))
+        .is_err());
+        assert!(parse_ptt_config(Some(json!({"mode":"unknown"}))).is_err());
     }
 }

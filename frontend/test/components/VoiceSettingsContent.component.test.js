@@ -62,3 +62,20 @@ it('explains permission loss instead of claiming that native capture is active',
   expect(wrapper.text()).toContain('macOS PTT needs attention')
   expect(wrapper.text()).toContain('Input Monitoring')
 })
+
+it.each(['binding-approval-required', 'binding-rejected'])('explains local key decisions: %s', async reason => {
+  nativePttState.helperState = reason
+  nativePttState.bindingStatus = { mode: 'focused-only', isGlobal: false, reason }
+  wrapper = context.mount(VoiceSettingsContent)
+  await flushPromises()
+  expect(wrapper.text()).toContain('Key approval required')
+  expect(wrapper.text()).toContain(reason === 'binding-rejected' ? 'was rejected' : 'Confirm the selected key')
+})
+
+it('explains that an incompatible helper must be updated', async () => {
+  nativePttState.helperState = 'update-required'
+  wrapper = context.mount(VoiceSettingsContent)
+  await flushPromises()
+  expect(wrapper.text()).toContain('Update PTT Helper')
+  expect(wrapper.text()).toContain('0.3.0')
+})

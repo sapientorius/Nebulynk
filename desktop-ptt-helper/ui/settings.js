@@ -19,9 +19,17 @@ const nodes = {
   error: document.getElementById('helper-error')
 }
 
+const bindingRequests = document.getElementById('binding-requests')
+const bindingCount = document.getElementById('binding-count')
+const bindingDialog = document.getElementById('binding-confirmation')
+const bindingDialogCopy = document.getElementById('binding-confirmation-copy')
+const bindingConfirm = document.getElementById('binding-confirm')
+let confirmationRequest = null
 let currentSnapshot = null
 
 const statusReasons = {
+  'binding-approval-required': 'Confirm the requested PTT key in this helper. Global capture is off until approval.',
+  'binding-rejected': 'The requested PTT key was rejected. Choose a key again in Nebulynk to request approval.',
   'macos-input-monitoring-required': 'Allow Input Monitoring in System Settings > Privacy & Security.',
   'macos-secure-input': 'macOS Secure Input is active. Global PTT is paused until protected input ends.',
   'macos-key-unsupported': 'This key cannot be used for global hold-to-talk on macOS. Choose another key.',
@@ -66,6 +74,8 @@ function statusPillClass(snapshot) {
 function statusPillLabel(snapshot) {
   if (!snapshot) return 'Loading'
   if (snapshot.paused) return 'Paused'
+  if (snapshot.bindingStatus?.reason === 'binding-approval-required') return 'Key Approval Required'
+  if (snapshot.bindingStatus?.reason === 'binding-rejected') return 'Key Rejected'
   switch (snapshot.bindingStatus?.mode) {
     case 'global-raw-input':
     case 'global-native':
@@ -118,6 +128,27 @@ function renderPendingRequests(snapshot) {
   }))
 }
 
+function renderBindingRequests(snapshot) {
+  const requests = snapshot.pendingBindingRequests || []
+  bindingCount.textContent = String(requests.length)
+  if (!requests.length) {
+    renderEmptyState(bindingRequests, 'No key requests waiting.')
+    return
+  }
+  bindingRequests.className = 'stack'
+  bindingRequests.replaceChildren(...requests.map((request) => createElement('article', { className: 'request-row' }, [
+    createElement('div', { className: 'request-copy' }, [
+      createElement('strong', { text: request.origin }),
+      createElement('small', { text: 'Requested key: ' + request.keyCode }),
+      createElement('small', { text: 'Previously allowed: ' + (request.previousKeyCode || 'None') })
+    ]),
+    createElement('div', { className: 'card-actions' }, [
+      createElement('button', { type: 'button', className: 'action-button', text: 'Review key', dataset: { approveBinding: request.requestId } }),
+      createElement('button', { type: 'button', className: 'danger-button', text: 'Reject', dataset: { rejectBinding: request.requestId } })
+    ])
+  ])))
+}
+
 function renderTrustedOrigins(snapshot) {
   const origins = snapshot.trustedOrigins || []
   nodes.trustedCount.textContent = String(origins.length)
@@ -133,11 +164,14 @@ function renderTrustedOrigins(snapshot) {
     const copy = createElement('div', { className: 'site-copy' }, [
       createElement('strong', { text: normalizedOrigin }),
       createElement('small', {
-        text: `Approved ${displayValue(origin.approvedAt, 'unknown time')} for ${clientKind}`
+        text: `Approved ${displayValue(origin.approvedAt, 'unknown time')} for ${clientKind}; allowed key: ${origin.approvedKeyCode || 'None'}`
       })
     ])
     const actions = createElement('div', { className: 'card-actions' }, [
       createElement('span', { className: 'tag', text: clientKind }),
+      ...(origin.approvedKeyCode ? [createElement('button', {
+        type: 'button', className: 'danger-button', text: 'Revoke key', dataset: { revokeBinding: normalizedOrigin }
+      })] : []),
       createElement('button', {
         className: 'danger-button',
         dataset: { revoke: normalizedOrigin },
@@ -210,6 +244,7 @@ function renderSnapshot(snapshot) {
   nodes.pauseToggle.checked = snapshot.paused === true
   nodes.autostartToggle.checked = snapshot.autostartEnabled === true
   renderStatus(snapshot)
+  renderBindingRequests(snapshot)
   renderPendingRequests(snapshot)
   renderTrustedOrigins(snapshot)
   renderSessions(snapshot)
@@ -257,6 +292,26 @@ nodes.permissionButton.addEventListener('click', async () => {
 })
 
 document.body.addEventListener('click', async (event) => {
+  const approveBinding = event.target.getAttribute('data-approve-binding')
+  if (approveBinding) {
+    const request = currentSnapshot?.pendingBindingRequests?.find((item) => item.requestId === approveBinding)
+    if (!request) return
+    // Freeze the exact request shown. Live snapshots must never change this decision.
+    confirmationRequest = Object.freeze({ ...request })
+    bindingDialogCopy.textContent = 'Allow ' + confirmationRequest.origin + ' to observe ' + confirmationRequest.keyCode + '?'
+    bindingDialog.showModal()
+    return
+  }
+  const rejectBinding = event.target.getAttribute('data-reject-binding')
+  const revokeBinding = event.target.getAttribute('data-revoke-binding')
+  if (rejectBinding || revokeBinding) {
+    try {
+      await invoke(rejectBinding ? 'helper_reject_binding' : 'helper_revoke_binding',
+        rejectBinding ? { requestId: rejectBinding } : { origin: revokeBinding })
+    } catch (error) { showError(error) }
+    finally { await refreshSnapshot() }
+    return
+  }
   const approveId = event.target.getAttribute('data-approve')
   if (approveId) {
     try {
@@ -300,3 +355,20 @@ window.__TAURI__.event.listen('helper:state-changed', (event) => {
 })
 
 refreshSnapshot().catch(console.error)
+
+bindingConfirm.addEventListener('click', async () => {
+  if (!confirmationRequest || bindingConfirm.disabled) return
+  const request = confirmationRequest
+  bindingConfirm.disabled = true
+  try {
+    await invoke('helper_approve_binding', { requestId: request.requestId })
+  } catch (error) { showError(error) }
+  finally {
+    confirmationRequest = null
+    bindingConfirm.disabled = false
+    bindingDialog.close()
+    await refreshSnapshot()
+  }
+})
+document.getElementById('binding-cancel').addEventListener('click', () => bindingDialog.close())
+bindingDialog.addEventListener('close', () => { confirmationRequest = null })

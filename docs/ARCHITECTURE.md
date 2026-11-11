@@ -154,3 +154,15 @@ existing LiveKit media does not imply seamless API-session recovery.
 See [runtime operations and isolated capacity verification](runtime-operations.md)
 for lifecycle ownership, recovery limits, exact rollout steps and reproducible
 local Docker tests. Redis rate limiting does not enable multiple API instances.
+
+### PTT Helper key permission boundary
+
+Helper 0.3.0 uses loopback protocol 2 and requires a persisted local key grant
+for each exact paired origin. A browser can request a key but cannot approve it.
+The local settings window confirms an immutable request identifier; replacing
+a request invalidates previous confirmations. Each origin has one granted key.
+Native events carry a binding generation and are checked against the current
+target, pairing, key grant and pause state before forwarding. Binding updates
+are serialized independently of the runtime mutex to avoid callback deadlocks.
+Diagnostics exclude keyboard events and heartbeat payloads and retain at most
+three 1 MiB files. See [PTT Helper](PTT_HELPER.md) for upgrade and test steps.

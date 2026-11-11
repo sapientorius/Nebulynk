@@ -1,6 +1,6 @@
 //! CoreGraphics/CoreFoundation ABI. All tap/runloop pointers stay on their owning thread.
 use super::{key_code, HoldState};
-use crate::ptt::{DesktopPttBindingRequest, DesktopPttBindingStatus, PttEvent};
+use crate::ptt::{DesktopPttBindingRequest, DesktopPttBindingStatus, NativePttEvent, PttEvent};
 use std::ffi::c_void;
 use std::ptr::null_mut;
 use std::sync::{mpsc, Arc, Mutex};
@@ -52,6 +52,7 @@ pub fn request_permission() -> bool {
 enum Command {
     Bind(
         DesktopPttBindingRequest,
+        u64,
         mpsc::Sender<DesktopPttBindingStatus>,
     ),
     Shutdown,
@@ -63,7 +64,7 @@ pub struct MacosPttService {
 }
 
 impl MacosPttService {
-    pub fn new(callback: Arc<dyn Fn(PttEvent) + Send + Sync + 'static>) -> Self {
+    pub fn new(callback: Arc<dyn Fn(NativePttEvent) + Send + Sync + 'static>) -> Self {
         let (commands, receive) = mpsc::channel();
         let status = Arc::new(Mutex::new(DesktopPttBindingStatus::default()));
         let thread_status = status.clone();
@@ -72,6 +73,7 @@ impl MacosPttService {
                 callback,
                 status: thread_status,
                 request: None,
+                generation: 0,
                 key: None,
                 hold: HoldState::default(),
                 tap: null_mut(),
@@ -84,8 +86,9 @@ impl MacosPttService {
                 let mut shutdown = false;
                 while let Ok(command) = receive.try_recv() {
                     match command {
-                        Command::Bind(request, response) => {
+                        Command::Bind(request, generation, response) => {
                             state.release();
+                            state.generation = generation;
                             state.key = request
                                 .key_code
                                 .as_deref()
@@ -124,10 +127,18 @@ impl MacosPttService {
         Self { commands, status }
     }
 
-    pub fn set_binding(&self, request: DesktopPttBindingRequest) -> DesktopPttBindingStatus {
+    pub fn set_binding(
+        &self,
+        request: DesktopPttBindingRequest,
+        generation: u64,
+    ) -> DesktopPttBindingStatus {
         let (send, receive) = mpsc::channel();
         let key = request.key_code.clone();
-        if self.commands.send(Command::Bind(request, send)).is_ok() {
+        if self
+            .commands
+            .send(Command::Bind(request, generation, send))
+            .is_ok()
+        {
             if let Ok(status) = receive.recv_timeout(Duration::from_secs(2)) {
                 return status;
             }
@@ -141,6 +152,7 @@ impl MacosPttService {
                 allow_pass_through: Some(true),
                 platform_strategy: None,
             },
+            generation,
             discard,
         ));
         let status = DesktopPttBindingStatus::unsupported(
@@ -166,9 +178,10 @@ impl Drop for MacosPttService {
 }
 
 struct TapState {
-    callback: Arc<dyn Fn(PttEvent) + Send + Sync>,
+    callback: Arc<dyn Fn(NativePttEvent) + Send + Sync>,
     status: Arc<Mutex<DesktopPttBindingStatus>>,
     request: Option<DesktopPttBindingRequest>,
+    generation: u64,
     key: Option<u16>,
     hold: HoldState,
     tap: Ref,
@@ -178,7 +191,10 @@ struct TapState {
 impl TapState {
     fn emit(&self, event: Option<PttEvent>) {
         if let Some(event) = event {
-            (self.callback)(event);
+            (self.callback)(NativePttEvent {
+                action: event,
+                generation: self.generation,
+            });
         }
     }
     fn release(&mut self) {

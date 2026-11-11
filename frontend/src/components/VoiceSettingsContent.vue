@@ -281,6 +281,7 @@ export default {
           || this.nativePttHelperState === 'pairing-required'
           || this.nativePttHelperState === 'unavailable'
           || this.nativePttHelperState === 'paused'
+          || ['binding-approval-required', 'binding-rejected', 'update-required'].includes(this.nativePttHelperState)
         )
     },
     showDesktopNonTextRecommendation() {
@@ -295,6 +296,14 @@ export default {
       if (!status) return null
       const mode = status.mode
       const reason = status.reason || null
+      if (['binding-approval-required', 'binding-rejected'].includes(reason)) {
+        return { type: 'warning', label: this.$t('ui.components.global_ptt_key_approval_label'),
+          detail: this.$t(reason === 'binding-rejected' ? 'ui.components.global_ptt_key_rejected' : 'ui.components.global_ptt_key_approval_required') }
+      }
+      if (this.nativePttHelperState === 'update-required') {
+        return { type: 'warning', label: this.$t('ui.components.global_ptt_helper_update_label'),
+          detail: this.$t('ui.components.global_ptt_helper_update_required') }
+      }
       if (reason?.startsWith('macos-')) {
         return { type: 'warning', label: this.$t('ui.components.global_ptt_macos_attention'),
           detail: this.$t(reason === 'macos-input-monitoring-required'

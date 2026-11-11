@@ -31,6 +31,29 @@
       </section>
       <p id="helper-error" role="alert" hidden></p>
 
+      <section class="panel">
+        <div class="panel-head">
+          <h2>PTT Key Approval</h2>
+          <span id="binding-count" class="meta-count">0</span>
+        </div>
+        <p>Each site may use one key that you approve here. A different requested key pauses global
+          PTT until you approve it. Only approve a key you selected yourself in Nebulynk.</p>
+        <div id="binding-requests" class="stack empty-state">No key requests waiting.</div>
+      </section>
+
+      <dialog id="binding-confirmation" aria-labelledby="binding-confirmation-title">
+        <h2 id="binding-confirmation-title">Confirm global PTT key</h2>
+        <p id="binding-confirmation-copy"></p>
+        <p>This replaces the site's previous key permission. The site can detect this key while
+          other apps are active.</p>
+        <div class="card-actions">
+          <button id="binding-confirm" class="action-button" type="button">Allow this key</button>
+          <button id="binding-cancel" class="ghost-button" type="button">Cancel</button>
+        </div>
+      </dialog>
+
+
+
       <section class="panel panel-wide">
         <div class="panel-head">
           <h2>Status</h2>

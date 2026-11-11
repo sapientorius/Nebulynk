@@ -2,7 +2,7 @@ import js from '@eslint/js'
 import vue from 'eslint-plugin-vue'
 import globals from 'globals'
 
-const targets = ['backend/**/*.{js,mjs}', 'frontend/**/*.{js,mjs,vue}', 'scripts/**/*.mjs', 'desktop-ptt-helper/scripts/**/*.mjs', 'eslint.config.mjs']
+const targets = ['backend/**/*.{js,mjs}', 'frontend/**/*.{js,mjs,vue}', 'scripts/**/*.mjs', 'desktop-ptt-helper/scripts/**/*.mjs', 'desktop-ptt-helper/ui/**/*.js', 'eslint.config.mjs']
 
 export default [
   // Build output, browser reports and copied third-party models are not source.
@@ -22,7 +22,7 @@ export default [
     }
   },
   { files: ['backend/**/*.{js,mjs}', 'scripts/**/*.mjs', 'desktop-ptt-helper/scripts/**/*.mjs', 'eslint.config.mjs', 'frontend/*.{js,mjs}', 'frontend/scripts/**/*.mjs', 'frontend/test/**/*.js'], languageOptions: { globals: globals.node } },
-  { files: ['frontend/src/**/*.{js,vue}', 'frontend/test/**/*.component.test.js', 'frontend/test/helpers/**/*.js', 'frontend/test/setup-dom.js'], languageOptions: { globals: globals.browser } },
+  { files: ['desktop-ptt-helper/ui/**/*.js', 'frontend/src/**/*.{js,vue}', 'frontend/test/**/*.component.test.js', 'frontend/test/helpers/**/*.js', 'frontend/test/setup-dom.js'], languageOptions: { globals: globals.browser } },
   // Playwright evaluate callbacks execute in the browser; Node unit setup supplies window only.
   { files: ['frontend/test/e2e/**/*.js'], languageOptions: { globals: globals.browser } },
   { files: ['frontend/test/**/*.js'], languageOptions: { globals: { window: 'readonly' } } },

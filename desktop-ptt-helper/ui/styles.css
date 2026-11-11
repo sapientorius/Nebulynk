@@ -262,3 +262,14 @@ button {
     flex-direction: column;
   }
 }
+dialog {
+  max-width: 36rem;
+  border: 1px solid #657286;
+  border-radius: 1rem;
+  padding: 1.5rem;
+  color: inherit;
+  background: #162031;
+  overflow-wrap: anywhere;
+}
+
+dialog::backdrop { background: rgb(0 0 0 / 65%); }

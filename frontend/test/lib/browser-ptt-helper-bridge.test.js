@@ -233,7 +233,7 @@ describe('browser ptt helper bridge', () => {
     expect(socket.sent[0]).toEqual({
       type: 'hello',
       payload: {
-        protocolVersion: '1',
+        protocolVersion: '2',
         origin: 'https://chat.example.com',
         sessionId: 'session-cuid',
         clientKind: 'browser',
@@ -244,7 +244,7 @@ describe('browser ptt helper bridge', () => {
     socket.emit('message', {
       data: JSON.stringify({
         type: 'hello_ack',
-        payload: {
+        payload: { protocolVersion: '2',
           authorized: true,
           bindingStatus: {
             mode: 'global-raw-input',
@@ -295,7 +295,7 @@ describe('browser ptt helper bridge', () => {
     socket.emit('message', {
       data: JSON.stringify({
         type: 'paired',
-        payload: {
+        payload: { protocolVersion: '2',
           pairingToken: 'token-123',
           bindingStatus: {
             mode: 'focused-only',
@@ -321,7 +321,7 @@ describe('browser ptt helper bridge', () => {
     enableBrowserPttHelper()
     const socket = MockWebSocket.instances[0]
     socket.emit('open')
-    socket.emit('message', { data: JSON.stringify({ type: 'hello_ack', payload: {
+    socket.emit('message', { data: JSON.stringify({ type: 'hello_ack', payload: { protocolVersion: '2',
       authorized: true, targetState: { isTarget: true },
       bindingStatus: { mode: 'global-native', isGlobal: true, platform: 'macos', keyCode: 'KeyV' }
     } }) })
@@ -356,7 +356,7 @@ describe('browser ptt helper bridge', () => {
     const emit = (type, payload = {}) => socket.emit('message', { data: JSON.stringify({ type, payload }) })
     emit('ptt_down')
     expect(triggerExternalPttDownMock).not.toHaveBeenCalled()
-    emit('hello_ack', { authorized: true, targetState: { isTarget: true },
+    emit('hello_ack', { protocolVersion: '2', authorized: true, targetState: { isTarget: true },
       bindingStatus: { mode: 'global-native', isGlobal: true, platform: 'macos', keyCode: 'ShiftLeft' } })
     emit('ptt_down')
     expect(triggerExternalPttDownMock).toHaveBeenCalledTimes(1)
@@ -393,7 +393,7 @@ describe('browser ptt helper bridge', () => {
     secondSocket.emit('message', {
       data: JSON.stringify({
         type: 'hello_ack',
-        payload: {
+        payload: { protocolVersion: '2',
           authorized: true,
           bindingStatus: {
             mode: 'global-raw-input',
@@ -416,4 +416,48 @@ describe('browser ptt helper bridge', () => {
     expect(nativePttState.helperState).toBe('connected')
     expect(nativePttState.authorized).toBe(true)
   })
+
+  it.each(['binding-approval-required', 'binding-rejected'])('releases held PTT and blocks Down for %s', async reason => {
+    const { initializeBrowserPttHelperBridge, enableBrowserPttHelper } = await import('../../src/lib/browser-ptt-helper-bridge.js')
+    const { nativePttState } = await import('../../src/lib/native-ptt-state.js')
+    initializeBrowserPttHelperBridge()
+    enableBrowserPttHelper()
+    const socket = MockWebSocket.instances[0]
+    socket.emit('open')
+    const emit = (type, payload = {}) => socket.emit('message', { data: JSON.stringify({ type, payload }) })
+    emit('hello_ack', { protocolVersion: '2', authorized: true, targetState: { isTarget: true },
+      bindingStatus: { mode: 'global-native', isGlobal: true, keyCode: 'KeyV' } })
+    emit('ptt_down')
+    expect(triggerExternalPttDownMock).toHaveBeenCalledOnce()
+    triggerExternalPttUpMock.mockClear()
+    emit('binding_status', { mode: 'focused-only', isGlobal: false, reason, keyCode: 'KeyB' })
+    expect(triggerExternalPttUpMock).toHaveBeenCalledOnce()
+    expect(nativePttState.helperState).toBe(reason)
+    emit('ptt_down')
+    expect(triggerExternalPttDownMock).toHaveBeenCalledOnce()
+  })
+
+  it.each(['rejection', 'legacy-ack'])('requires an update for an old helper: %s', async response => {
+    const { initializeBrowserPttHelperBridge, enableBrowserPttHelper } = await import('../../src/lib/browser-ptt-helper-bridge.js')
+    const { nativePttState } = await import('../../src/lib/native-ptt-state.js')
+    initializeBrowserPttHelperBridge()
+    enableBrowserPttHelper()
+    const socket = MockWebSocket.instances[0]
+    socket.emit('open')
+    const emit = (type, payload = {}) => socket.emit('message', { data: JSON.stringify({ type, payload }) })
+    if (response === 'rejection') emit('error', { code: 'helper_error', message: 'Unsupported helper protocol version.' })
+    else emit('hello_ack', { authorized: true, protocolVersion: '1', bindingStatus: { isGlobal: true } })
+    expect(nativePttState.helperState).toBe('update-required')
+    expect(nativePttState.authorized).toBe(false)
+    emit('binding_status', { isGlobal: true, mode: 'global-native' })
+    emit('target_state', { isTarget: true })
+    emit('ptt_down')
+    expect(triggerExternalPttDownMock).not.toHaveBeenCalled()
+    socket.emit('close')
+    vi.advanceTimersByTime(10000)
+    expect(nativePttState.helperState).toBe('update-required')
+    expect(MockWebSocket.instances).toHaveLength(1)
+    expect(socket.sent.every(message => message.type === 'hello')).toBe(true)
+  })
+
 })

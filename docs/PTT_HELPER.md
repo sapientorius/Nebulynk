@@ -8,13 +8,13 @@ Choose a suitable non-text key if those side effects are undesirable.
 ## Downloads
 
 Use the download linked in **Voice settings > Push-to-Talk**. Official platform
-releases include these separately versioned Helper 0.2.0 installers:
+releases include these separately versioned Helper 0.3.0 installers:
 
 | Platform | Installer | Status |
 | --- | --- | --- |
-| macOS, Apple Silicon (M-series) | `nebulynk-ptt-helper_0.2.0_macos-beta_aarch64.dmg` | Beta |
-| macOS, Intel | `nebulynk-ptt-helper_0.2.0_macos-beta_x86_64.dmg` | Beta |
-| Windows, 64-bit | `nebulynk-ptt-helper_0.2.0_windows_x86_64.msi` | Windows helper |
+| macOS, Apple Silicon (M-series) | `nebulynk-ptt-helper_0.3.0_macos-beta_aarch64.dmg` | Beta |
+| macOS, Intel | `nebulynk-ptt-helper_0.3.0_macos-beta_x86_64.dmg` | Beta |
+| Windows, 64-bit | `nebulynk-ptt-helper_0.3.0_windows_x86_64.msi` | Windows helper |
 
 On a Mac, **Apple menu > About This Mac** shows either an Apple chip or an Intel
 processor. The macOS deployment target is **macOS 13 or later**. Native CI builds
@@ -44,13 +44,62 @@ commit, CPU architecture, Beta status, size and SHA-256 checksum.
 4. Keep the helper running in the menu bar. In Nebulynk, choose **Voice settings
    > Push-to-Talk**, set your key and enable **global Push-to-Talk**.
 5. Approve the exact Nebulynk site in the helper's pairing window. Join a voice
-   channel/call and test holding and releasing your key, then repeat while
-   another app is active.
+   channel/call. Open the helper from its menu bar/tray icon, review the requested
+   site and key under **PTT Key Approval**, then confirm **Allow this key**.
+   Test holding and releasing the key, then repeat while another app is active.
 
 There is no need to disable Gatekeeper globally or purchase an Apple developer
 account. The separate microphone permission belongs to the browser; this helper
 observes the configured PTT key and does not record audio. Background keyboard
 access stays off until you opt in and approve pairing.
+
+## Local key approval and upgrading
+
+Helper **0.3.0** and the matching Nebulynk frontend use **protocol 2**. Update
+both parts and reload the webpage after upgrading. Older mixed versions do not
+activate global PTT. Existing site pairings survive an upgrade, but each site
+needs its first local key approval; no key is approved automatically.
+
+Choose the key in Nebulynk. In the helper, click **Review key**, check the frozen
+site/key confirmation and choose **Allow this key**. Only approve changes you
+selected yourself. Each exact origin (scheme, hostname and port) has one allowed
+key. Approving a new key replaces the previous permission. Reconnecting or
+restarting the helper keeps that permission.
+
+A different requested key stops global PTT until you approve it. Focused-window
+PTT remains available. Identical requests do not open repeated dialogs. Rejected
+requests stay rejected for that connection; choose another key and then your
+desired key again, or reconnect, to request a new review. **Revoke key** removes
+only the key permission; **Revoke** removes the whole site pairing and its key.
+If the request changes while the confirmation is open, approval fails safely:
+review the current request again. A storage error also leaves the new key off.
+
+The local permission restricts a paired webpage to the key you allowed. A paired
+page receives its press/release signals while other apps are active; pairing is
+therefore still a trust decision. Website messages cannot approve keys. Local
+pause and macOS Input Monitoring restrictions continue to take precedence.
+
+## Bounded local diagnostics
+
+PTT works without a log file. The helper retains only startup/version, relevant
+operational errors and pairing/key-approval decisions for troubleshooting. It
+does not write keyboard codes, individual PTT presses/releases, tokens, audio,
+client payloads or periodic heartbeat/session updates to its log.
+
+The log uses the application's per-user log directory: normally
+
+- macOS: `~/Library/Logs/net.nebulynk.desktop-ptt-helper/`
+- Windows: `%LOCALAPPDATA%\net.nebulynk.desktop-ptt-helper\logs\`
+
+At most **3 MiB** are retained across `helper.log`, `helper.log.1` and
+`helper.log.2`, with **1 MiB per file** and **4 KiB per entry**. Rotation happens
+before an entry would exceed its file limit. Known oversized log files are
+removed at startup. On macOS, the directory and files are private to your user.
+Any log I/O failure disables further logging for that run without stopping PTT.
+
+The old temporary `NebulynkPttHelper/helper.log` is removed when the new helper
+starts. This also removes the older unbounded diagnostic history. Other files
+in that directory are left alone. No log-upload service is included.
 
 ## Helper controls and recovery
 
@@ -92,6 +141,17 @@ the installed PWA where supported. Mark each item passed/failed/not tested:
   grant Input Monitoring. Verify the menu icon and settings window.
 - Pair/decline/revoke a site. Enable/disable the browser opt-in and confirm no
   helper connection occurs before opt-in.
+- Upgrade a previously paired helper: pairing must remain, but global PTT must
+  wait for local key approval. Confirm the origin and key, then reconnect and
+  restart: the same key should remain allowed.
+- Change the key while holding PTT: transmission must stop until local approval.
+  Reject, revoke and change it again. A second site must not inherit permission.
+  Change the requested key while its confirmation is open: the stale approval
+  must fail. Existing focused-window PTT should continue while blocked.
+- Verify an old frontend/new helper and a new frontend/old helper cannot start
+  global PTT; the new frontend must explain that a helper update is required.
+- Check that the old temporary log is removed and leaving the webpage connected
+  or pressing PTT does not append heartbeat or key-event history.
 - Hold and release ShiftLeft/ShiftRight, a letter, Space and a suitable F-key.
   Repeat with another active app and a focused message input. Normal typing,
   capitalization and Enter submission remain available; repeats produce no

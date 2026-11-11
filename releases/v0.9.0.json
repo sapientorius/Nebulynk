@@ -37,6 +37,15 @@
       "description": {
         "en": "The browser releases helper-driven transmission when permissions, the active target or the local connection are lost. macOS capture observes keys without suppressing their normal behavior and handles key repeats and modifier releases."
       }
+    },
+    {
+      "category": "security",
+      "title": {
+        "en": "Local PTT key approval and bounded diagnostics"
+      },
+      "description": {
+        "en": "PTT Helper 0.3.0 requires a local approval for each site’s global key. Webpages can request a different key but cannot silently activate it. Existing pairings need a first key approval after upgrading. Keyboard events and periodic state updates are no longer logged, and local diagnostics are limited to 3 MiB."
+      }
     }
   ],
   "security": [],
@@ -49,7 +58,8 @@
         "Before updating, create and verify external backups of PostgreSQL, both Garage volumes, and deployment configuration and secrets. Keep the existing Compose project or platform resource and persistent-volume mappings. For upgrades from versions before 0.8.0, also follow the intervening release instructions.",
         "Set NEBULYNK_VERSION=0.9.0, pull the backend, frontend and transcription-worker images, and recreate all three services together. Stop the old backend completely before starting its replacement and allow at least 75 seconds for shutdown.",
         "Wait for GET /health/ready and the worker health check to pass, then verify login, chat and Push-to-Talk. This release adds no database migrations or breaking configuration changes relative to 0.8.1.",
-        "macOS users may optionally download PTT Helper (Beta) for Apple Silicon or Intel from this release. Move it to Applications, approve first launch in Privacy & Security and grant Input Monitoring permission. See https://github.com/sapientorius/Nebulynk/blob/v0.9.0/docs/PTT_HELPER.md. Windows users can install the Windows helper from the same release."
+        "macOS users may optionally download PTT Helper (Beta) for Apple Silicon or Intel from this release. Move it to Applications, approve first launch in Privacy & Security and grant Input Monitoring permission. See https://github.com/sapientorius/Nebulynk/blob/v0.9.0/docs/PTT_HELPER.md. Windows users can install the Windows helper from the same release.",
+        "Install PTT Helper 0.3.0 and reload Nebulynk. Helper protocol 2 requires both parts to be updated; mixed old/new versions keep global PTT off. Approve the configured key in the local helper for each paired site, including sites paired before upgrading. See docs/PTT_HELPER.md."
       ]
     },
     "docs_url": "https://github.com/sapientorius/Nebulynk/blob/v0.9.0/docs/SELF_HOSTING.md"
