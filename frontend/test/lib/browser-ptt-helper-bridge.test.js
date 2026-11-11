@@ -460,4 +460,29 @@ describe('browser ptt helper bridge', () => {
     expect(socket.sent.every(message => message.type === 'hello')).toBe(true)
   })
 
+
+  it.each(['origin_revoked', 'invalid_pairing_token', 'pairing_rejected'])('clears native authorization and falls back safely after %s', async code => {
+    const { initializeBrowserPttHelperBridge, enableBrowserPttHelper } = await import('../../src/lib/browser-ptt-helper-bridge.js')
+    const { nativePttState } = await import('../../src/lib/native-ptt-state.js')
+    initializeBrowserPttHelperBridge()
+    enableBrowserPttHelper()
+    const socket = MockWebSocket.instances[0]
+    socket.emit('open')
+    const emit = (type, payload = {}) => socket.emit('message', { data: JSON.stringify({ type, payload }) })
+    emit('hello_ack', { protocolVersion: '2', authorized: true, targetState: { isTarget: true },
+      bindingStatus: { mode: 'global-native', isGlobal: true, keyCode: 'KeyV' } })
+    emit('ptt_down')
+    expect(triggerExternalPttDownMock).toHaveBeenCalledOnce()
+    triggerExternalPttUpMock.mockClear()
+    emit('error', { code })
+    expect(triggerExternalPttUpMock).toHaveBeenCalledOnce()
+    expect(nativePttState.authorized).toBe(false)
+    expect(nativePttState.isTarget).toBe(false)
+    expect(nativePttState.bindingStatus.isGlobal).toBe(false)
+    expect(nativePttState.helperState).toBe('pairing-required')
+    emit('binding_status', { mode: 'global-native', isGlobal: true })
+    emit('ptt_down')
+    expect(triggerExternalPttDownMock).toHaveBeenCalledOnce()
+  })
+
 })

@@ -299,8 +299,16 @@ function handleMessage(event) {
         requireHelperUpdate()
         break
       }
-      if (payload.code === 'invalid_pairing_token' || payload.code === 'origin_revoked') {
+      if (['invalid_pairing_token', 'origin_revoked', 'pairing_rejected'].includes(payload.code)) {
         setPairingToken(null)
+        applyBindingStatus(DEFAULT_DESKTOP_PTT_BINDING_STATUS, {
+          authorized: false,
+          isTarget: false,
+          targetSessionId: null,
+          helperState: 'pairing-required',
+          lastError: payload.message || payload.code
+        })
+        break
       }
       updateNativePttState({
         transport: 'browser-helper',
