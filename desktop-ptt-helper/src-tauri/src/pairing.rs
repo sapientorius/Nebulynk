@@ -114,14 +114,17 @@ impl AttemptLimiter {
             origins: HashMap::new(),
         }
     }
+    fn expire(&mut self, now: Instant) {
+        self.origins.retain(|_, entry| {
+            now.checked_duration_since(entry.used).unwrap_or_default() < ORIGIN_RETENTION
+        });
+    }
     pub fn allow(&mut self, origin: &str, now: Instant) -> bool {
         // Charge the global bucket first: rotating names must not grow this map.
         if !self.global.take(now) {
             return false;
         }
-        self.origins.retain(|_, entry| {
-            now.checked_duration_since(entry.used).unwrap_or_default() < ORIGIN_RETENTION
-        });
+        self.expire(now);
         if !self.origins.contains_key(origin) && self.origins.len() >= MAX_ORIGINS {
             if let Some(oldest) = self
                 .origins
@@ -213,6 +216,7 @@ impl PairingPolicy {
     }
     /// Returns whether mode closed and connection ids whose requests expired.
     pub fn tick(&mut self, now: Moment) -> (bool, Vec<u64>) {
+        self.attempts.expire(now.monotonic);
         let was_open = self.mode.is_some();
         if was_open && !self.active(now) {
             let ids = self.requests.iter().map(|r| r.connection_id).collect();
@@ -410,5 +414,15 @@ mod tests {
         assert!(limiter.allow("https://one.example", now));
         assert!(!limiter.allow("https://one.example", now));
         assert!(limiter.allow("https://one.example", now + Duration::from_secs(10)));
+    }
+    #[test]
+    fn idle_limiter_origins_expire_during_backend_maintenance_even_with_mode_closed() {
+        let now = Moment::now();
+        let mut policy = PairingPolicy::new(now);
+        assert!(policy.attempts.allow("https://one.example", now.monotonic));
+        assert!(!policy.active(now));
+        assert_eq!(policy.attempts.origins.len(), 1);
+        policy.tick(now.later(ORIGIN_RETENTION));
+        assert!(policy.attempts.origins.is_empty());
     }
 }
