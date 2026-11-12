@@ -157,7 +157,7 @@ local Docker tests. Redis rate limiting does not enable multiple API instances.
 
 ### PTT Helper key permission boundary
 
-Helper 0.3.0 uses loopback protocol 2 and requires a persisted local key grant
+Helper 0.4.0 uses loopback protocol 2 and requires a persisted local key grant
 for each exact paired origin. A browser can request a key but cannot approve it.
 The local settings window confirms an immutable request identifier; replacing
 a request invalidates previous confirmations. Each origin has one granted key.
@@ -166,3 +166,15 @@ target, pairing, key grant and pause state before forwarding. Binding updates
 are serialized independently of the runtime mutex to avoid callback deadlocks.
 Diagnostics exclude keyboard events and heartbeat payloads and retain at most
 three 1 MiB files. See [PTT Helper](PTT_HELPER.md) for upgrade and test steps.
+
+
+New origins require a local, non-persistent 120-second pairing mode. The bundled
+settings surface confirms a frozen origin/request ID and saves before authorization;
+one successful pairing ends the mode. Existing protocol-2 tokens and key grants
+survive upgrades and reconnect without opening the mode. Unknown origins are
+rejected before HTTP upgrade while closed. Pairing policy and bounded transport
+are separate Rust modules with deterministic policy and real loopback tests.
+The transport caps pre-auth/auth connections, per-origin and global attempts,
+message/frame sizes, inbound rates and outbound queues/writes. Network traffic
+cannot open/focus settings or enable pairing. The new frontend requires helper
+0.4.0 and retries unpaired attempts only on explicit user action.

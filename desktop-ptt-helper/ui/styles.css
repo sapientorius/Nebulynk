@@ -276,3 +276,9 @@ dialog::backdrop { background: rgb(0 0 0 / 65%); }
 
 .request-copy small { display: block; }
 dialog h2, dialog p { margin-bottom: 12px; }
+
+.shell > .panel + .panel { margin-top: 18px; }
+.request-copy, .site-copy { min-width: 0; overflow-wrap: anywhere; }
+#pairing-instructions { margin: 12px 0; line-height: 1.45; color: var(--muted); }
+#pairing-mode-status { margin-bottom: 12px; }
+button:disabled { cursor: default; opacity: 0.5; }

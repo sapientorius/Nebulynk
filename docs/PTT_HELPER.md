@@ -8,13 +8,13 @@ Choose a suitable non-text key if those side effects are undesirable.
 ## Downloads
 
 Use the download linked in **Voice settings > Push-to-Talk**. Official platform
-releases include these separately versioned Helper 0.3.0 installers:
+releases include these separately versioned Helper 0.4.0 installers:
 
 | Platform | Installer | Status |
 | --- | --- | --- |
-| macOS, Apple Silicon (M-series) | `nebulynk-ptt-helper_0.3.0_macos-beta_aarch64.dmg` | Beta |
-| macOS, Intel | `nebulynk-ptt-helper_0.3.0_macos-beta_x86_64.dmg` | Beta |
-| Windows, 64-bit | `nebulynk-ptt-helper_0.3.0_windows_x86_64.msi` | Windows helper |
+| macOS, Apple Silicon (M-series) | `nebulynk-ptt-helper_0.4.0_macos-beta_aarch64.dmg` | Beta |
+| macOS, Intel | `nebulynk-ptt-helper_0.4.0_macos-beta_x86_64.dmg` | Beta |
+| Windows, 64-bit | `nebulynk-ptt-helper_0.4.0_windows_x86_64.msi` | Windows helper |
 
 On a Mac, **Apple menu > About This Mac** shows either an Apple chip or an Intel
 processor. The macOS deployment target is **macOS 13 or later**. Native CI builds
@@ -42,10 +42,14 @@ commit, CPU architecture, Beta status, size and SHA-256 checksum.
    Restart the helper if macOS requests it. See
    [Apple's Input Monitoring guide](https://support.apple.com/guide/mac-help/control-access-to-input-monitoring-on-mac-mchl4cedafb6/mac).
 4. Keep the helper running in the menu bar. In Nebulynk, choose **Voice settings
-   > Push-to-Talk**, set your key and enable **global Push-to-Talk**.
-5. Approve the exact Nebulynk site in the helper's pairing window. Join a voice
-   channel/call. Open the helper from its menu bar/tray icon, review the requested
-   site and key under **PTT Key Approval**, then confirm **Allow this key**.
+   > Push-to-Talk** and set your key.
+5. Open the helper locally and click **Pair New Website** (German: **Neue Webseite koppeln**)
+   in settings or its menu bar/tray menu. This opens pairing for 120 seconds.
+   In Nebulynk, click **Connect to helper** or enable global PTT. Review the full
+   website origin in the helper, click **Review website**, then **Pair this website**.
+   Pairing mode ends after this one saved approval. Join a voice channel/call,
+   review the separate site/key request under **PTT Key Approval**, then confirm
+   **Allow this key**.
    Test holding and releasing the key, then repeat while another app is active.
 
 There is no need to disable Gatekeeper globally or purchase an Apple developer
@@ -53,12 +57,59 @@ account. The separate microphone permission belongs to the browser; this helper
 observes the configured PTT key and does not record audio. Background keyboard
 access stays off until you opt in and approve pairing.
 
+## Local pairing mode
+
+Only the bundled local settings window or tray/menu bar can start pairing.
+No network message can start or extend it. The mode defaults to closed on every
+helper start and is never saved. **Stop Pairing**, expiry or one successfully
+saved pairing ends the mode and closes remaining unconfirmed pairing sockets.
+Normal settings, separate key approval and valid-token reconnects do not require
+pairing mode. A rejected origin stays blocked until you locally restart the mode.
+
+Network traffic never opens or focuses the helper. Open it yourself to review
+requests. The origin confirmation is fixed while open; expired, disconnected or
+superseded requests cannot be approved. A request lasts at most 60 seconds and
+never outlives the 120-second mode. Saving must succeed before access is granted.
+
+Without a stored token, use **Open helper → Pair New Website → Connect to helper**.
+After a failed new-pairing attempt, retry explicitly in Nebulynk. A generic
+connection failure can mean a stopped helper, closed pairing mode or browser
+restriction. It does not prove that the helper is uninstalled. Valid-token
+sessions reconnect automatically; revocation or authentication failure requires
+manual pairing again. Focused-window PTT remains available.
+
+The listener can still be detectable as a local service. The guarantees are
+controlled new pairing, no unsolicited focus changes and bounded resources.
+Unknown origins receive a generic HTTP 403 before upgrade while mode is closed.
+Known origins must still authenticate. Global limits apply across rotating
+origins; rate-limited traffic produces no per-attempt file logs or UI events.
+
+| Resource | Limit |
+| --- | --- |
+| Pending requests | 4 total, 1 per origin; 60 seconds maximum |
+| Unauthenticated connections, including setup | 16 total; setup + first hello 5 seconds |
+| Authenticated connections | 16 total, 8 per origin |
+| Unconfirmed attempts | Global 30/min, burst 8; origin 6/min, burst 2 |
+| Origin limiter cache | 256 entries, 5-minute retention |
+| Incoming messages | Unauthenticated 20/min, burst 5; authenticated 600/min, burst 60 |
+| Message and frame size | 64 KiB each, enforced by WebSocket transport |
+| Outbound queue and writes | 64 messages per connection; 2-second write timeout |
+
+Valid authenticated reconnects do not consume the new-pairing attempt budget.
+Limits reject new connections instead of displacing working authorized sessions.
+Slow readers, overflowing queues, I/O errors and timeouts close their connection
+and release its held PTT. Backend expiry checks also account for sleep/wake and
+detected backwards clock changes.
+
 ## Local key approval and upgrading
 
-Helper **0.3.0** and the matching Nebulynk frontend use **protocol 2**. Update
-both parts and reload the webpage after upgrading. Older mixed versions do not
-activate global PTT. Existing site pairings survive an upgrade, but each site
-needs its first local key approval; no key is approved automatically.
+The current Nebulynk frontend requires Helper **0.4.0 or newer**, still using
+**protocol 2**. Reload the webpage after updating. Existing pairing tokens and
+key permissions from Helper 0.3.0 survive: the same site/key reconnects without
+opening pairing mode. Upgrades from earlier helpers still need a first local
+key approval. Older paired protocol-2 webclients remain compatible with Helper
+0.4.0; protocol-1 combinations cannot activate global PTT. The new frontend
+asks users of older helpers to update.
 
 Choose the key in Nebulynk. In the helper, click **Review key**, check the frozen
 site/key confirmation and choose **Allow this key**. Only approve changes you
@@ -139,17 +190,26 @@ the installed PWA where supported. Mark each item passed/failed/not tested:
 
 - Download using a browser, install from DMG, follow first-launch approval and
   grant Input Monitoring. Verify the menu icon and settings window.
-- Pair/decline/revoke a site. Enable/disable the browser opt-in and confirm no
-  helper connection occurs before opt-in.
-- Upgrade a previously paired helper: pairing must remain, but global PTT must
-  wait for local key approval. Confirm the origin and key, then reconnect and
-  restart: the same key should remain allowed.
+- First pairing with mode closed must fail quietly: no helper window opens or
+  steals focus. Start mode locally, verify its countdown, connect explicitly,
+  review the complete origin and approve. The mode must end after one saved pairing.
+- Send repeated requests from other origins, with and without mode open. Existing
+  authorized PTT must continue, no focus changes occur, and requests stay bounded.
+  Reject a request, retry from that origin, cancel mode and test 120-second expiry.
+  A 60-second request or an open confirmation must not remain usable after expiry.
+- Reconnect and restart the helper with a saved valid token and key: no open mode
+  or new approval is needed. Revoke the origin, then verify manual new pairing.
+- Enable/disable browser opt-in; no connection occurs before opt-in. On an enabled
+  but unpaired page reload, connection waits for an explicit user action.
+- Upgrade Helper 0.3.0 with an approved key: pairing and key permission must remain.
+  An upgrade from a helper without key grants must still wait for local key approval.
 - Change the key while holding PTT: transmission must stop until local approval.
   Reject, revoke and change it again. A second site must not inherit permission.
   Change the requested key while its confirmation is open: the stale approval
   must fail. Existing focused-window PTT should continue while blocked.
-- Verify an old frontend/new helper and a new frontend/old helper cannot start
-  global PTT; the new frontend must explain that a helper update is required.
+- A previously paired protocol-2 frontend must still work with Helper 0.4.0.
+  The new frontend must require an update for Helper 0.3.0 and older. Protocol-1
+  combinations must not activate global PTT.
 - Check that the old temporary log is removed and leaving the webpage connected
   or pressing PTT does not append heartbeat or key-event history.
 - Hold and release ShiftLeft/ShiftRight, a letter, Space and a suitable F-key.
@@ -164,7 +224,9 @@ the installed PWA where supported. Mark each item passed/failed/not tested:
 - Enable login startup, sign out/in, then disable it and repeat. Check no
   duplicate helper is started.
 
-Practical Mac acceptance is **pending** until the tester records results.
+Run the same pairing, rejection, expiry, key and reconnect checks on Windows.
+
+Practical Windows and Mac acceptance of Helper 0.4.0 is **pending** until the tester records results.
 Testing one CPU architecture does not establish device coverage for the other;
 report those limits explicitly. Recheck the final release candidate after any
 functional changes and check the actual public download after publication.

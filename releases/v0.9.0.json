@@ -44,7 +44,18 @@
         "en": "Local PTT key approval and bounded diagnostics"
       },
       "description": {
-        "en": "PTT Helper 0.3.0 requires a local approval for each site’s global key. Webpages can request a different key but cannot silently activate it. Existing pairings need a first key approval after upgrading. Keyboard events and periodic state updates are no longer logged, and local diagnostics are limited to 3 MiB."
+        "en": "PTT Helper 0.4.0 requires a local approval for each site’s global key. Webpages can request a different key but cannot silently activate it. Existing tokens and key grants from Helper 0.3.0 survive; earlier helpers require a first local key approval. Keyboard events and periodic state updates are no longer logged, and local diagnostics are limited to 3 MiB."
+      }
+    },
+    {
+      "category": "security",
+      "title": {
+        "en": "Local pairing mode and bounded helper connections",
+        "de": "Lokaler Kopplungsmodus und begrenzte Helper-Verbindungen"
+      },
+      "description": {
+        "en": "PTT Helper 0.4.0 accepts new pairings only during a locally started 120-second mode. Confirm the full origin before approving; one saved pairing ends the mode. Network requests never open or focus the helper. Existing protocol-2 tokens and key grants remain valid. Connection, request, rate, size and output limits constrain unsolicited traffic; unpaired browser retries require an explicit action.",
+        "de": "PTT Helper 0.4.0 erlaubt neue Kopplungen nur während eines lokal gestarteten Modus von 120 Sekunden. Die vollständige Origin wird vor der Freigabe bestätigt; eine gespeicherte Kopplung beendet den Modus. Netzwerkanfragen öffnen oder fokussieren den Helper nicht. Bestehende Protokoll-2-Token und Tastenfreigaben bleiben erhalten. Feste Verbindungs-, Anfrage-, Raten-, Größen- und Ausgabegrenzen begrenzen unerwünschten Verkehr; ungepaarte Browserversuche werden nur ausdrücklich wiederholt."
       }
     }
   ],
@@ -59,7 +70,7 @@
         "Set NEBULYNK_VERSION=0.9.0, pull the backend, frontend and transcription-worker images, and recreate all three services together. Stop the old backend completely before starting its replacement and allow at least 75 seconds for shutdown.",
         "Wait for GET /health/ready and the worker health check to pass, then verify login, chat and Push-to-Talk. This release adds no database migrations or breaking configuration changes relative to 0.8.1.",
         "macOS users may optionally download PTT Helper (Beta) for Apple Silicon or Intel from this release. Move it to Applications, approve first launch in Privacy & Security and grant Input Monitoring permission. See https://github.com/sapientorius/Nebulynk/blob/v0.9.0/docs/PTT_HELPER.md. Windows users can install the Windows helper from the same release.",
-        "Install PTT Helper 0.3.0 and reload Nebulynk. Helper protocol 2 requires both parts to be updated; mixed old/new versions keep global PTT off. Approve the configured key in the local helper for each paired site, including sites paired before upgrading. See docs/PTT_HELPER.md."
+        "Install PTT Helper 0.4.0 or newer and reload Nebulynk. Existing Helper 0.3.0 tokens and key approvals remain valid. For a new site or invalid token, open the helper, start Pair New Website, connect explicitly in Nebulynk and review the complete origin before confirming. Then approve the configured key separately if needed. Pairing mode is not required for valid-token reconnects or key/settings changes. Protocol 2 remains in use; the new frontend requires Helper 0.4.0. See docs/PTT_HELPER.md."
       ]
     },
     "docs_url": "https://github.com/sapientorius/Nebulynk/blob/v0.9.0/docs/SELF_HOSTING.md"

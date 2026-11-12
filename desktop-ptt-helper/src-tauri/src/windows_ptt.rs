@@ -946,6 +946,11 @@ mod windows {
     }
 }
 
+#[cfg(target_os = "windows")]
+pub fn supports_key(code: &str) -> bool {
+    windows::supports_key(code)
+}
+
 #[cfg(test)]
 mod tests {
     use super::{DesktopPttBindingStatus, WindowsPttService};
@@ -960,9 +965,4 @@ mod tests {
         #[cfg(target_os = "windows")]
         assert_ne!(status.platform, "linux");
     }
-}
-
-#[cfg(target_os = "windows")]
-pub fn supports_key(code: &str) -> bool {
-    windows::supports_key(code)
 }

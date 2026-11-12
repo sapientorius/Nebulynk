@@ -29,6 +29,7 @@ vi.mock('../../src/lib/mic-activation.js', () => ({
 
 class MockWebSocket {
   static instances = []
+  static CONNECTING = 0
   static OPEN = 1
 
   constructor(url) {
@@ -171,6 +172,7 @@ describe('browser ptt helper bridge', () => {
 
   it('reconnects on startup when global push-to-talk was already enabled', async () => {
     globalThis.localStorage.setItem('nebulynk:ptt-helper:enabled', 'true')
+    globalThis.localStorage.setItem('nebulynk:ptt-helper:pairing-token', 'valid-token')
 
     const { initializeBrowserPttHelperBridge, browserPttHelperState } = await import('../../src/lib/browser-ptt-helper-bridge.js')
 
@@ -244,7 +246,7 @@ describe('browser ptt helper bridge', () => {
     socket.emit('message', {
       data: JSON.stringify({
         type: 'hello_ack',
-        payload: { protocolVersion: '2',
+        payload: { protocolVersion: '2', helperVersion: '0.4.0',
           authorized: true,
           bindingStatus: {
             mode: 'global-raw-input',
@@ -295,7 +297,7 @@ describe('browser ptt helper bridge', () => {
     socket.emit('message', {
       data: JSON.stringify({
         type: 'paired',
-        payload: { protocolVersion: '2',
+        payload: { protocolVersion: '2', helperVersion: '0.4.0',
           pairingToken: 'token-123',
           bindingStatus: {
             mode: 'focused-only',
@@ -321,7 +323,7 @@ describe('browser ptt helper bridge', () => {
     enableBrowserPttHelper()
     const socket = MockWebSocket.instances[0]
     socket.emit('open')
-    socket.emit('message', { data: JSON.stringify({ type: 'hello_ack', payload: { protocolVersion: '2',
+    socket.emit('message', { data: JSON.stringify({ type: 'hello_ack', payload: { protocolVersion: '2', helperVersion: '0.4.0',
       authorized: true, targetState: { isTarget: true },
       bindingStatus: { mode: 'global-native', isGlobal: true, platform: 'macos', keyCode: 'KeyV' }
     } }) })
@@ -356,7 +358,7 @@ describe('browser ptt helper bridge', () => {
     const emit = (type, payload = {}) => socket.emit('message', { data: JSON.stringify({ type, payload }) })
     emit('ptt_down')
     expect(triggerExternalPttDownMock).not.toHaveBeenCalled()
-    emit('hello_ack', { protocolVersion: '2', authorized: true, targetState: { isTarget: true },
+    emit('hello_ack', { protocolVersion: '2', helperVersion: '0.4.0', authorized: true, targetState: { isTarget: true },
       bindingStatus: { mode: 'global-native', isGlobal: true, platform: 'macos', keyCode: 'ShiftLeft' } })
     emit('ptt_down')
     expect(triggerExternalPttDownMock).toHaveBeenCalledTimes(1)
@@ -380,6 +382,7 @@ describe('browser ptt helper bridge', () => {
 
     initializeBrowserPttHelperBridge()
     enableBrowserPttHelper()
+    globalThis.localStorage.setItem('nebulynk:ptt-helper:pairing-token', 'valid-token')
     const firstSocket = MockWebSocket.instances[0]
     firstSocket.emit('open')
     firstSocket.emit('close')
@@ -393,7 +396,7 @@ describe('browser ptt helper bridge', () => {
     secondSocket.emit('message', {
       data: JSON.stringify({
         type: 'hello_ack',
-        payload: { protocolVersion: '2',
+        payload: { protocolVersion: '2', helperVersion: '0.4.0',
           authorized: true,
           bindingStatus: {
             mode: 'global-raw-input',
@@ -425,7 +428,7 @@ describe('browser ptt helper bridge', () => {
     const socket = MockWebSocket.instances[0]
     socket.emit('open')
     const emit = (type, payload = {}) => socket.emit('message', { data: JSON.stringify({ type, payload }) })
-    emit('hello_ack', { protocolVersion: '2', authorized: true, targetState: { isTarget: true },
+    emit('hello_ack', { protocolVersion: '2', helperVersion: '0.4.0', authorized: true, targetState: { isTarget: true },
       bindingStatus: { mode: 'global-native', isGlobal: true, keyCode: 'KeyV' } })
     emit('ptt_down')
     expect(triggerExternalPttDownMock).toHaveBeenCalledOnce()
@@ -469,7 +472,7 @@ describe('browser ptt helper bridge', () => {
     const socket = MockWebSocket.instances[0]
     socket.emit('open')
     const emit = (type, payload = {}) => socket.emit('message', { data: JSON.stringify({ type, payload }) })
-    emit('hello_ack', { protocolVersion: '2', authorized: true, targetState: { isTarget: true },
+    emit('hello_ack', { protocolVersion: '2', helperVersion: '0.4.0', authorized: true, targetState: { isTarget: true },
       bindingStatus: { mode: 'global-native', isGlobal: true, keyCode: 'KeyV' } })
     emit('ptt_down')
     expect(triggerExternalPttDownMock).toHaveBeenCalledOnce()
@@ -479,10 +482,65 @@ describe('browser ptt helper bridge', () => {
     expect(nativePttState.authorized).toBe(false)
     expect(nativePttState.isTarget).toBe(false)
     expect(nativePttState.bindingStatus.isGlobal).toBe(false)
-    expect(nativePttState.helperState).toBe('pairing-required')
+    expect(nativePttState.helperState).toBe(code === 'pairing_rejected' ? 'pairing-rejected' : 'pairing-setup')
     emit('binding_status', { mode: 'global-native', isGlobal: true })
     emit('ptt_down')
     expect(triggerExternalPttDownMock).toHaveBeenCalledOnce()
   })
 
+  it('keeps enabled but unpaired startup quiet and requires manual retry after failure', async () => {
+    localStorage.setItem('nebulynk:ptt-helper:enabled', 'true')
+    const { initializeBrowserPttHelperBridge, retryBrowserPttHelper } = await import('../../src/lib/browser-ptt-helper-bridge.js')
+    const { nativePttState } = await import('../../src/lib/native-ptt-state.js')
+    initializeBrowserPttHelperBridge()
+    expect(MockWebSocket.instances).toHaveLength(0)
+    expect(nativePttState.helperState).toBe('pairing-setup')
+    retryBrowserPttHelper()
+    const first = MockWebSocket.instances[0]
+    first.emit('error')
+    first.emit('close')
+    vi.advanceTimersByTime(60000)
+    expect(MockWebSocket.instances).toHaveLength(1)
+    expect(nativePttState.helperState).toBe('connection-failed')
+    retryBrowserPttHelper()
+    expect(MockWebSocket.instances).toHaveLength(2)
+  })
+
+  it.each(['hello_ack', 'paired', 'pairing_required'])('requires helper 0.4.0 in %s before trusting it', async type => {
+    const { initializeBrowserPttHelperBridge, enableBrowserPttHelper } = await import('../../src/lib/browser-ptt-helper-bridge.js')
+    const { nativePttState } = await import('../../src/lib/native-ptt-state.js')
+    initializeBrowserPttHelperBridge(); enableBrowserPttHelper()
+    const socket = MockWebSocket.instances[0]; socket.emit('open')
+    socket.emit('message', { data: JSON.stringify({ type, payload: { protocolVersion: '2', helperVersion: '0.3.0', authorized: true,
+      pairingToken: 'untrusted', bindingStatus: { isGlobal: true } } }) })
+    expect(nativePttState.helperState).toBe('update-required')
+    expect(nativePttState.authorized).toBe(false)
+    expect(localStorage.getItem('nebulynk:ptt-helper:pairing-token')).toBeNull()
+  })
+
+  it.each(['pairing_mode_closed', 'pairing_expired', 'pairing_rejected', 'invalid_pairing_token', 'origin_revoked', 'helper_limited'])('stops automatic reconnect and releases PTT for %s', async code => {
+    localStorage.setItem('nebulynk:ptt-helper:pairing-token', 'stored')
+    const { initializeBrowserPttHelperBridge, enableBrowserPttHelper } = await import('../../src/lib/browser-ptt-helper-bridge.js')
+    const { nativePttState } = await import('../../src/lib/native-ptt-state.js')
+    initializeBrowserPttHelperBridge(); enableBrowserPttHelper()
+    const socket = MockWebSocket.instances[0]; socket.emit('open')
+    socket.emit('message', { data: JSON.stringify({ type: 'error', payload: { code } }) })
+    socket.emit('close')
+    vi.advanceTimersByTime(60000)
+    expect(MockWebSocket.instances).toHaveLength(1)
+    expect(nativePttState.authorized).toBe(false)
+    expect(triggerExternalPttUpMock).toHaveBeenCalled()
+    if (['invalid_pairing_token', 'origin_revoked', 'pairing_rejected'].includes(code)) expect(localStorage.getItem('nebulynk:ptt-helper:pairing-token')).toBeNull()
+    else expect(localStorage.getItem('nebulynk:ptt-helper:pairing-token')).toBe('stored')
+  })
+
+  it('does not erase a newer token stored by another tab after a stale authentication failure', async () => {
+    localStorage.setItem('nebulynk:ptt-helper:pairing-token', 'old')
+    const { initializeBrowserPttHelperBridge, enableBrowserPttHelper } = await import('../../src/lib/browser-ptt-helper-bridge.js')
+    initializeBrowserPttHelperBridge(); enableBrowserPttHelper()
+    const socket = MockWebSocket.instances[0]; socket.emit('open')
+    localStorage.setItem('nebulynk:ptt-helper:pairing-token', 'new')
+    socket.emit('message', { data: JSON.stringify({ type: 'error', payload: { code: 'invalid_pairing_token' } }) })
+    expect(localStorage.getItem('nebulynk:ptt-helper:pairing-token')).toBe('new')
+  })
 })

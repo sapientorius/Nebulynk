@@ -31,6 +31,24 @@
       </section>
       <p id="helper-error" role="alert" hidden></p>
 
+      <section class="panel" aria-labelledby="pairing-mode-title">
+        <h2 id="pairing-mode-title">Pair a new website</h2>
+        <p id="pairing-instructions">Start pairing here, then connect from Nebulynk. Check the full origin before approving. Existing paired sites reconnect automatically.</p>
+        <p id="pairing-mode-status" role="status"></p>
+        <button id="pairing-start" class="action-button" type="button">Pair New Website</button>
+        <button id="pairing-stop" class="ghost-button" type="button" hidden>Stop Pairing</button>
+      </section>
+
+      <dialog id="pairing-confirmation" aria-labelledby="pairing-confirmation-title">
+        <h2 id="pairing-confirmation-title">Confirm website</h2>
+        <p id="pairing-confirmation-copy"></p>
+        <p id="pairing-confirmation-status" role="status"></p>
+        <div class="card-actions">
+          <button id="pairing-confirm" class="action-button" type="button">Pair this website</button>
+          <button id="pairing-cancel" class="ghost-button" type="button">Cancel</button>
+        </div>
+      </dialog>
+
       <section class="panel">
         <div class="panel-head">
           <h2>PTT Key Approval</h2>

@@ -26,6 +26,59 @@ const bindingDialogCopy = document.getElementById('binding-confirmation-copy')
 const bindingConfirm = document.getElementById('binding-confirm')
 let confirmationRequest = null
 let currentSnapshot = null
+const pairingDialog = document.getElementById('pairing-confirmation')
+const pairingConfirm = document.getElementById('pairing-confirm')
+let pairingConfirmation = null
+let pairingSaving = false
+const de = navigator.language?.startsWith('de')
+const pairText = de ? {
+  title: 'Neue Webseite koppeln', instructions: 'Hier den Kopplungsmodus starten, dann in Nebulynk verbinden. Vor der Freigabe die vollständige Origin prüfen. Bereits gekoppelte Seiten verbinden sich automatisch.',
+  start: 'Neue Webseite koppeln', stop: 'Kopplung beenden', closed: 'Kopplungsmodus geschlossen.',
+  active: seconds => 'Kopplungsmodus aktiv: noch ' + seconds + ' Sekunden. Endet nach einer gespeicherten Kopplung.',
+  review: 'Webseite prüfen', confirmTitle: 'Webseite bestätigen', confirm: 'Diese Webseite koppeln', cancel: 'Abbrechen',
+  question: origin => 'Diese Webseite mit dem Helper koppeln? ' + origin,
+  expires: seconds => 'Anfrage läuft in ' + seconds + ' Sekunden ab.', expired: 'Die Anfrage ist abgelaufen, getrennt oder ersetzt worden. Erneut in Nebulynk verbinden.'
+} : {
+  title: 'Pair a new website', instructions: 'Start pairing here, then connect from Nebulynk. Check the full origin before approving. Existing paired sites reconnect automatically.',
+  start: 'Pair New Website', stop: 'Stop Pairing', closed: 'Pairing mode is closed.',
+  active: seconds => 'Pairing mode active: ' + seconds + ' seconds left. Ends after one saved pairing.',
+  review: 'Review website', confirmTitle: 'Confirm website', confirm: 'Pair this website', cancel: 'Cancel',
+  question: origin => 'Pair this website with the helper? ' + origin,
+  expires: seconds => 'Request expires in ' + seconds + ' seconds.', expired: 'This request expired, disconnected or was replaced. Connect again from Nebulynk.'
+}
+for (const [id,text] of Object.entries({ 'pairing-mode-title': pairText.title, 'pairing-instructions': pairText.instructions,
+  'pairing-start': pairText.start, 'pairing-stop': pairText.stop, 'pairing-confirmation-title': pairText.confirmTitle,
+  'pairing-confirm': pairText.confirm, 'pairing-cancel': pairText.cancel })) document.getElementById(id).textContent = text
+
+function secondsLeft(expiresAt) { return Math.max(0, Math.ceil((Date.parse(expiresAt) - Date.now()) / 1000)) || 0 }
+function renderPairingClock() {
+  const active = currentSnapshot?.pairingModeActive && secondsLeft(currentSnapshot.pairingModeExpiresAt) > 0
+  document.getElementById('pairing-mode-status').textContent = active ? pairText.active(secondsLeft(currentSnapshot.pairingModeExpiresAt)) : pairText.closed
+  document.getElementById('pairing-start').hidden = active
+  document.getElementById('pairing-stop').hidden = !active
+  if (!pairingConfirmation) return
+  const valid = active && secondsLeft(pairingConfirmation.expiresAt) > 0 && currentSnapshot?.pendingPairingRequests?.some(r => r.requestId === pairingConfirmation.requestId)
+  pairingConfirm.disabled = !valid || pairingSaving
+  document.getElementById('pairing-confirmation-status').textContent = valid ? pairText.expires(secondsLeft(pairingConfirmation.expiresAt)) : pairText.expired
+}
+setInterval(renderPairingClock, 250)
+for (const [id,command] of [['pairing-start','helper_start_pairing'],['pairing-stop','helper_stop_pairing']]) {
+  document.getElementById(id).addEventListener('click', async () => {
+    try { await invoke(command) } catch (error) { showError(error) }
+    finally { await refreshSnapshot() }
+  })
+}
+pairingConfirm.addEventListener('click', async () => {
+  if (!pairingConfirmation || pairingConfirm.disabled || pairingSaving) return
+  const request = pairingConfirmation
+  pairingSaving = true
+  renderPairingClock()
+  try { await invoke('helper_approve_pairing', { requestId: request.requestId }) }
+  catch (error) { showError(error) }
+  finally { pairingSaving = false; pairingDialog.close(); await refreshSnapshot() }
+})
+document.getElementById('pairing-cancel').addEventListener('click', () => pairingDialog.close())
+pairingDialog.addEventListener('close', () => { pairingConfirmation = null })
 
 const statusReasons = {
   'binding-approval-required': 'Confirm the requested PTT key in this helper. Global capture is off until approval.',
@@ -114,7 +167,7 @@ function renderPendingRequests(snapshot) {
       createElement('button', {
         className: 'action-button',
         dataset: { approve: displayValue(request.requestId) },
-        text: 'Approve',
+        text: pairText.review,
         type: 'button'
       }),
       createElement('button', {
@@ -243,6 +296,7 @@ function renderSnapshot(snapshot) {
   nodes.permissionButton.hidden = snapshot.inputMonitoringGranted === true
   nodes.pauseToggle.checked = snapshot.paused === true
   nodes.autostartToggle.checked = snapshot.autostartEnabled === true
+  renderPairingClock()
   renderStatus(snapshot)
   renderBindingRequests(snapshot)
   renderPendingRequests(snapshot)
@@ -314,13 +368,12 @@ document.body.addEventListener('click', async (event) => {
   }
   const approveId = event.target.getAttribute('data-approve')
   if (approveId) {
-    try {
-      await invoke('helper_approve_pairing', { requestId: approveId })
-    } catch (error) {
-      console.error(error)
-    } finally {
-      await refreshSnapshot()
-    }
+    const request = currentSnapshot?.pendingPairingRequests?.find(r => r.requestId === approveId)
+    if (!request) return
+    pairingConfirmation = Object.freeze({ ...request })
+    document.getElementById('pairing-confirmation-copy').textContent = pairText.question(pairingConfirmation.origin)
+    renderPairingClock()
+    pairingDialog.showModal()
     return
   }
 
