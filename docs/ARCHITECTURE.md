@@ -11,8 +11,11 @@ backend, and supporting data services.
 - PostgreSQL for application data, Redis for transient coordination and rate
   limiting, and S3-compatible storage for media.
 - LiveKit for voice and meeting media when those features are enabled.
-- An optional Windows push-to-talk helper that pairs only with an explicitly
-  trusted browser or PWA origin.
+- An optional Windows/macOS (Beta) push-to-talk helper that pairs only with an
+  explicitly trusted browser or PWA origin over a loopback WebSocket. Windows
+  uses Raw Input; macOS uses a listen-only CoreGraphics event tap with Input
+  Monitoring permission. Both retain the key's normal behavior and forward
+  events to one authorized target session. See the [helper guide](PTT_HELPER.md).
 
 ## Design Principles
 
@@ -151,3 +154,27 @@ existing LiveKit media does not imply seamless API-session recovery.
 See [runtime operations and isolated capacity verification](runtime-operations.md)
 for lifecycle ownership, recovery limits, exact rollout steps and reproducible
 local Docker tests. Redis rate limiting does not enable multiple API instances.
+
+### PTT Helper key permission boundary
+
+Helper 0.4.0 uses loopback protocol 2 and requires a persisted local key grant
+for each exact paired origin. A browser can request a key but cannot approve it.
+The local settings window confirms an immutable request identifier; replacing
+a request invalidates previous confirmations. Each origin has one granted key.
+Native events carry a binding generation and are checked against the current
+target, pairing, key grant and pause state before forwarding. Binding updates
+are serialized independently of the runtime mutex to avoid callback deadlocks.
+Diagnostics exclude keyboard events and heartbeat payloads and retain at most
+three 1 MiB files. See [PTT Helper](PTT_HELPER.md) for upgrade and test steps.
+
+
+New origins require a local, non-persistent 120-second pairing mode. The bundled
+settings surface confirms a frozen origin/request ID and saves before authorization;
+one successful pairing ends the mode. Existing protocol-2 tokens and key grants
+survive upgrades and reconnect without opening the mode. Unknown origins are
+rejected before HTTP upgrade while closed. Pairing policy and bounded transport
+are separate Rust modules with deterministic policy and real loopback tests.
+The transport caps pre-auth/auth connections, per-origin and global attempts,
+message/frame sizes, inbound rates and outbound queues/writes. Network traffic
+cannot open/focus settings or enable pairing. The new frontend requires helper
+0.4.0 and retries unpaired attempts only on explicit user action.

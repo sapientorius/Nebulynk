@@ -12,9 +12,10 @@ import {
   updateNativePttState
 } from './native-ptt-state.js'
 import { isDesktopRuntime } from './runtime.js'
+import { browserPttHelperPlatform } from './ptt-helper-platform.js'
 
 const HELPER_URL = 'ws://127.0.0.1:47641/ws'
-const HELPER_PROTOCOL_VERSION = '1'
+const HELPER_PROTOCOL_VERSION = '2'
 const PAIRING_TOKEN_KEY = 'nebulynk:ptt-helper:pairing-token'
 const SESSION_ID_KEY = 'nebulynk:ptt-helper:session-id'
 const ENABLED_KEY = 'nebulynk:ptt-helper:enabled'
@@ -33,20 +34,23 @@ let settingsCleanup = null
 let browserEventCleanup = []
 let activeSocketSerial = 0
 let heartbeatTimer = null
+let protocolBlocked = false
+let protocolReady = false
+let manualRetryRequired = false
+let socketPairingToken = null
 
 export const browserPttHelperState = reactive({
   available: false,
-  enabled: false
+  enabled: false,
+  platform: null
 })
 
-function isWindowsBrowserHelperCandidate(targetWindow = typeof window !== 'undefined' ? window : null) {
+function isBrowserHelperCandidate(targetWindow = typeof window !== 'undefined' ? window : null) {
   if (!targetWindow || isDesktopRuntime(targetWindow) || typeof WebSocket === 'undefined') {
     return false
   }
 
-  const platform = targetWindow.navigator?.userAgentData?.platform || targetWindow.navigator?.platform || ''
-  const userAgent = targetWindow.navigator?.userAgent || ''
-  return /win/i.test(platform) || /windows/i.test(userAgent)
+  return browserPttHelperPlatform(targetWindow.navigator) !== null
 }
 
 function getEnabledPreference() {
@@ -108,6 +112,7 @@ function getSessionId() {
 }
 
 function helperStateFromStatus(status) {
+  if (['binding-approval-required', 'binding-rejected'].includes(status?.reason)) return status.reason
   if (status?.reason === 'paused') return 'paused'
   if (status?.mode === 'unsupported') return 'unsupported'
   return 'connected'
@@ -122,6 +127,7 @@ function isLiveSocket(candidate) {
 
 function sendEnvelope(type, payload = {}) {
   if (!socket || socket.readyState !== WebSocket.OPEN) return
+  if (type !== 'hello' && type !== 'disconnect' && !nativePttState.authorized) return
   socket.send(JSON.stringify({
     type,
     payload
@@ -150,6 +156,7 @@ function currentSessionStatePayload() {
 }
 
 function applyBindingStatus(status, overrides = {}) {
+  if (!status?.isGlobal || status?.reason === 'paused') micActivation.triggerExternalPttUp()
   micActivation.setDesktopPttBindingStatus(status || DEFAULT_DESKTOP_PTT_BINDING_STATUS)
   applyNativePttBindingStatus(status || DEFAULT_DESKTOP_PTT_BINDING_STATUS, {
     transport: 'browser-helper',
@@ -159,6 +166,7 @@ function applyBindingStatus(status, overrides = {}) {
 }
 
 function resetUnavailableState(message = null) {
+  micActivation.triggerExternalPttUp()
   micActivation.setDesktopPttBindingStatus(DEFAULT_DESKTOP_PTT_BINDING_STATUS)
   resetNativePttState({
     transport: 'browser-helper',
@@ -168,7 +176,7 @@ function resetUnavailableState(message = null) {
 }
 
 function scheduleReconnect() {
-  if (!started || reconnectTimer) return
+  if (!started || reconnectTimer || protocolBlocked || manualRetryRequired || !getPairingToken()) return
   const delay = Math.min(RECONNECT_MAX_MS, RECONNECT_BASE_MS * (2 ** reconnectAttempt))
   reconnectAttempt += 1
   reconnectTimer = window.setTimeout(() => {
@@ -195,6 +203,20 @@ function sendPttConfig() {
   sendEnvelope('ptt_config', payload)
 }
 
+function compatibleHelper(payload) {
+  const match = /^(\d+)\.(\d+)\.(\d+)$/.exec(payload.helperVersion || '')
+  return payload.protocolVersion === HELPER_PROTOCOL_VERSION && match && (Number(match[1]) > 0 || Number(match[2]) >= 4)
+}
+
+function waitForManualRetry(helperState, message = null) {
+  manualRetryRequired = true
+  protocolReady = false
+  if (reconnectTimer) window.clearTimeout(reconnectTimer)
+  reconnectTimer = null
+  applyBindingStatus(DEFAULT_DESKTOP_PTT_BINDING_STATUS, { helperState, authorized: false,
+    isTarget: false, targetSessionId: null, lastError: message })
+}
+
 function handleMessage(event) {
   let envelope = null
   try {
@@ -206,6 +228,9 @@ function handleMessage(event) {
   const payload = envelope?.payload || {}
   switch (envelope?.type) {
     case 'hello_ack':
+      if (!compatibleHelper(payload)) { requireHelperUpdate(); break }
+      protocolReady = true
+      manualRetryRequired = false
       reconnectAttempt = 0
       updateNativePttState({
         transport: 'browser-helper',
@@ -227,6 +252,7 @@ function handleMessage(event) {
       }
       break
     case 'pairing_required':
+      if (!compatibleHelper(payload)) { requireHelperUpdate(); break }
       updateNativePttState({
         transport: 'browser-helper',
         helperState: 'pairing-required',
@@ -243,8 +269,13 @@ function handleMessage(event) {
       })
       break
     case 'paired':
+      if (!compatibleHelper(payload)) { requireHelperUpdate(); break }
+      protocolReady = true
       if (typeof payload.pairingToken === 'string' && payload.pairingToken.trim()) {
-        setPairingToken(payload.pairingToken.trim())
+        socketPairingToken = payload.pairingToken.trim()
+        setPairingToken(socketPairingToken)
+        manualRetryRequired = false
+        reconnectAttempt = 0
       }
       updateNativePttState({
         transport: 'browser-helper',
@@ -260,43 +291,65 @@ function handleMessage(event) {
       scheduleSessionStateSync()
       break
     case 'binding_status':
+      if (!protocolReady || !nativePttState.authorized) break
       applyBindingStatus(payload, {
-        authorized: true,
-        isTarget: undefined
+        authorized: true
       })
       break
     case 'target_state':
+      if (!protocolReady || !nativePttState.authorized) break
+      if (!payload.isTarget) micActivation.triggerExternalPttUp()
       updateNativePttState({
         transport: 'browser-helper',
-        helperState: 'connected',
+        helperState: helperStateFromStatus(nativePttState.bindingStatus),
         authorized: true,
         isTarget: payload.isTarget === true,
         targetSessionId: payload.targetSessionId || null
       })
       break
     case 'ptt_down':
-      micActivation.triggerExternalPttDown()
+      if (nativePttState.authorized && nativePttState.isTarget && nativePttState.bindingStatus.isGlobal) {
+        micActivation.triggerExternalPttDown()
+      }
       break
     case 'ptt_up':
       micActivation.triggerExternalPttUp()
       break
-    case 'error':
-      if (payload.code === 'invalid_pairing_token' || payload.code === 'origin_revoked') {
-        setPairingToken(null)
+    case 'error': {
+      if (payload.code === 'unsupported_protocol' || payload.message === 'Unsupported helper protocol version.') {
+        requireHelperUpdate()
+        break
       }
-      updateNativePttState({
-        transport: 'browser-helper',
-        helperState: payload.code === 'pairing_rejected' ? 'pairing-required' : nativePttState.helperState,
-        lastError: payload.message || payload.code || 'helper_error'
-      })
+      if (['invalid_pairing_token', 'origin_revoked', 'pairing_rejected'].includes(payload.code)) {
+        // Another tab may already have stored a newer token. Do not erase that credential.
+        if (socketPairingToken && getPairingToken() === socketPairingToken) setPairingToken(null)
+        waitForManualRetry(payload.code === 'pairing_rejected' ? 'pairing-rejected' : 'pairing-setup', payload.code)
+        break
+      }
+      const blockedState = { pairing_mode_closed: 'pairing-mode-closed', pairing_expired: 'pairing-expired',
+        helper_limited: 'helper-limited' }[payload.code]
+      if (blockedState) { waitForManualRetry(blockedState, payload.code); break }
+      updateNativePttState({ transport: 'browser-helper', lastError: payload.message || payload.code || 'helper_error' })
       break
+    }
   }
 }
 
+function requireHelperUpdate() {
+  protocolBlocked = true
+  protocolReady = false
+  if (reconnectTimer) window.clearTimeout(reconnectTimer)
+  reconnectTimer = null
+  resetUnavailableState('helper_update_required')
+  updateNativePttState({ helperState: 'update-required' })
+  socket?.close()
+}
+
 function connect() {
-  if (!started || !isWindowsBrowserHelperCandidate()) return
+  if (!started || !isBrowserHelperCandidate()) return
   if (isLiveSocket(socket)) return
 
+  protocolReady = false
   const nextSocket = new WebSocket(HELPER_URL)
   const socketSerial = ++activeSocketSerial
   socket = nextSocket
@@ -308,13 +361,13 @@ function connect() {
 
   nextSocket.addEventListener('open', () => {
     if (socket !== nextSocket || socketSerial !== activeSocketSerial) return
-    reconnectAttempt = 0
+    socketPairingToken = getPairingToken()
     sendEnvelope('hello', {
       protocolVersion: HELPER_PROTOCOL_VERSION,
       origin: window.location.origin,
       sessionId: getSessionId(),
       clientKind: window.matchMedia?.('(display-mode: standalone)')?.matches ? 'pwa' : 'browser',
-      pairingToken: getPairingToken()
+      pairingToken: socketPairingToken
     })
   })
 
@@ -324,22 +377,29 @@ function connect() {
   })
   nextSocket.addEventListener('error', () => {
     if (socket !== nextSocket || socketSerial !== activeSocketSerial) return
-    resetUnavailableState('helper_socket_error')
+    if (!getPairingToken()) waitForManualRetry('connection-failed', 'helper_socket_error')
+    else resetUnavailableState('helper_socket_error')
   })
   nextSocket.addEventListener('close', () => {
     if (socket !== nextSocket || socketSerial !== activeSocketSerial) return
     socket = null
-    resetUnavailableState('helper_disconnected')
+    protocolReady = false
+    if (!protocolBlocked && !manualRetryRequired) {
+      if (!getPairingToken()) waitForManualRetry('connection-failed', 'helper_disconnected')
+      else resetUnavailableState('helper_disconnected')
+    }
     scheduleReconnect()
   })
 }
 
 function startBrowserPttHelperConnection() {
-  if (!initialized || !isWindowsBrowserHelperCandidate() || started) {
+  if (!initialized || !isBrowserHelperCandidate() || started) {
     return
   }
 
   started = true
+  protocolBlocked = false
+  protocolReady = false
   currentRoute = bridgeRouter?.currentRoute?.value?.fullPath || currentBrowserRoute()
   resetNativePttState({
     transport: 'browser-helper',
@@ -378,11 +438,15 @@ function startBrowserPttHelperConnection() {
     sendPttConfig()
   }, 2000)
 
-  connect()
+  if (getPairingToken()) connect()
+  else { manualRetryRequired = true; updateNativePttState({ helperState: 'pairing-setup' }) }
 }
 
 function stopBrowserPttHelperConnection() {
   started = false
+  protocolReady = false
+  manualRetryRequired = false
+  socketPairingToken = null
   routerCleanup?.()
   routerCleanup = null
   settingsCleanup?.()
@@ -409,8 +473,9 @@ function stopBrowserPttHelperConnection() {
 }
 
 export function initializeBrowserPttHelperBridge({ router } = {}) {
-  const available = isWindowsBrowserHelperCandidate()
+  const available = isBrowserHelperCandidate()
   browserPttHelperState.available = available
+  browserPttHelperState.platform = available ? browserPttHelperPlatform(window.navigator) : null
 
   if (!available) {
     browserPttHelperState.enabled = false
@@ -434,12 +499,13 @@ export function initializeBrowserPttHelperBridge({ router } = {}) {
     initialized = false
     bridgeRouter = null
     browserPttHelperState.available = false
+    browserPttHelperState.platform = null
     browserPttHelperState.enabled = false
   }
 }
 
 export function enableBrowserPttHelper() {
-  if (!isWindowsBrowserHelperCandidate()) {
+  if (!isBrowserHelperCandidate()) {
     browserPttHelperState.available = false
     browserPttHelperState.enabled = false
     return false
@@ -453,6 +519,7 @@ export function enableBrowserPttHelper() {
   browserPttHelperState.enabled = true
   setEnabledPreference(true)
   startBrowserPttHelperConnection()
+  retryBrowserPttHelper()
   return true
 }
 
@@ -460,4 +527,13 @@ export function disableBrowserPttHelper() {
   browserPttHelperState.enabled = false
   setEnabledPreference(false)
   stopBrowserPttHelperConnection()
+}
+
+export function retryBrowserPttHelper() {
+  if (!started || !browserPttHelperState.enabled || isLiveSocket(socket)) return
+  manualRetryRequired = false
+  protocolBlocked = false
+  if (reconnectTimer) window.clearTimeout(reconnectTimer)
+  reconnectTimer = null
+  connect()
 }
