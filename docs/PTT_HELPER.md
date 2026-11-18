@@ -257,7 +257,7 @@ run for the tester; never describe a local cross-platform type check as a Mac
 runtime test.
 
 Test the Mac candidate against a Nebulynk test installation built from the same
-feature branch or the 0.9.0 release candidate. A published 0.8.1 frontend still
+feature branch or the 0.8.2 release candidate. A published 0.8.1 frontend still
 limits the browser helper to Windows and cannot opt in on macOS. Use a separate
 test deployment; [staging images](STAGING.md) can be prepared from the candidate
 branch. The helper installer alone does not update the browser frontend.

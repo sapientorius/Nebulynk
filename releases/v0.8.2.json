@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
-  "version": "0.9.0",
+  "version": "0.8.2",
   "revision": 1,
   "channel": "stable",
-  "published_at": "2026-11-04T00:00:00.000Z",
+  "published_at": "2026-11-18T00:00:00.000Z",
   "title": {
-    "en": "Nebulynk 0.9.0"
+    "en": "Nebulynk 0.8.2"
   },
   "summary": {
     "en": "Adds the macOS PTT Helper beta for Apple Silicon and Intel, automatic native helper downloads, and clearer permission and recovery states."
@@ -67,12 +67,12 @@
     "manual_steps": {
       "en": [
         "Before updating, create and verify external backups of PostgreSQL, both Garage volumes, and deployment configuration and secrets. Keep the existing Compose project or platform resource and persistent-volume mappings. For upgrades from versions before 0.8.0, also follow the intervening release instructions.",
-        "Set NEBULYNK_VERSION=0.9.0, pull the backend, frontend and transcription-worker images, and recreate all three services together. Stop the old backend completely before starting its replacement and allow at least 75 seconds for shutdown.",
+        "Set NEBULYNK_VERSION=0.8.2, pull the backend, frontend and transcription-worker images, and recreate all three services together. Stop the old backend completely before starting its replacement and allow at least 75 seconds for shutdown.",
         "Wait for GET /health/ready and the worker health check to pass, then verify login, chat and Push-to-Talk. This release adds no database migrations or breaking configuration changes relative to 0.8.1.",
-        "macOS users may optionally download PTT Helper (Beta) for Apple Silicon or Intel from this release. Move it to Applications, approve first launch in Privacy & Security and grant Input Monitoring permission. See https://github.com/sapientorius/Nebulynk/blob/v0.9.0/docs/PTT_HELPER.md. Windows users can install the Windows helper from the same release.",
+        "macOS users may optionally download PTT Helper (Beta) for Apple Silicon or Intel from this release. Move it to Applications, approve first launch in Privacy & Security and grant Input Monitoring permission. See https://github.com/sapientorius/Nebulynk/blob/v0.8.2/docs/PTT_HELPER.md. Windows users can install the Windows helper from the same release.",
         "Install PTT Helper 0.4.0 or newer and reload Nebulynk. Existing Helper 0.3.0 tokens and key approvals remain valid. For a new site or invalid token, open the helper, start Pair New Website, connect explicitly in Nebulynk and review the complete origin before confirming. Then approve the configured key separately if needed. Pairing mode is not required for valid-token reconnects or key/settings changes. Protocol 2 remains in use; the new frontend requires Helper 0.4.0. See docs/PTT_HELPER.md."
       ]
     },
-    "docs_url": "https://github.com/sapientorius/Nebulynk/blob/v0.9.0/docs/SELF_HOSTING.md"
+    "docs_url": "https://github.com/sapientorius/Nebulynk/blob/v0.8.2/docs/SELF_HOSTING.md"
   }
 }

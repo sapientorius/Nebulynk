@@ -94,7 +94,7 @@ publication.
 
 ### Native PTT Helper downloads
 
-From 0.9.0, full CI requires the reusable `ptt-helper.yml` workflow: Windows x64
+From 0.8.2, full CI requires the reusable `ptt-helper.yml` workflow: Windows x64
 MSI and macOS Apple Silicon/Intel DMGs. Mac packages carry a Beta label and a
 free ad-hoc signature; no Apple Developer ID or notarization secrets are used.
 Keep helper versions synchronized in its npm package, Cargo manifest/lockfile

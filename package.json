@@ -1,6 +1,6 @@
 {
   "name": "nebulynk",
-  "version": "0.9.0",
+  "version": "0.8.2",
   "private": true,
   "description": "Self-hosted communication platform for business teams",
   "workspaces": [
