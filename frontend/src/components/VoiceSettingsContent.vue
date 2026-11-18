@@ -122,20 +122,24 @@
         >
           <div class="global-ptt-card">
             <div class="global-ptt-copy">
-              <strong>{{ $t('ui.components.global_ptt_install_helper') }}</strong>
+              <strong>{{ $t(isMacHelper ? 'ui.components.global_ptt_install_macos_helper' : 'ui.components.global_ptt_install_helper') }}</strong>
               <div class="setting-hint global-ptt-hint">
-                {{ $t('ui.components.global_ptt_helper_download_available') }}
+                {{ $t(isMacHelper ? 'ui.components.global_ptt_macos_beta_description' : 'ui.components.global_ptt_helper_download_available') }}
                 <a
-                  href="https://github.com/sapientorius/Nebulynk/releases/tag/ptt-helper-v0.1.0"
+                  :href="pttHelperReleaseUrl"
+                  data-testid="ptt-helper-download"
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  {{ $t('ui.components.global_ptt_download_windows_helper') }}
+                  {{ $t(isMacHelper ? 'ui.components.global_ptt_download_macos_helper' : 'ui.components.global_ptt_download_windows_helper') }}
                 </a>
               </div>
               <div class="setting-hint global-ptt-hint">
-                {{ $t('ui.components.global_ptt_permission_explanation') }}
+                {{ $t(isMacHelper ? 'ui.components.global_ptt_macos_permission_explanation' : 'ui.components.global_ptt_permission_explanation') }}
               </div>
+              <a v-if="isMacHelper" :href="pttHelperGuideUrl" target="_blank" rel="noopener noreferrer" data-testid="ptt-helper-guide">
+                {{ $t('ui.components.global_ptt_macos_installation_guide') }}
+              </a>
             </div>
             <n-button
               :type="browserPttHelperEnabled ? 'warning' : 'primary'"
@@ -145,6 +149,12 @@
                 ? $t('ui.components.global_ptt_disable')
                 : $t('ui.components.global_ptt_enable') }}
             </n-button>
+            <div v-if="browserPttHelperEnabled && !nativePttAuthorized" class="setting-hint global-ptt-hint" data-testid="ptt-pairing-steps">
+              {{ $t('ui.components.global_ptt_pairing_steps') }}
+              <n-button v-if="showHelperRetry" size="small" @click="retryHelper" data-testid="ptt-helper-retry">
+                {{ $t('ui.components.global_ptt_pairing_connect') }}
+              </n-button>
+            </div>
             <div v-if="browserPttHelperEnabled" class="setting-hint global-ptt-hint">
               {{ $t('ui.components.global_ptt_enabled_description') }}
             </div>
@@ -173,11 +183,13 @@ import { nativePttState } from '../lib/native-ptt-state.js'
 import {
   browserPttHelperState,
   disableBrowserPttHelper,
-  enableBrowserPttHelper
+  enableBrowserPttHelper,
+  retryBrowserPttHelper
 } from '../lib/browser-ptt-helper-bridge.js'
 import { isDesktopPttTextEntryKey } from '../lib/desktop-ptt-shortcut.js'
 import * as micActivation from '../lib/mic-activation.js'
 import { isDesktopWorkspaceWindow } from '../lib/runtime.js'
+import { PTT_HELPER_RELEASE_URL, PTT_HELPER_GUIDE_URL } from '../lib/ptt-helper-platform.js'
 
 export default {
   name: 'VoiceSettingsContent',
@@ -205,6 +217,11 @@ export default {
     }
   },
   computed: {
+    isMacHelper() {
+      return browserPttHelperState.platform === 'macos'
+    },
+    pttHelperReleaseUrl() { return PTT_HELPER_RELEASE_URL },
+    pttHelperGuideUrl() { return PTT_HELPER_GUIDE_URL },
     voiceStore() {
       return useVoiceStore()
     },
@@ -238,6 +255,8 @@ export default {
     nativePttHelperState() {
       return nativePttState.helperState || 'idle'
     },
+    nativePttAuthorized() { return nativePttState.authorized === true },
+    showHelperRetry() { return !this.nativePttAuthorized && !['connecting', 'pairing-required'].includes(this.nativePttHelperState) },
     nativePttIsTarget() {
       return nativePttState.isTarget !== false
     },
@@ -271,6 +290,7 @@ export default {
           || this.nativePttHelperState === 'pairing-required'
           || this.nativePttHelperState === 'unavailable'
           || this.nativePttHelperState === 'paused'
+          || ['binding-approval-required', 'binding-rejected', 'update-required'].includes(this.nativePttHelperState)
         )
     },
     showDesktopNonTextRecommendation() {
@@ -285,11 +305,28 @@ export default {
       if (!status) return null
       const mode = status.mode
       const reason = status.reason || null
-      if (this.nativePttHelperState === 'pairing-required') {
-        return { type: 'warning', label: 'Pairing benoetigt', detail: 'Freigabe im lokalen Helper bestaetigen' }
+      if (['binding-approval-required', 'binding-rejected'].includes(reason)) {
+        return { type: 'warning', label: this.$t('ui.components.global_ptt_key_approval_label'),
+          detail: this.$t(reason === 'binding-rejected' ? 'ui.components.global_ptt_key_rejected' : 'ui.components.global_ptt_key_approval_required') }
       }
+      if (this.nativePttHelperState === 'update-required') {
+        return { type: 'warning', label: this.$t('ui.components.global_ptt_helper_update_label'),
+          detail: this.$t('ui.components.global_ptt_helper_update_required') }
+      }
+      if (reason?.startsWith('macos-')) {
+        return { type: 'warning', label: this.$t('ui.components.global_ptt_macos_attention'),
+          detail: this.$t(reason === 'macos-input-monitoring-required'
+            ? 'ui.components.global_ptt_macos_permission_explanation'
+            : reason === 'macos-secure-input' ? 'ui.components.global_ptt_macos_secure_input'
+              : 'ui.components.global_ptt_macos_capture_unavailable') }
+      }
+      const pairingDetail = { 'pairing-required': 'global_ptt_pairing_waiting', 'pairing-setup': 'global_ptt_pairing_steps',
+        'pairing-mode-closed': 'global_ptt_pairing_closed', 'pairing-expired': 'global_ptt_pairing_expired',
+        'pairing-rejected': 'global_ptt_pairing_rejected', 'helper-limited': 'global_ptt_pairing_limited',
+        'connection-failed': 'global_ptt_connection_failed' }[this.nativePttHelperState]
+      if (pairingDetail) return { type: 'warning', label: this.$t('ui.components.global_ptt_pairing_label'), detail: this.$t('ui.components.' + pairingDetail) }
       if (this.nativePttHelperState === 'unavailable') {
-        return { type: 'default', label: 'Helper offline', detail: 'Globales PTT faellt auf Fenster-Fokus zurueck' }
+        return { type: 'default', label: this.$t('ui.components.global_ptt_pairing_label'), detail: this.$t('ui.components.global_ptt_connection_failed') }
       }
       if (this.nativePttHelperState === 'paused' || reason === 'paused') {
         return { type: 'warning', label: 'PTT pausiert', detail: 'Der lokale Helper laeuft, leitet aber keine Tasten weiter' }
@@ -403,6 +440,7 @@ export default {
       micActivation.setVadThreshold(value)
       micActivation.saveSettings()
     },
+    retryHelper() { retryBrowserPttHelper() },
     toggleBrowserGlobalPtt() {
       if (this.browserPttHelperEnabled) {
         disableBrowserPttHelper()

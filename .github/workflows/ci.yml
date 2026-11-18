@@ -40,6 +40,7 @@ jobs:
       core: ${{ steps.plan.outputs.core }}
       full: ${{ steps.plan.outputs.full }}
       containers: ${{ steps.plan.outputs.containers }}
+      helper: ${{ steps.plan.outputs.helper }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -202,10 +203,16 @@ jobs:
           path: output/ci/
           if-no-files-found: ignore
 
+  helper:
+    name: Native PTT Helper
+    needs: scope
+    if: ${{ needs.scope.outputs.helper == 'true' }}
+    uses: ./.github/workflows/ptt-helper.yml
+
   required:
     name: CI required
     if: always()
-    needs: [scope, validate, postgres-integration, plesk, security, e2e, containers]
+    needs: [scope, validate, postgres-integration, plesk, security, e2e, containers, helper]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

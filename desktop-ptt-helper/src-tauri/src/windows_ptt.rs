@@ -1,94 +1,6 @@
-use serde::{Deserialize, Serialize};
+use crate::ptt::{DesktopPttBindingRequest, DesktopPttBindingStatus, NativePttEvent, PttEvent};
 use std::sync::{mpsc, Arc, Mutex};
 use std::time::Duration;
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub struct DesktopPttBindingRequest {
-    pub key_code: Option<String>,
-    pub mode: Option<String>,
-    pub allow_pass_through: Option<bool>,
-    pub platform_strategy: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub struct DesktopPttBindingStatus {
-    pub mode: String,
-    pub key_code: Option<String>,
-    pub is_global: bool,
-    pub uses_native_hook: bool,
-    pub uses_raw_input: bool,
-    pub allow_pass_through: bool,
-    pub platform: String,
-    pub reason: Option<String>,
-}
-
-impl Default for DesktopPttBindingStatus {
-    fn default() -> Self {
-        Self {
-            mode: "focused-only".to_string(),
-            key_code: None,
-            is_global: false,
-            uses_native_hook: false,
-            uses_raw_input: false,
-            allow_pass_through: true,
-            platform: platform_name().to_string(),
-            reason: None,
-        }
-    }
-}
-
-impl DesktopPttBindingStatus {
-    pub fn unsupported(key_code: Option<String>, allow_pass_through: bool, reason: String) -> Self {
-        Self {
-            mode: "unsupported".to_string(),
-            key_code,
-            is_global: false,
-            uses_native_hook: false,
-            uses_raw_input: false,
-            allow_pass_through,
-            platform: platform_name().to_string(),
-            reason: Some(reason),
-        }
-    }
-
-    pub fn global_raw_input(key_code: String, allow_pass_through: bool) -> Self {
-        Self {
-            mode: "global-raw-input".to_string(),
-            key_code: Some(key_code),
-            is_global: true,
-            uses_native_hook: false,
-            uses_raw_input: true,
-            allow_pass_through,
-            platform: platform_name().to_string(),
-            reason: None,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PttEvent {
-    Down,
-    Up,
-}
-
-fn platform_name() -> &'static str {
-    #[cfg(target_os = "windows")]
-    {
-        "windows"
-    }
-
-    #[cfg(target_os = "macos")]
-    {
-        "macos"
-    }
-
-    #[cfg(all(not(target_os = "windows"), not(target_os = "macos")))]
-    {
-        "linux"
-    }
-}
 
 #[derive(Clone)]
 pub struct WindowsPttService {
@@ -101,7 +13,7 @@ pub struct WindowsPttService {
 }
 
 impl WindowsPttService {
-    pub fn new(callback: Arc<dyn Fn(PttEvent) + Send + Sync + 'static>) -> Self {
+    pub fn new(callback: Arc<dyn Fn(NativePttEvent) + Send + Sync + 'static>) -> Self {
         let status = Arc::new(Mutex::new(DesktopPttBindingStatus::default()));
 
         #[cfg(target_os = "windows")]
@@ -113,7 +25,8 @@ impl WindowsPttService {
                     fallback_reason: None,
                 },
                 Err(reason) => {
-                    *status.lock().unwrap() = DesktopPttBindingStatus::unsupported(None, true, reason.clone());
+                    *status.lock().unwrap() =
+                        DesktopPttBindingStatus::unsupported(None, true, reason.clone());
                     Self {
                         status,
                         command_tx: None,
@@ -126,7 +39,8 @@ impl WindowsPttService {
         #[cfg(not(target_os = "windows"))]
         {
             let reason = "Windows Raw Input is only available on Windows.".to_string();
-            *status.lock().unwrap() = DesktopPttBindingStatus::unsupported(None, true, reason.clone());
+            *status.lock().unwrap() =
+                DesktopPttBindingStatus::unsupported(None, true, reason.clone());
             Self {
                 status,
                 command_tx: None,
@@ -135,10 +49,18 @@ impl WindowsPttService {
         }
     }
 
-    pub fn set_binding(&self, request: DesktopPttBindingRequest) -> DesktopPttBindingStatus {
+    pub fn set_binding(
+        &self,
+        request: DesktopPttBindingRequest,
+        generation: u64,
+    ) -> DesktopPttBindingStatus {
         if let Some(reason) = self.fallback_reason.clone() {
             let allow_pass_through = request.allow_pass_through.unwrap_or(true);
-            let status = DesktopPttBindingStatus::unsupported(request.key_code.clone(), allow_pass_through, reason);
+            let status = DesktopPttBindingStatus::unsupported(
+                request.key_code.clone(),
+                allow_pass_through,
+                reason,
+            );
             *self.status.lock().unwrap() = status.clone();
             return status;
         }
@@ -154,6 +76,7 @@ impl WindowsPttService {
             if command_tx
                 .send(WindowsPttCommand::SetBinding {
                     request,
+                    generation,
                     response_tx,
                 })
                 .is_err()
@@ -171,7 +94,8 @@ impl WindowsPttService {
                 let status = DesktopPttBindingStatus::unsupported(
                     request_key_code.clone(),
                     request_allow_pass_through,
-                    "Windows Raw Input helper window is not ready to receive binding updates.".to_string(),
+                    "Windows Raw Input helper window is not ready to receive binding updates."
+                        .to_string(),
                 );
                 *self.status.lock().unwrap() = status.clone();
                 return status;
@@ -233,6 +157,7 @@ impl Drop for WindowsPttService {
 enum WindowsPttCommand {
     SetBinding {
         request: DesktopPttBindingRequest,
+        generation: u64,
         response_tx: mpsc::Sender<DesktopPttBindingStatus>,
     },
     Shutdown,
@@ -241,7 +166,8 @@ enum WindowsPttCommand {
 #[cfg(target_os = "windows")]
 mod windows {
     use super::{
-        DesktopPttBindingRequest, DesktopPttBindingStatus, PttEvent, WindowsPttCommand,
+        DesktopPttBindingRequest, DesktopPttBindingStatus, NativePttEvent, PttEvent,
+        WindowsPttCommand,
     };
     use std::ptr::null_mut;
     use std::sync::atomic::{AtomicBool, Ordering};
@@ -250,10 +176,6 @@ mod windows {
     use std::time::Duration;
     use windows_sys::Win32::Foundation::{HWND, LPARAM, LRESULT, WPARAM};
     use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
-    use windows_sys::Win32::UI::Input::{
-        GetRawInputData, RegisterRawInputDevices, RAWINPUT, RAWINPUTDEVICE, RAWINPUTHEADER, RID_INPUT,
-        RIDEV_INPUTSINK, RIM_TYPEKEYBOARD,
-    };
     use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
         GetAsyncKeyState, VK_ADD, VK_APPS, VK_BACK, VK_CAPITAL, VK_CONTROL, VK_DECIMAL, VK_DIVIDE,
         VK_ESCAPE, VK_LCONTROL, VK_LMENU, VK_LSHIFT, VK_LWIN, VK_MENU, VK_MULTIPLY, VK_NUMLOCK,
@@ -263,10 +185,14 @@ mod windows {
         VK_PAUSE, VK_RCONTROL, VK_RETURN, VK_RMENU, VK_RSHIFT, VK_RWIN, VK_SCROLL, VK_SHIFT,
         VK_SNAPSHOT, VK_SPACE, VK_SUBTRACT, VK_TAB,
     };
+    use windows_sys::Win32::UI::Input::{
+        GetRawInputData, RegisterRawInputDevices, RAWINPUT, RAWINPUTDEVICE, RAWINPUTHEADER,
+        RIDEV_INPUTSINK, RID_INPUT, RIM_TYPEKEYBOARD,
+    };
     use windows_sys::Win32::UI::WindowsAndMessaging::{
-        CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW, GetMessageW, PostMessageW,
-        PostQuitMessage, RegisterClassW, TranslateMessage, CS_HREDRAW, CS_VREDRAW, HWND_MESSAGE,
-        MSG, WM_APP, WM_DESTROY, WM_INPUT, WNDCLASSW,
+        CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW, GetMessageW,
+        PostMessageW, PostQuitMessage, RegisterClassW, TranslateMessage, CS_HREDRAW, CS_VREDRAW,
+        HWND_MESSAGE, MSG, WM_APP, WM_DESTROY, WM_INPUT, WNDCLASSW,
     };
 
     const WINDOW_CLASS_NAME: &str = "NebulynkWindowsRawInputPttHelper";
@@ -279,14 +205,17 @@ mod windows {
     #[derive(Default)]
     struct ThreadState {
         hwnd: isize,
+        press_serial: u64,
         current_binding: Option<ActiveBinding>,
         command_rx: Option<mpsc::Receiver<WindowsPttCommand>>,
-        callback: Option<Arc<dyn Fn(PttEvent) + Send + Sync + 'static>>,
+        callback: Option<Arc<dyn Fn(NativePttEvent) + Send + Sync + 'static>>,
     }
 
     #[derive(Debug, Clone)]
     struct ActiveBinding {
         matcher: WindowsPttKeyMatcher,
+        generation: u64,
+        armed: bool,
     }
 
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -310,7 +239,7 @@ mod windows {
     }
 
     pub fn spawn_windows_ptt_thread(
-        callback: Arc<dyn Fn(PttEvent) + Send + Sync + 'static>,
+        callback: Arc<dyn Fn(NativePttEvent) + Send + Sync + 'static>,
         status: Arc<Mutex<DesktopPttBindingStatus>>,
     ) -> Result<mpsc::Sender<WindowsPttCommand>, String> {
         let (command_tx, command_rx) = mpsc::channel::<WindowsPttCommand>();
@@ -330,18 +259,24 @@ mod windows {
         match ready_rx.recv() {
             Ok(Ok(())) => Ok(command_tx),
             Ok(Err(error)) => Err(error),
-            Err(_) => Err("Windows Raw Input helper thread failed to report readiness.".to_string()),
+            Err(_) => {
+                Err("Windows Raw Input helper thread failed to report readiness.".to_string())
+            }
         }
     }
 
     fn run_thread(
         command_rx: mpsc::Receiver<WindowsPttCommand>,
-        callback: Arc<dyn Fn(PttEvent) + Send + Sync + 'static>,
+        callback: Arc<dyn Fn(NativePttEvent) + Send + Sync + 'static>,
         ready_tx: &mut Option<mpsc::Sender<Result<(), String>>>,
     ) -> Result<(), String> {
         THREAD_STATE.get_or_init(|| Mutex::new(ThreadState::default()));
         {
-            let mut state = THREAD_STATE.get().unwrap().lock().map_err(|error| error.to_string())?;
+            let mut state = THREAD_STATE
+                .get()
+                .unwrap()
+                .lock()
+                .map_err(|error| error.to_string())?;
             state.command_rx = Some(command_rx);
             state.callback = Some(callback);
             state.current_binding = None;
@@ -349,7 +284,11 @@ mod windows {
 
         let hwnd = create_hidden_window()?;
         {
-            let mut state = THREAD_STATE.get().unwrap().lock().map_err(|error| error.to_string())?;
+            let mut state = THREAD_STATE
+                .get()
+                .unwrap()
+                .lock()
+                .map_err(|error| error.to_string())?;
             state.hwnd = hwnd as isize;
         }
         register_raw_input_keyboard(hwnd)?;
@@ -429,11 +368,7 @@ mod windows {
             hwndTarget: hwnd,
         };
         let result = unsafe {
-            RegisterRawInputDevices(
-                &device,
-                1,
-                std::mem::size_of::<RAWINPUTDEVICE>() as u32,
-            )
+            RegisterRawInputDevices(&device, 1, std::mem::size_of::<RAWINPUTDEVICE>() as u32)
         };
         if result == 0 {
             return Err(std::io::Error::last_os_error().to_string());
@@ -482,8 +417,12 @@ mod windows {
 
         for command in pending {
             match command {
-                WindowsPttCommand::SetBinding { request, response_tx } => {
-                    let status = apply_binding_command(request);
+                WindowsPttCommand::SetBinding {
+                    request,
+                    generation,
+                    response_tx,
+                } => {
+                    let status = apply_binding_command(request, generation);
                     let _ = response_tx.send(status);
                 }
                 WindowsPttCommand::Shutdown => {
@@ -515,7 +454,10 @@ mod windows {
         unsafe { PostMessageW(state.hwnd as HWND, WM_APP_COMMAND, 0, 0) != 0 }
     }
 
-    fn apply_binding_command(request: DesktopPttBindingRequest) -> DesktopPttBindingStatus {
+    fn apply_binding_command(
+        request: DesktopPttBindingRequest,
+        generation: u64,
+    ) -> DesktopPttBindingStatus {
         let normalized_mode = match request.mode.as_deref().map(str::trim) {
             Some("ptt") => "ptt",
             Some("vad") => "vad",
@@ -528,7 +470,12 @@ mod windows {
             return DesktopPttBindingStatus::default();
         }
 
-        let Some(key_code) = request.key_code.as_deref().map(str::trim).filter(|value| !value.is_empty()) else {
+        let Some(key_code) = request
+            .key_code
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+        else {
             clear_active_binding();
             return DesktopPttBindingStatus::default();
         };
@@ -538,14 +485,20 @@ mod windows {
             return DesktopPttBindingStatus::unsupported(
                 Some(key_code.to_string()),
                 allow_pass_through,
-                "This push-to-talk key does not support desktop-global binding on Windows.".to_string(),
+                "This push-to-talk key does not support desktop-global binding on Windows."
+                    .to_string(),
             );
         };
 
         if let Some(state_lock) = THREAD_STATE.get() {
             if let Ok(mut state) = state_lock.lock() {
+                IS_PRESSED.store(false, Ordering::SeqCst);
                 state.current_binding = Some(ActiveBinding {
                     matcher,
+                    generation,
+                    armed: !matcher_release_virtual_keys(matcher)
+                        .iter()
+                        .any(|key| is_virtual_key_pressed(*key)),
                 });
             }
         }
@@ -571,27 +524,43 @@ mod windows {
         let Some(state_lock) = THREAD_STATE.get() else {
             return;
         };
-        let Ok(state) = state_lock.lock() else {
+        let Ok(mut state) = state_lock.lock() else {
             return;
         };
-        let Some(binding) = state.current_binding.as_ref() else {
+        let Some(binding) = state.current_binding.as_mut() else {
             return;
         };
-        let callback = state.callback.as_ref().cloned();
         let matcher = binding.matcher;
-        drop(state);
-
+        let generation = binding.generation;
+        if !matcher.matches(event) {
+            return;
+        }
+        if !binding.armed {
+            if event.is_key_up {
+                binding.armed = true;
+            }
+            return;
+        }
         let Some(action) = resolve_raw_keyboard_action(matcher, event) else {
             return;
         };
-
+        if action == RawPttAction::Down {
+            state.press_serial = state.press_serial.wrapping_add(1);
+        }
+        let press_serial = state.press_serial;
+        let callback = state.callback.as_ref().cloned();
+        drop(state);
         if let Some(callback) = callback {
-            match action {
-                RawPttAction::Down => {
-                    callback(PttEvent::Down);
-                    spawn_release_fallback(callback, matcher);
-                }
-                RawPttAction::Up => callback(PttEvent::Up),
+            callback(NativePttEvent {
+                action: if action == RawPttAction::Down {
+                    PttEvent::Down
+                } else {
+                    PttEvent::Up
+                },
+                generation,
+            });
+            if action == RawPttAction::Down {
+                spawn_release_fallback(callback, matcher, generation, press_serial);
             }
         }
     }
@@ -624,8 +593,12 @@ mod windows {
         Some(RawKeyboardEvent {
             virtual_key: keyboard.VKey,
             make_code: keyboard.MakeCode,
-            is_extended: (keyboard.Flags as u32 & windows_sys::Win32::UI::WindowsAndMessaging::RI_KEY_E0) != 0,
-            is_key_up: (keyboard.Flags as u32 & windows_sys::Win32::UI::WindowsAndMessaging::RI_KEY_BREAK) != 0,
+            is_extended: (keyboard.Flags as u32
+                & windows_sys::Win32::UI::WindowsAndMessaging::RI_KEY_E0)
+                != 0,
+            is_key_up: (keyboard.Flags as u32
+                & windows_sys::Win32::UI::WindowsAndMessaging::RI_KEY_BREAK)
+                != 0,
         })
     }
 
@@ -651,33 +624,41 @@ mod windows {
     }
 
     fn spawn_release_fallback(
-        callback: Arc<dyn Fn(PttEvent) + Send + Sync + 'static>,
+        callback: Arc<dyn Fn(NativePttEvent) + Send + Sync + 'static>,
         matcher: WindowsPttKeyMatcher,
+        generation: u64,
+        press_serial: u64,
     ) {
         let release_virtual_keys = matcher_release_virtual_keys(matcher);
         if release_virtual_keys.is_empty() {
             return;
         }
-
         thread::spawn(move || {
             for _ in 0..3_000 {
-                if !IS_PRESSED.load(Ordering::SeqCst) {
+                thread::sleep(Duration::from_millis(10));
+                let Some(lock) = THREAD_STATE.get() else {
+                    return;
+                };
+                let Ok(state) = lock.lock() else { return };
+                if state.current_binding.as_ref().map(|b| b.generation) != Some(generation)
+                    || state.press_serial != press_serial
+                    || !IS_PRESSED.load(Ordering::SeqCst)
+                {
                     return;
                 }
-
-                thread::sleep(Duration::from_millis(10));
                 if release_virtual_keys
                     .iter()
-                    .any(|virtual_key| is_virtual_key_pressed(*virtual_key))
+                    .any(|key| is_virtual_key_pressed(*key))
                 {
                     continue;
                 }
-
-                if IS_PRESSED
-                    .compare_exchange(true, false, Ordering::SeqCst, Ordering::SeqCst)
-                    .is_ok()
-                {
-                    callback(PttEvent::Up);
+                let released = IS_PRESSED.swap(false, Ordering::SeqCst);
+                drop(state);
+                if released {
+                    callback(NativePttEvent {
+                        action: PttEvent::Up,
+                        generation,
+                    });
                 }
                 return;
             }
@@ -731,6 +712,10 @@ mod windows {
         }
     }
 
+    pub(super) fn supports_key(code: &str) -> bool {
+        resolve_windows_ptt_key(code).is_some()
+    }
+
     fn resolve_windows_ptt_key(key_code: &str) -> Option<WindowsPttKeyMatcher> {
         let key_code = key_code.trim();
         if key_code.is_empty() {
@@ -740,7 +725,9 @@ mod windows {
         if let Some(suffix) = key_code.strip_prefix("Key") {
             let bytes = suffix.as_bytes();
             if bytes.len() == 1 && bytes[0].is_ascii_alphabetic() {
-                return Some(WindowsPttKeyMatcher::VirtualKey(bytes[0].to_ascii_uppercase() as u16));
+                return Some(WindowsPttKeyMatcher::VirtualKey(
+                    bytes[0].to_ascii_uppercase() as u16,
+                ));
             }
         }
 
@@ -957,6 +944,11 @@ mod windows {
             );
         }
     }
+}
+
+#[cfg(target_os = "windows")]
+pub fn supports_key(code: &str) -> bool {
+    windows::supports_key(code)
 }
 
 #[cfg(test)]
