@@ -382,7 +382,7 @@ fn helper_snapshot(runtime: &RuntimeState) -> HelperStateSnapshot {
     HelperStateSnapshot {
         helper_version: APP_VERSION.to_string(),
         platform: runtime.binding_status.platform.clone(),
-        beta: cfg!(target_os = "macos"),
+        beta: false,
         input_monitoring_granted: input_monitoring_granted(),
         binding_status: runtime.binding_status.clone(),
         paused: runtime.persisted.paused,
@@ -2081,11 +2081,7 @@ fn main() {
                 .ok_or_else(|| "Helper tray icon is missing from the Tauri bundle.".to_string())?;
             TrayIconBuilder::with_id(TRAY_ID)
                 .icon(tray_icon)
-                .tooltip(if cfg!(target_os = "macos") {
-                    "Nebulynk PTT Helper (Beta)"
-                } else {
-                    "Nebulynk PTT Helper"
-                })
+                .tooltip("Nebulynk PTT Helper")
                 .menu(&menu)
                 .show_menu_on_left_click(false)
                 .build(app)?;

@@ -32,6 +32,21 @@ async function fixture() {
   }
 }
 
+it('shows macOS setup instructions and offers the permission action only when needed', async () => {
+  const f = await fixture()
+  expect(f.query('#helper-title').textContent).toBe('macOS Push-to-Talk')
+  expect(f.query('#mac-permissions').hidden).toBe(false)
+  expect(f.query('#mac-permissions').textContent).toContain('not notarized by Apple')
+  expect(f.query('#input-permission-button').hidden).toBe(true)
+
+  f.update({ inputMonitoringGranted: false })
+  expect(f.query('#input-permission-button').hidden).toBe(false)
+
+  f.update({ platform: 'windows' })
+  expect(f.query('#helper-title').textContent).toBe('Windows Push-to-Talk')
+  expect(f.query('#mac-permissions').hidden).toBe(true)
+})
+
 it('requires review and a second local action and freezes the exact displayed request', async () => {
   const f = await fixture()
   f.query('[data-approve-binding]').click()

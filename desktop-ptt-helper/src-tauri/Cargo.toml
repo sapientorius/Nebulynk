@@ -1,6 +1,6 @@
 [package]
 name = "nebulynk-ptt-helper"
-version = "0.4.0"
+version = "0.4.1"
 description = "Nebulynk Push-to-Talk helper for Windows and macOS"
 authors = ["OpenAI Codex"]
 edition = "2021"

@@ -289,7 +289,7 @@ function renderStatus(snapshot) {
 function renderSnapshot(snapshot) {
   currentSnapshot = snapshot
   const mac = snapshot.platform === 'macos'
-  nodes.title.textContent = mac ? 'macOS Push-to-Talk (Beta)' : 'Windows Push-to-Talk'
+  nodes.title.textContent = mac ? 'macOS Push-to-Talk' : 'Windows Push-to-Talk'
   nodes.macPermissions.hidden = !mac
   nodes.permissionStatus.textContent = snapshot.inputMonitoringGranted
     ? 'Input Monitoring is allowed.' : 'Input Monitoring permission is required for global Push-to-Talk.'

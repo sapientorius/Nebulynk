@@ -11,7 +11,7 @@ backend, and supporting data services.
 - PostgreSQL for application data, Redis for transient coordination and rate
   limiting, and S3-compatible storage for media.
 - LiveKit for voice and meeting media when those features are enabled.
-- An optional Windows/macOS (Beta) push-to-talk helper that pairs only with an
+- An optional Windows and macOS push-to-talk helper that pairs only with an
   explicitly trusted browser or PWA origin over a loopback WebSocket. Windows
   uses Raw Input; macOS uses a listen-only CoreGraphics event tap with Input
   Monitoring permission. Both retain the key's normal behavior and forward
@@ -157,7 +157,7 @@ local Docker tests. Redis rate limiting does not enable multiple API instances.
 
 ### PTT Helper key permission boundary
 
-Helper 0.4.0 uses loopback protocol 2 and requires a persisted local key grant
+Helper 0.4.0 and newer use loopback protocol 2 and require a persisted local key grant
 for each exact paired origin. A browser can request a key but cannot approve it.
 The local settings window confirms an immutable request identifier; replacing
 a request invalidates previous confirmations. Each origin has one granted key.
@@ -177,4 +177,4 @@ are separate Rust modules with deterministic policy and real loopback tests.
 The transport caps pre-auth/auth connections, per-origin and global attempts,
 message/frame sizes, inbound rates and outbound queues/writes. Network traffic
 cannot open/focus settings or enable pairing. The new frontend requires helper
-0.4.0 and retries unpaired attempts only on explicit user action.
+0.4.0 or newer and retries unpaired attempts only on explicit user action.

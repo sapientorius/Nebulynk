@@ -12,8 +12,8 @@ over their infrastructure, data, and AI-provider choices.
 - Optional AI-assisted transcription, summaries, and meeting follow-up through
   bring-your-own-key provider configuration.
 - Browser and PWA access, including Android sharing of text, links, and files
-  into a selected Nebulynk chat, with an optional Windows/macOS (Beta) helper for global
-  push-to-talk.
+  into a selected Nebulynk chat, with an optional helper for global push-to-talk
+  on Windows and macOS.
 
 ## Self-Hosting
 
