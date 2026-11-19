@@ -95,8 +95,9 @@ publication.
 ### Native PTT Helper downloads
 
 From 0.8.2, full CI requires the reusable `ptt-helper.yml` workflow: Windows x64
-MSI and macOS Apple Silicon/Intel DMGs. Mac packages carry a Beta label and a
-free ad-hoc signature; no Apple Developer ID or notarization secrets are used.
+MSI and macOS Apple Silicon/Intel DMGs. Mac packages use an ad-hoc signature.
+The setup instructions describe first-launch approval and Input Monitoring
+for installers that Apple has not notarized.
 Keep helper versions synchronized in its npm package, Cargo manifest/lockfile
 and Tauri configuration. They remain independent of the platform SemVer.
 
@@ -108,11 +109,10 @@ container/Plesk assets. Missing or conflicting helper files stop the feed.
 Changes to packaging must keep `scripts/ptt-helper-artifacts.mjs` and its tests
 aligned with the helper filenames and manifest contract.
 
-Before tagging the first Mac Beta, complete and record the device acceptance
-in [PTT Helper testing](PTT_HELPER.md#pre-release-tester-checklist). A successful
-CI build alone is not device acceptance. Run **Build PTT Helper** manually to
-provide candidates without publishing an official release. Verify public
-installer downloads and checksums after publication, including the Beta label.
+Record device acceptance for functional Helper changes using the
+[PTT Helper testing checklist](PTT_HELPER.md#pre-release-tester-checklist).
+Run **Build PTT Helper** manually to provide candidates for device testing.
+Verify public installer downloads, checksums and the manifest after publication.
 
 ### Release completion steps
 

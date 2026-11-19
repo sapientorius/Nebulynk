@@ -29,6 +29,10 @@ body {
 }
 
 .shell {
+  --section-gap: 18px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--section-gap);
   max-width: 1120px;
   margin: 0 auto;
   padding: 32px;
@@ -57,7 +61,6 @@ body {
 
 .hero {
   align-items: flex-start;
-  margin-bottom: 24px;
 }
 
 .eyebrow {
@@ -92,8 +95,7 @@ h2 {
 
 .panel-grid {
   display: grid;
-  gap: 18px;
-  margin-top: 18px;
+  gap: var(--section-gap);
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
@@ -105,8 +107,30 @@ h2 {
   box-shadow: 0 18px 48px rgba(0, 0, 0, 0.2);
 }
 
-.panel-wide {
-  margin-bottom: 18px;
+.panel-head {
+  align-items: center;
+}
+
+.panel-description {
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.panel-head + .panel-description {
+  margin-top: 8px;
+}
+
+.permission-panel:not([hidden]) {
+  display: grid;
+  justify-items: start;
+  gap: 10px;
+  line-height: 1.45;
+}
+
+#helper-error {
+  color: var(--danger);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
 }
 
 .stack {
@@ -277,7 +301,6 @@ dialog::backdrop { background: rgb(0 0 0 / 65%); }
 .request-copy small { display: block; }
 dialog h2, dialog p { margin-bottom: 12px; }
 
-.shell > .panel + .panel { margin-top: 18px; }
 .request-copy, .site-copy { min-width: 0; overflow-wrap: anywhere; }
 #pairing-instructions { margin: 12px 0; line-height: 1.45; color: var(--muted); }
 #pairing-mode-status { margin-bottom: 12px; }

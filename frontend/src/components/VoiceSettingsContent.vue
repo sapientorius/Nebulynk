@@ -124,9 +124,10 @@
             <div class="global-ptt-copy">
               <strong>{{ $t(isMacHelper ? 'ui.components.global_ptt_install_macos_helper' : 'ui.components.global_ptt_install_helper') }}</strong>
               <div class="setting-hint global-ptt-hint">
-                {{ $t(isMacHelper ? 'ui.components.global_ptt_macos_beta_description' : 'ui.components.global_ptt_helper_download_available') }}
+                {{ $t(isMacHelper ? 'ui.components.global_ptt_macos_description' : 'ui.components.global_ptt_helper_download_available') }}
                 <a
                   :href="pttHelperReleaseUrl"
+                  class="global-ptt-link"
                   data-testid="ptt-helper-download"
                   target="_blank"
                   rel="noopener noreferrer"
@@ -137,7 +138,14 @@
               <div class="setting-hint global-ptt-hint">
                 {{ $t(isMacHelper ? 'ui.components.global_ptt_macos_permission_explanation' : 'ui.components.global_ptt_permission_explanation') }}
               </div>
-              <a v-if="isMacHelper" :href="pttHelperGuideUrl" target="_blank" rel="noopener noreferrer" data-testid="ptt-helper-guide">
+              <a
+                v-if="isMacHelper"
+                :href="pttHelperGuideUrl"
+                class="global-ptt-link"
+                target="_blank"
+                rel="noopener noreferrer"
+                data-testid="ptt-helper-guide"
+              >
                 {{ $t('ui.components.global_ptt_macos_installation_guide') }}
               </a>
             </div>
@@ -528,7 +536,25 @@ export default {
 }
 
 .global-ptt-hint {
+  color: var(--app-text-muted);
+  opacity: 1;
   margin-top: 6px;
+}
+
+.global-ptt-link {
+  color: var(--app-text-strong);
+  color: color-mix(in srgb, var(--app-text-strong) 75%, var(--theme-primary));
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
+.global-ptt-link:hover {
+  color: var(--app-text-strong);
+}
+
+.global-ptt-link:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
 }
 
 .vad-meter {

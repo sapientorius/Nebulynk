@@ -27,7 +27,7 @@ describe('static source contract: VoiceSettingsContent', () => {
     expect(source).toContain('disableBrowserPttHelper()')
     expect(source).toContain(':href="pttHelperReleaseUrl"')
     expect(source).toContain('ui.components.global_ptt_install_macos_helper')
-    expect(source).toContain('ui.components.global_ptt_macos_beta_description')
+    expect(source).toContain('ui.components.global_ptt_macos_description')
     expect(source).toContain('ui.components.global_ptt_download_windows_helper')
     expect(source).toContain('ui.components.global_ptt_macos_permission_explanation')
     expect(source).toContain("$t('ui.components.global_ptt_enable')")
