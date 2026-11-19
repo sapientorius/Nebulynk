@@ -8,31 +8,30 @@ Choose a suitable non-text key if those side effects are undesirable.
 ## Downloads
 
 Use the download linked in **Voice settings > Push-to-Talk**. Official platform
-releases include these separately versioned Helper 0.4.0 installers:
+releases include these separately versioned Helper 0.4.1 installers:
 
-| Platform | Installer | Status |
-| --- | --- | --- |
-| macOS, Apple Silicon (M-series) | `nebulynk-ptt-helper_0.4.0_macos-beta_aarch64.dmg` | Beta |
-| macOS, Intel | `nebulynk-ptt-helper_0.4.0_macos-beta_x86_64.dmg` | Beta |
-| Windows, 64-bit | `nebulynk-ptt-helper_0.4.0_windows_x86_64.msi` | Windows helper |
+| Platform | Installer |
+| --- | --- |
+| macOS, Apple Silicon (M-series) | `nebulynk-ptt-helper_0.4.1_macos_aarch64.dmg` |
+| macOS, Intel | `nebulynk-ptt-helper_0.4.1_macos_x86_64.dmg` |
+| Windows, 64-bit | `nebulynk-ptt-helper_0.4.1_windows_x86_64.msi` |
 
 On a Mac, **Apple menu > About This Mac** shows either an Apple chip or an Intel
 processor. The macOS deployment target is **macOS 13 or later**. Native CI builds
-run on macOS 15; compatibility with other versions and actual keyboard/permission
-behavior require device testing. The platform release itself remains stable;
-the Beta label applies to the Mac helper.
+run on macOS 15. Check keyboard capture and permission behavior on the macOS
+version and hardware you use.
 
 Every installer has a `.sha256` file. To check a Mac download, run
 `shasum -a 256 -c INSTALLER.dmg.sha256` in its download directory. The
 `ptt-helper-assets.json` release asset records helper/platform versions, source
-commit, CPU architecture, Beta status, size and SHA-256 checksum.
+commit, CPU architecture, release status, size and SHA-256 checksum.
 
-## Install the macOS Beta
+## Install the macOS helper
 
 1. Download the DMG for your Mac, open it and drag **Nebulynk PTT Helper** into
    **Applications**. Eject the disk image, then start the app from Applications.
-2. This Beta has a free **ad-hoc signature**. It has no Apple Developer ID and
-   is **not notarized by Apple**. If macOS blocks its first launch, go to
+2. The helper uses an **ad-hoc signature** and is **not notarized by Apple**.
+   If macOS blocks its first launch, go to
    **System Settings > Privacy & Security**, find the message for this app and
    choose **Open Anyway** if you trust the download. Confirm the subsequent
    app-specific dialog. The wording may differ by macOS version; see
@@ -180,9 +179,9 @@ in that directory are left alone. No log-upload service is included.
 
 ## Pre-release tester checklist
 
-The first macOS Beta needs a device acceptance report before the release tag.
-CI verifies native builds and pure state/keyboard tests; it does not grant
-interactive privacy permissions or prove global PTT on a real desktop.
+Use this checklist to record device acceptance for functional Helper changes.
+CI verifies native builds and runs automated state and keyboard tests. Check
+interactive privacy permissions and global PTT on a real desktop.
 
 Record the source commit, helper version, installer SHA-256, CPU, macOS version,
 keyboard layout and browser version. Test Safari and a Chromium browser, plus
@@ -207,7 +206,7 @@ the installed PWA where supported. Mark each item passed/failed/not tested:
   Reject, revoke and change it again. A second site must not inherit permission.
   Change the requested key while its confirmation is open: the stale approval
   must fail. Existing focused-window PTT should continue while blocked.
-- A previously paired protocol-2 frontend must still work with Helper 0.4.0.
+- A previously paired protocol-2 frontend must still work with Helper 0.4.1.
   The new frontend must require an update for Helper 0.3.0 and older. Protocol-1
   combinations must not activate global PTT.
 - Check that the old temporary log is removed and leaving the webpage connected
@@ -226,9 +225,7 @@ the installed PWA where supported. Mark each item passed/failed/not tested:
 
 Run the same pairing, rejection, expiry, key and reconnect checks on Windows.
 
-Practical Windows and Mac acceptance of Helper 0.4.0 is **pending** until the tester records results.
-Testing one CPU architecture does not establish device coverage for the other;
-report those limits explicitly. Recheck the final release candidate after any
+Report results by CPU architecture. Recheck the final release candidate after
 functional changes and check the actual public download after publication.
 
 ## Building and test candidates
@@ -256,11 +253,9 @@ Required full CI calls the same workflow. Download a candidate from its Actions
 run for the tester; never describe a local cross-platform type check as a Mac
 runtime test.
 
-Test the Mac candidate against a Nebulynk test installation built from the same
-feature branch or the 0.8.2 release candidate. A published 0.8.1 frontend still
-limits the browser helper to Windows and cannot opt in on macOS. Use a separate
-test deployment; [staging images](STAGING.md) can be prepared from the candidate
-branch. The helper installer alone does not update the browser frontend.
+Test the Mac candidate against a separate Nebulynk installation built from the
+same branch. Prepare [staging images](STAGING.md) from the candidate branch and
+update the test frontend alongside the helper.
 
 Standard GitHub-hosted runners are free for public repositories; private
 repositories use the account's included usage and billing rules. Builds do not

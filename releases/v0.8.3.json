@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "version": "0.8.3",
+  "revision": 1,
+  "channel": "stable",
+  "published_at": "2026-11-19T00:00:00.000Z",
+  "title": {
+    "en": "Nebulynk 0.8.3"
+  },
+  "summary": {
+    "en": "Releases PTT Helper 0.4.1 for macOS and Windows, improves the helper layout, and makes the download and setup links easier to read in Voice settings."
+  },
+  "changes": [
+    {
+      "category": "improvement",
+      "title": {
+        "en": "macOS PTT Helper leaves beta"
+      },
+      "description": {
+        "en": "Install Helper 0.4.1 on Apple Silicon or Intel. The Mac app uses an ad-hoc signature and is not notarized by Apple. Follow the installation guide for first-launch approval and Input Monitoring."
+      }
+    },
+    {
+      "category": "fix",
+      "title": {
+        "en": "More readable Push-to-Talk setup"
+      },
+      "description": {
+        "en": "Download and setup links in Voice settings use higher-contrast colors in light and dark themes. Helper settings use consistent spacing between cards, permission instructions, and approval controls."
+      }
+    }
+  ],
+  "security": [],
+  "upgrade": {
+    "backup_required": true,
+    "downtime_expected": true,
+    "breaking": false,
+    "manual_steps": {
+      "en": [
+        "Before updating, create and verify external backups of PostgreSQL, both Garage volumes, and deployment configuration and secrets. Keep the existing Compose project or platform resource and persistent-volume mappings. If you are updating from an older version, follow the intervening release instructions.",
+        "Set NEBULYNK_VERSION=0.8.3, pull the backend, frontend and transcription-worker images, and recreate all three services together. Stop the old backend completely before starting its replacement and allow at least 75 seconds for shutdown.",
+        "Wait for GET /health/ready and the worker health check to pass, then verify login, chat and Push-to-Talk.",
+        "Download PTT Helper 0.4.1 from Voice settings for the improved layout and reload Nebulynk after updating. Existing pairings and approved keys carry over. On macOS, install the replacement in Applications and check Input Monitoring. See https://github.com/sapientorius/Nebulynk/blob/v0.8.3/docs/PTT_HELPER.md."
+      ]
+    },
+    "docs_url": "https://github.com/sapientorius/Nebulynk/blob/v0.8.3/docs/SELF_HOSTING.md"
+  }
+}

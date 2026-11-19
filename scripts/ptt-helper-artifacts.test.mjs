@@ -20,11 +20,13 @@ async function fixture(run) {
   } finally { await rm(directory, { recursive: true, force: true }) }
 }
 
-test('all architectures produce versioned checksums; only macOS carries beta status', async () => {
+test('all architectures produce stable installer filenames and versioned checksums', async () => {
   await fixture(async ({ output, manifest }) => {
     assert.equal(manifest.artifacts.length, 3)
     for (const metadata of manifest.artifacts) {
-      assert.equal(metadata.beta, metadata.platform === 'macos')
+      const extension = metadata.platform === 'macos' ? 'dmg' : 'msi'
+      assert.equal(metadata.file, `nebulynk-ptt-helper_${manifest.helperVersion}_${metadata.platform}_${metadata.arch}.${extension}`)
+      assert.equal(metadata.beta, false)
       assert.equal(metadata.revision, revision)
       await verifyFiles(output, metadata, manifest)
     }
@@ -50,7 +52,8 @@ test('wrong commit, helper version, architecture and unsafe paths are rejected',
   await fixture(async ({ manifest }) => {
     const original = manifest.artifacts[0]
     for (const patch of [{ revision: 'b'.repeat(40) }, { helperVersion: '999.0.0' }, { platformVersion: '999.0.0' },
-      { beta: false }, { arch: 'universal' }, { file: '../outside.dmg' }, { size: 0 }]) {
+      { beta: true }, { file: original.file.replace('_macos_', '_macos-beta_') },
+      { arch: 'universal' }, { file: '../outside.dmg' }, { size: 0 }]) {
       assert.throws(() => validateMetadata({ ...original, ...patch }, manifest), /Invalid or conflicting/)
     }
   })

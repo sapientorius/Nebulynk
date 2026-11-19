@@ -44,9 +44,9 @@ try {
   symlinkSync('/Applications', join(stage, 'Applications'))
   run('/usr/bin/codesign', ['--verify', '--deep', '--strict', stagedApp])
   mkdirSync(imageDirectory, { recursive: true })
-  run('/usr/bin/hdiutil', ['create', '-srcfolder', stage, '-volname', `${config.productName} (Beta)`,
+  run('/usr/bin/hdiutil', ['create', '-srcfolder', stage, '-volname', config.productName,
     '-fs', 'HFS+', '-format', 'UDZO', '-ov', '-o', image])
-  console.log(`Built macOS Beta disk image: ${image}`)
+  console.log(`Built macOS disk image: ${image}`)
 } finally {
   // Only the temporary directory returned by this invocation's mkdtemp is removed.
   rmSync(stage, { recursive: true, force: true })

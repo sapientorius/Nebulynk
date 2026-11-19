@@ -5,13 +5,13 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 
 const root = fileURLToPath(new URL('../', import.meta.url))
 const variants = [
-  { platform: 'macos', arch: 'aarch64', beta: true, extension: 'dmg' },
-  { platform: 'macos', arch: 'x86_64', beta: true, extension: 'dmg' },
-  { platform: 'windows', arch: 'x86_64', beta: false, extension: 'msi' }
+  { platform: 'macos', arch: 'aarch64', extension: 'dmg' },
+  { platform: 'macos', arch: 'x86_64', extension: 'dmg' },
+  { platform: 'windows', arch: 'x86_64', extension: 'msi' }
 ]
 const sha256 = bytes => createHash('sha256').update(bytes).digest('hex')
 const metadataName = variant => `ptt-helper-${variant.platform}-${variant.arch}.json`
-const fileName = (variant, version) => `nebulynk-ptt-helper_${version}_${variant.platform}${variant.beta ? '-beta' : ''}_${variant.arch}.${variant.extension}`
+const fileName = (variant, version) => `nebulynk-ptt-helper_${version}_${variant.platform}_${variant.arch}.${variant.extension}`
 
 async function versions() {
   const json = async name => JSON.parse(await readFile(join(root, name), 'utf8'))
@@ -34,7 +34,7 @@ function revision(value) {
 
 export function validateMetadata(metadata, expected) {
   const variant = variants.find(v => v.platform === metadata?.platform && v.arch === metadata?.arch)
-  if (!variant || metadata.schemaVersion !== 1 || metadata.beta !== variant.beta
+  if (!variant || metadata.schemaVersion !== 1 || metadata.beta !== false
     || metadata.helperVersion !== expected.helperVersion || metadata.platformVersion !== expected.platformVersion
     || metadata.revision !== expected.revision || metadata.file !== fileName(variant, expected.helperVersion)
     || !/^[a-f0-9]{64}$/.test(metadata.sha256 || '') || !Number.isSafeInteger(metadata.size) || metadata.size <= 0) {
@@ -63,7 +63,7 @@ export async function packageArtifact({ platform, arch, source, output, revision
   if (candidates.length !== 1) throw new Error(`Expected one ${variant.extension} bundle; found ${candidates.length}`)
   const sourceFile = join(candidates[0].parentPath, candidates[0].name)
   const bytes = await readFile(sourceFile)
-  const metadata = { schemaVersion: 1, ...expected, platform, arch, beta: variant.beta,
+  const metadata = { schemaVersion: 1, ...expected, platform, arch, beta: false,
     file: fileName(variant, expected.helperVersion), sha256: sha256(bytes), size: bytes.length }
   validateMetadata(metadata, expected)
   await mkdir(output, { recursive: true })

@@ -6,7 +6,7 @@ import { componentContext } from '../helpers/mount-component.js'
 import { useVoiceStore } from '../../src/stores/index.js'
 import { browserPttHelperState, enableBrowserPttHelper, disableBrowserPttHelper, retryBrowserPttHelper } from '../../src/lib/browser-ptt-helper-bridge.js'
 import { nativePttState } from '../../src/lib/native-ptt-state.js'
-import { PTT_HELPER_RELEASE_URL } from '../../src/lib/ptt-helper-platform.js'
+import { PTT_HELPER_GUIDE_URL, PTT_HELPER_RELEASE_URL } from '../../src/lib/ptt-helper-platform.js'
 
 vi.mock('../../src/lib/browser-ptt-helper-bridge.js', () => ({
   browserPttHelperState: reactive({ available: true, enabled: false, platform: 'macos' }),
@@ -27,12 +27,14 @@ beforeEach(async () => {
 })
 afterEach(() => wrapper?.unmount())
 
-it('renders the Mac beta download and permissions guide and preserves explicit opt-in', async () => {
+it('renders the Mac download and permissions guide and preserves explicit opt-in', async () => {
   wrapper = context.mount(VoiceSettingsContent)
   await flushPromises()
-  expect(wrapper.get('[data-testid=ptt-helper-download]').text()).toContain('Beta')
+  expect(wrapper.get('[data-testid=ptt-helper-download]').text()).toBe('Download macOS PTT Helper')
   expect(wrapper.get('[data-testid=ptt-helper-download]').attributes('href')).toBe(PTT_HELPER_RELEASE_URL)
   expect(wrapper.get('[data-testid=ptt-helper-guide]').text()).toContain('macOS permissions')
+  expect(wrapper.get('[data-testid=ptt-helper-guide]').attributes('href')).toBe(PTT_HELPER_GUIDE_URL)
+  expect(wrapper.text()).toContain('not notarized by Apple')
   expect(wrapper.text()).toContain('Input Monitoring')
   expect(enableBrowserPttHelper).not.toHaveBeenCalled()
   const enable = wrapper.findAll('button').find(button => button.text() === 'Enable global Push-to-Talk')
