@@ -22,8 +22,8 @@ releases include these separately versioned Helper 0.4.1 installers:
 
 On a Mac, **Apple menu > About This Mac** shows either an Apple chip or an Intel
 processor. The macOS deployment target is **macOS 13 or later**. Native CI builds
-run on macOS 15. Check keyboard capture and permission behavior on the macOS
-version and hardware you use.
+run on macOS 26 for Apple Silicon and macOS 15 for Intel. Check keyboard capture
+and permission behavior on the macOS version and hardware you use.
 
 Every installer has a `.sha256` file. To check a Mac download, run
 `shasum -a 256 -c INSTALLER.dmg.sha256` in its download directory. The
