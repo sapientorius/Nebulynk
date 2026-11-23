@@ -90,6 +90,7 @@
           <div>
             <n-button
               :type="recordingKey ? 'warning' : 'default'"
+              data-testid="ptt-key-record"
               @click="startKeyRecording"
               style="min-width: 160px"
             >
@@ -197,7 +198,7 @@ import {
 import { isDesktopPttTextEntryKey } from '../lib/desktop-ptt-shortcut.js'
 import * as micActivation from '../lib/mic-activation.js'
 import { isDesktopWorkspaceWindow } from '../lib/runtime.js'
-import { PTT_HELPER_RELEASE_URL, PTT_HELPER_GUIDE_URL } from '../lib/ptt-helper-platform.js'
+import { browserPttHelperPlatform, PTT_HELPER_RELEASE_URL, PTT_HELPER_GUIDE_URL } from '../lib/ptt-helper-platform.js'
 
 export default {
   name: 'VoiceSettingsContent',
@@ -251,7 +252,11 @@ export default {
     vadThreshold() {
       return this.vadThresholdLocal
     },
+    isWindows() {
+      return browserPttHelperPlatform(window.navigator) === 'windows'
+    },
     pttKeyDisplay() {
+      if (this.isWindows && this.pttKeyLocal === 'AltRight') return 'Alt Gr / Alt rechts'
       return micActivation.getDisplayKeyName(this.pttKeyLocal)
     },
     desktopPttBindingStatus() {
@@ -473,16 +478,32 @@ export default {
       this.cancelKeyRecording()
       this.recordingKey = true
 
-      this.keyRecordHandler = (e) => {
-        e.preventDefault()
-        e.stopPropagation()
-        micActivation.setPttKey(e.code)
+      let pendingLeftControl = false
+      this.keyRecordHandler = (event) => {
+        const isKeyDown = event.type === 'keydown'
+        const isLeftControl = event.code === 'ControlLeft'
+        if (!isKeyDown && !(pendingLeftControl && isLeftControl)) return
+
+        event.preventDefault()
+        event.stopPropagation()
+        if (event.repeat) return
+
+        // Windows can report a synthetic left Ctrl press just before the physical AltGr press.
+        if (this.isWindows && isKeyDown && isLeftControl) {
+          pendingLeftControl = true
+          return
+        }
+
+        const keyCode = pendingLeftControl && event.code !== 'AltRight' ? 'ControlLeft' : event.code
+        micActivation.setPttKey(keyCode)
         micActivation.saveSettings()
-        this.pttKeyLocal = e.code
+        this.pttKeyLocal = keyCode
         this.cancelKeyRecording()
       }
 
       window.addEventListener('keydown', this.keyRecordHandler, true)
+      window.addEventListener('keyup', this.keyRecordHandler, true)
+      window.addEventListener('blur', this.cancelKeyRecording)
 
       this.keyRecordTimeout = setTimeout(() => {
         this.cancelKeyRecording()
@@ -492,6 +513,8 @@ export default {
       this.recordingKey = false
       if (this.keyRecordHandler) {
         window.removeEventListener('keydown', this.keyRecordHandler, true)
+        window.removeEventListener('keyup', this.keyRecordHandler, true)
+        window.removeEventListener('blur', this.cancelKeyRecording)
         this.keyRecordHandler = null
       }
       if (this.keyRecordTimeout) {

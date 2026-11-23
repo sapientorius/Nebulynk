@@ -19,7 +19,7 @@ jobs:
           - platform: macos
             arch: aarch64
             target: aarch64-apple-darwin
-            runner: macos-15
+            runner: macos-26
             script: build:macos
           - platform: macos
             arch: x86_64
