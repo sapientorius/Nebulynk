@@ -127,6 +127,31 @@ describe('local push-to-talk with focused text fields', () => {
     expect(playSfx).toHaveBeenCalledExactlyOnceWith('ptt-down')
   })
 
+  it('holds PTT for AltGr while passing through text input events', () => {
+    setPttKey('AltRight')
+    const field = focusField()
+    const fieldHandler = vi.fn()
+    field.addEventListener('keydown', fieldHandler)
+
+    keyEvent(field, 'keydown', 'ControlLeft', { key: 'Control', ctrlKey: true })
+    expect(isCurrentlyTransmitting()).toBe(false)
+    keyEvent(field, 'keydown', 'AltRight', { key: 'AltGraph' })
+    keyEvent(field, 'keydown', 'AltRight', { key: 'AltGraph', repeat: true })
+    expect(isCurrentlyTransmitting()).toBe(true)
+    expect(track.unmute).toHaveBeenCalledOnce()
+
+    const character = keyEvent(field, 'keydown', 'KeyQ', { key: '@' })
+    expect(character.defaultPrevented).toBe(false)
+    expect(fieldHandler).toHaveBeenLastCalledWith(character)
+
+    keyEvent(field, 'keyup', 'ControlLeft', { key: 'Control' })
+    expect(isCurrentlyTransmitting()).toBe(true)
+    keyEvent(field, 'keyup', 'AltRight', { key: 'AltGraph' })
+    expect(isCurrentlyTransmitting()).toBe(false)
+    expect(track.mute).toHaveBeenCalledOnce()
+    expect(playSfx.mock.calls).toEqual([['ptt-down'], ['ptt-up']])
+  })
+
   it('leaves other typing keys available', () => {
     const field = focusField()
     const inputHandler = vi.fn()

@@ -5,6 +5,10 @@ Push-to-Talk while another application is active. Your assigned key retains its
 normal behavior: Shift still capitalizes letters and letters/Space still type.
 Choose a suitable non-text key if those side effects are undesirable.
 
+On Windows, record **Alt Gr** in voice settings to bind the physical right Alt
+key. If the old binding shows left Ctrl, record Alt Gr again and confirm the new
+key in the helper for global PTT.
+
 ## Downloads
 
 Use the download linked in **Voice settings > Push-to-Talk**. Official platform
@@ -224,6 +228,9 @@ the installed PWA where supported. Mark each item passed/failed/not tested:
   duplicate helper is started.
 
 Run the same pairing, rejection, expiry, key and reconnect checks on Windows.
+With the German keyboard layout, record Alt Gr and check that the binding uses
+the right Alt key. Hold and release it in the browser and with the approved
+helper while another app has focus. Check that Alt Gr + Q still types `@`.
 
 Report results by CPU architecture. Recheck the final release candidate after
 functional changes and check the actual public download after publication.
