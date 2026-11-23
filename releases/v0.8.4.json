@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "version": "0.8.4",
+  "revision": 1,
+  "channel": "stable",
+  "published_at": "2026-11-23T00:00:00.000Z",
+  "title": {
+    "en": "Nebulynk 0.8.4"
+  },
+  "summary": {
+    "en": "Fixes assigning Alt Gr as the Push-to-Talk key on Windows."
+  },
+  "changes": [
+    {
+      "category": "fix",
+      "title": {
+        "en": "Alt Gr for Push-to-Talk on Windows"
+      },
+      "description": {
+        "en": "Voice settings now recognize Alt Gr as the physical right Alt key when Windows also sends a left Ctrl event. Left Ctrl can still be assigned separately."
+      }
+    }
+  ],
+  "security": [],
+  "upgrade": {
+    "backup_required": true,
+    "downtime_expected": true,
+    "breaking": false,
+    "manual_steps": {
+      "en": [
+        "Before updating, create and verify external backups of PostgreSQL, both Garage volumes, and deployment configuration and secrets. Keep the existing Compose project or platform resource and persistent-volume mappings. If you are updating from an older version, follow the intervening release instructions.",
+        "Set NEBULYNK_VERSION=0.8.4, pull the backend, frontend and transcription-worker images, and recreate all three services together. Stop the old backend completely before starting its replacement and allow at least 75 seconds for shutdown.",
+        "Wait for GET /health/ready and the worker health check to pass, then verify login, chat and Push-to-Talk.",
+        "If a previous Alt Gr assignment shows left Ctrl, assign Alt Gr again in Voice settings. For global Push-to-Talk, approve the new AltRight binding in the PTT Helper."
+      ]
+    },
+    "docs_url": "https://github.com/sapientorius/Nebulynk/blob/v0.8.4/docs/SELF_HOSTING.md"
+  }
+}
