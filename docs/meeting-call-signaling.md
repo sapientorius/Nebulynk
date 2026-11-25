@@ -66,6 +66,14 @@ until the server confirms its outcome, so a missed acceptance event cannot stran
 the caller. Only the browser that started the attempt automatically joins the
 active meeting; recovered attempts on other tabs or devices still require entry.
 
+## Guest links
+
+Opening a guest link restores the browser session. A signed-in member who
+already has access goes directly to the meeting view and can join the call
+there. A member who needs access is prompted to ask the host for an invitation
+and keeps their current session. Visitors without a member session can enter
+their display name to continue as guests.
+
 ## Scheduled meeting cards
 
 Scheduling, rescheduling, guest-link preview and guest-link acceptance do not

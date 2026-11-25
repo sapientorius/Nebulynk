@@ -575,6 +575,7 @@ const baseMessages = {
     meetingInvite: {
       loading: 'Loading meeting invite...',
       invalidDescription: 'This meeting link is invalid or no longer available.',
+      requestInvitation: 'Ask the host to invite you.',
       untitled: 'Untitled meeting',
       fields: {
         displayName: 'Display Name',
@@ -587,7 +588,7 @@ const baseMessages = {
       },
       buttons: {
         joinAsGuest: 'Join as guest',
-        openMeeting: 'Open meeting'
+        retry: 'Try again'
       },
       status: {
         scheduled: 'Scheduled',
@@ -596,6 +597,7 @@ const baseMessages = {
       },
       errors: {
         loadFailed: 'Meeting link could not be loaded',
+        accessDenied: 'Your account does not have access to this meeting.',
         displayNameRequired: 'Please enter a display name',
         acceptFailed: 'Meeting link could not be accepted'
       }
@@ -1473,6 +1475,7 @@ const baseMessages = {
     meetingInvite: {
       loading: 'Meeting-Link wird geladen...',
       invalidDescription: 'Dieser Meeting-Link ist ungueltig oder nicht mehr verfuegbar.',
+      requestInvitation: 'Bitte den Gastgeber um eine Einladung.',
       untitled: 'Unbenanntes Meeting',
       fields: {
         displayName: 'Anzeigename',
@@ -1485,7 +1488,7 @@ const baseMessages = {
       },
       buttons: {
         joinAsGuest: 'Als Gast beitreten',
-        openMeeting: 'Meeting oeffnen'
+        retry: 'Erneut versuchen'
       },
       status: {
         scheduled: 'Geplant',
@@ -1494,6 +1497,7 @@ const baseMessages = {
       },
       errors: {
         loadFailed: 'Meeting-Link konnte nicht geladen werden',
+        accessDenied: 'Dein Konto hat keinen Zugriff auf dieses Meeting.',
         displayNameRequired: 'Bitte einen Anzeigenamen eingeben',
         acceptFailed: 'Meeting-Link konnte nicht angenommen werden'
       }

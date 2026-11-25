@@ -571,6 +571,7 @@ export function createApiSession({ http, getBaseUrl }, options = {}) {
   async function restoreBrowserSession(options = {}) {
     const forceRefresh = options?.forceRefresh === true
     const silent = options?.silent === true
+    const preserveSessionOnUnexpectedError = options?.preserveSessionOnUnexpectedError === true
 
     if (!forceRefresh && authState.accessToken && authState.user) {
       return buildAuthReturnPayload()
@@ -615,7 +616,9 @@ export function createApiSession({ http, getBaseUrl }, options = {}) {
           if (!silent && !restoreWarningLogged) {
             logSessionRestoreWarning('refresh_failed', error, diagnosticContext)
           }
-          clearStoredAuth()
+          if (!preserveSessionOnUnexpectedError || error?.response?.status === 401) {
+            clearStoredAuth()
+          }
           throw error
         })
         .finally(() => {

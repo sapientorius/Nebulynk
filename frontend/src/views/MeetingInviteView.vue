@@ -6,7 +6,11 @@
     </n-card>
 
     <n-card v-else-if="error" style="max-width: 460px; width: 100%">
-      <n-result status="error" :title="error" :description="$t('meetingInvite.invalidDescription')" />
+      <n-result status="error" :title="error.title" :description="error.description">
+        <template v-if="error.retryable" #footer>
+          <n-button @click="loadInviteInfo">{{ $t('meetingInvite.buttons.retry') }}</n-button>
+        </template>
+      </n-result>
     </n-card>
 
     <n-card v-else-if="invite" style="max-width: 460px; width: 100%">
@@ -34,7 +38,7 @@
           </div>
         </div>
 
-        <n-form v-if="!isMemberSession" :model="form" @submit.prevent="acceptInvite">
+        <n-form :model="form" @submit.prevent="acceptInvite">
           <n-form-item :label="$t('meetingInvite.fields.displayName')">
             <n-input
               v-model:value="form.displayName"
@@ -56,7 +60,7 @@
           data-testid="meeting-invite-submit"
           @click="acceptInvite"
         >
-          {{ isMemberSession ? $t('meetingInvite.buttons.openMeeting') : $t('meetingInvite.buttons.joinAsGuest') }}
+          {{ $t('meetingInvite.buttons.joinAsGuest') }}
         </n-button>
       </n-space>
     </n-card>
@@ -64,8 +68,21 @@
 </template>
 
 <script>
-import { useMeetingInviteStore, useSessionStore } from '../stores/index.js'
-import { translateApiError } from '../lib/api-error.js'
+import { useMeetingInviteStore, useMeetingsStore, useSessionStore } from '../stores/index.js'
+import { restoreBrowserSession } from '../lib/api.js'
+import { getApiErrorCode, translateApiError } from '../lib/api-error.js'
+import { applyLocaleForUser } from '../lib/i18n.js'
+
+async function canOpenMeeting(meetingId, isCurrent) {
+  try {
+    const meeting = await useMeetingsStore().get(meetingId, { isCurrent })
+    if (!meeting && isCurrent()) throw new Error('Meeting access could not be verified')
+    return !!meeting && meeting.content_access?.allowed !== false
+  } catch (error) {
+    if (error?.response?.status === 403) return false
+    throw error
+  }
+}
 
 export default {
   name: 'MeetingInviteView',
@@ -76,6 +93,7 @@ export default {
       error: null,
       formError: null,
       submitting: false,
+      routeGeneration: 0,
       form: {
         displayName: ''
       }
@@ -88,8 +106,8 @@ export default {
     sessionStore() {
       return useSessionStore()
     },
-    isMemberSession() {
-      return !!this.sessionStore.user && this.sessionStore.user.account_type !== 'guest'
+    inviteToken() {
+      return this.$route.params.token
     },
     inviteStatusLabel() {
       if (!this.invite?.status) return ''
@@ -107,46 +125,99 @@ export default {
       return new Date(this.invite.join_not_before).toLocaleString()
     }
   },
-  async created() {
-    if (this.sessionStore.user?.display_name) {
-      this.form.displayName = this.sessionStore.user.display_name
+  watch: {
+    inviteToken: {
+      immediate: true,
+      handler: 'loadInviteInfo'
     }
-    await this.loadInviteInfo()
+  },
+  beforeUnmount() {
+    this.routeGeneration++
   },
   methods: {
+    isCurrentInvite(generation, token) {
+      return this.routeGeneration === generation && this.inviteToken === token
+    },
     async loadInviteInfo() {
+      const token = this.inviteToken
+      const generation = ++this.routeGeneration
+      const isCurrent = () => this.isCurrentInvite(generation, token)
+      this.loadingInfo = true
+      this.invite = null
+      this.error = null
+      this.formError = null
+      this.submitting = false
+
       try {
-        this.invite = await this.meetingInviteStore.loadInvite(this.$route.params.token)
+        const session = await restoreBrowserSession({
+          silent: true,
+          preserveSessionOnUnexpectedError: true
+        }).catch((error) => {
+          if (error?.response?.status === 401) return null
+          throw error
+        })
+        if (!isCurrent()) return
+
+        const user = session?.accessToken ? session.user : null
+        if (user) applyLocaleForUser(user)
+        const invite = await this.meetingInviteStore.loadInvite(token)
+        if (!isCurrent()) return
+
+        if (!user || user.account_type === 'guest') {
+          this.form.displayName = user?.display_name || ''
+          this.invite = invite
+          return
+        }
+
+        const allowed = await canOpenMeeting(invite.meeting_id, isCurrent)
+        if (!isCurrent()) return
+
+        if (allowed) {
+          await this.$router.replace({ name: 'Meeting', params: { meetingId: invite.meeting_id } })
+        } else {
+          this.error = {
+            title: this.$t('meetingInvite.errors.accessDenied'),
+            description: this.$t('meetingInvite.requestInvitation')
+          }
+        }
       } catch (error) {
-        this.error = translateApiError(error, 'meetingInvite.errors.loadFailed')
+        if (!isCurrent()) return
+        const invalidLink = [400, 404].includes(error?.response?.status)
+          && getApiErrorCode(error)?.startsWith('api.meeting_invite.')
+        this.error = {
+          title: translateApiError(error, 'meetingInvite.errors.loadFailed'),
+          description: invalidLink ? this.$t('meetingInvite.invalidDescription') : undefined,
+          retryable: !invalidLink
+        }
       } finally {
-        this.loadingInfo = false
+        if (isCurrent()) this.loadingInfo = false
       }
     },
     async acceptInvite() {
-      if (this.isMemberSession) {
-        await this.$router.replace(`/meetings/${this.invite.meeting_id}`).catch(() => {})
-        return
-      }
+      if (this.loadingInfo || !this.invite || this.submitting) return
 
       this.formError = null
-      if (!this.form.displayName.trim()) {
+      const displayName = this.form.displayName.trim()
+      if (!displayName) {
         this.formError = this.$t('meetingInvite.errors.displayNameRequired')
         return
       }
 
+      const token = this.inviteToken
+      const generation = this.routeGeneration
       this.submitting = true
       try {
-        const result = await this.meetingInviteStore.acceptInvite({
-          token: this.$route.params.token,
-          displayName: this.form.displayName.trim()
-        })
+        const result = await this.meetingInviteStore.acceptInvite({ token, displayName })
+        if (!this.isCurrentInvite(generation, token)) return
         await this.sessionStore.applyAuthenticationResult(result)
-        await this.$router.replace(`/meetings/${result.meeting.id}`).catch(() => {})
+        if (!this.isCurrentInvite(generation, token)) return
+        await this.$router.replace({ name: 'Meeting', params: { meetingId: result.meeting.id } })
       } catch (error) {
-        this.formError = translateApiError(error, 'meetingInvite.errors.acceptFailed')
+        if (this.isCurrentInvite(generation, token)) {
+          this.formError = translateApiError(error, 'meetingInvite.errors.acceptFailed')
+        }
       } finally {
-        this.submitting = false
+        if (this.isCurrentInvite(generation, token)) this.submitting = false
       }
     }
   }

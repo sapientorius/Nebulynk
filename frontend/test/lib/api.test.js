@@ -438,6 +438,21 @@ describe('auth api helpers', () => {
     })
   })
 
+  it('can preserve stored CSRF for a retry after an unexpected restore error', async () => {
+    const { restoreBrowserSession } = await import('../../src/lib/api.js')
+    const options = { silent: true, preserveSessionOnUnexpectedError: true }
+    localStorage.setItem('nebulynk_csrf_token:client', 'csrf-token')
+    postMock.mockRejectedValueOnce(new Error('Network error')).mockResolvedValueOnce({
+      data: { accessToken: 'restored-token', user: { id: 'member' } }
+    })
+
+    await expect(restoreBrowserSession(options)).rejects.toThrow('Network error')
+    await expect(restoreBrowserSession(options)).resolves.toMatchObject({ accessToken: 'restored-token' })
+    expect(postMock).toHaveBeenLastCalledWith('/auth/session/refresh', {}, expect.objectContaining({
+      headers: expect.objectContaining({ 'X-CSRF-Token': 'csrf-token' })
+    }))
+  })
+
   it('prefers the readable csrf cookie over stale persisted csrf storage', async () => {
     const {
       getStoredAccessToken,
